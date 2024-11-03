@@ -4,3 +4,4 @@ from dataclasses import dataclass
 class Offer:
     player: int
     offer: list[int]
+    

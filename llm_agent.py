@@ -1,0 +1,99 @@
+from agent import Agent
+from offer import Offer
+import json
+
+from agent import Agent
+from offer import Offer
+import json
+
+class LLMAgent(Agent):
+    def __init__(self, llm_type="llama", api_key=None, player_num=None):
+        super().__init__(llm_type=llm_type, api_key=api_key)
+        self.player_num = player_num
+        self.llm_type = llm_type
+        
+    def give_offer(self, prompt: str) -> Offer | bool:
+        system_prompt = """You are an AI negotiator participating in a negotiation game. Your goal is to maximize your value while making reasonable offers.
+
+        You must respond in one of these formats ONLY:
+        1. {"action": "ACCEPT"} - to accept the current offer
+        2. {"action": "WALK"} - to walk away from negotiations
+        3. {"action": "COUNTEROFFER", "offer": [n1, n2, n3, n4]} - where n1-n4 are numbers representing your counteroffer
+
+        Ensure your response is valid JSON and matches one of these exact formats."""
+        
+        if self.llm_type == "llama":
+            api_request = {
+                "model": "llama3.1-405b",
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.7,
+                "max_tokens": 500,
+                "stream": False
+            }
+            
+            try:
+                response = self.llm.run(api_request)
+                # Debug print to see the response structure
+                print("Raw API Response:", response.json())
+                
+                # Extract the content from the response
+                response_data = response.json()
+                if isinstance(response_data, dict) and 'content' in response_data:
+                    content = response_data['content']
+                else:
+                    content = response_data['choices'][0]['message']['content']
+                
+                # Parse the JSON content
+                result = json.loads(content)
+                
+            except Exception as e:
+                print(f"Error with LLM response: {e}")
+                # Print the full response for debugging
+                if 'response' in locals():
+                    print("Full response:", response.json())
+                print("Defaulting to WALK")
+                return False
+                
+        else:  # openai
+            try:
+                response = self.llm.chat.completions.create(
+                    model="gpt-4",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.7,
+                    response_format={ "type": "json_object" }
+                )
+                result = json.loads(response.choices[0].message.content)
+            except Exception as e:
+                print(f"Error with OpenAI response: {e}")
+                print("Defaulting to WALK")
+                return False
+
+        # Validate and process the response
+        try:
+            print("Parsed result:", result)  # Debug print
+            
+            if result["action"] == "ACCEPT":
+                return True
+            elif result["action"] == "WALK":
+                return False
+            elif result["action"] == "COUNTEROFFER":
+                # Validate offer format
+                if not isinstance(result["offer"], list):
+                    print("Invalid offer format, defaulting to WALK")
+                    return False
+                # Ensure all offer values are integers
+                offer = [int(x) for x in result["offer"]]
+                return Offer(player=self.player_num, offer=offer)
+            else:
+                print(f"Invalid action {result['action']}, defaulting to WALK")
+                return False
+        except (KeyError, TypeError, ValueError) as e:
+            print(f"Error processing result: {e}")
+            print("Defaulting to WALK")
+            return False

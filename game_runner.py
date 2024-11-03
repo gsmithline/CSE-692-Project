@@ -15,46 +15,80 @@ class NegotitaionGame:
 
         self.players = [player1_agent, player2_agent]
         
-        self.item_value_range = item_value_range
+        self.item_values = item_value_range
         self.gamma = gamma
         self.max_rounds = max_rounds
-        self.outside_offer_value_range = outside_offer_value_range
+        self.outside_offer_value_range = outside_offer_value_range  # Store the range
+        self.outside_offer_values = None  # Will store the actual values
         self.player_values = {0: None, 1: None}
         self.reset()
 
     def reset(self):
         self.player_values[0] = np.random.randint(self.item_values[0], self.item_values[1], self.num_items)
         self.player_values[1] = np.random.randint(self.item_values[0], self.item_values[1], self.num_items)
-        self.outside_offer_values = np.random.randint(self.outside_offer_values[0], self.outside_offer_values[1], 2)
+        # Fix: Use outside_offer_value_range instead of outside_offer_values
+        self.outside_offer_values = np.random.randint(
+            self.outside_offer_value_range[0], 
+            self.outside_offer_value_range[1], 
+            2
+        )
         self.current_player = 0
         self.history = {0: [], 1: []}
         self.current_offer = None
         self.in_progress = True
 
-    def step(self, offer: Offer):
+    def step(self):  # Remove the 'offer' parameter
+        """Execute one step of the negotiation"""
         agent = self.players[self.current_player]
-        offer = agent.give_offer(make_prompt(
-            T=self.max_rounds,
+    
+        prompt = make_prompt(
+            T=self.num_items,
             quantities=self.items,
             V=self.item_values[1],
             values=self.player_values[self.current_player],
-            W=self.outside_offer_value_range[1],
-            w=self.outside_offer_value_range[self.current_player],
+            W1=self.outside_offer_value_range[1],
+            W2=self.outside_offer_value_range[0],
+            w=self.outside_offer_values[self.current_player],
             R=self.max_rounds,
             g=self.gamma,
-            r=len(self.history[0]) + len(self.history[1])
-        ))
+            r = (len(self.history[0]) + len(self.history[1])) // 2 + 1,
+            history=self.history,
+            current_offer=self.current_offer,
+            player_num=self.current_player  # Add this line
+        ) 
+        print(prompt)
 
-        if offer == True:
+        # Get agent's response
+        offer = agent.give_offer(prompt)
+
+        if offer is True:  # Accept current offer
             self.in_progress = False
-        
-        if self.current_player == 0:
-            self.history[0].append(offer)
-        else:
-            self.history[1].append(offer)
+        elif offer is False:  # Walk away
+            self.in_progress = False
+            self.current_offer = None
+        else:  # New offer
+            self.current_offer = offer
+            if self.current_player == 0:
+                self.history[0].append(offer)
+            else:
+                self.history[1].append(offer)
 
         self.current_player = 1 - self.current_player
 
+    def run(self):
+        """Run the game until completion or max rounds reached"""
+        while self.in_progress and len(self.history[0]) + len(self.history[1]) < self.max_rounds:
+            self.step()
+            
+            print(f"Round {len(self.history[0]) + len(self.history[1])}")
+            print(f"Current player: {self.current_player + 1}")
+            print(f"Current offer: {self.current_offer}")
+        
+        print("\nGame Complete!")
+        if self.current_offer:
+            print("Deal reached!")
+        else:
+            print("No deal reached.")
 
 class GameEvaluator:
     def __init__(self, game: NegotitaionGame):
