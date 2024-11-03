@@ -36,7 +36,7 @@ class NegotitaionGame:
         offer = agent.give_offer(make_prompt(
             T=self.max_rounds,
             quantities=self.items,
-            V=self.item_values[1],
+            V=self.item_value_range[1],
             values=self.player_values[self.current_player],
             W=self.outside_offer_value_range[1],
             w=self.outside_offer_value_range[self.current_player],
