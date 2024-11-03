@@ -64,14 +64,11 @@ class GameEvaluator:
         for player in [0, 1]:
             for offer in self.game.history[player]:
                 if isinstance(offer, Offer):
-                    given_value = sum(self.game.player_values[player][i] * offer.offer[i] 
-                                   for i in range(self.game.num_items))
+                    given_value = np.dot(self.game.player_values[player], offer.offer)
                     
-                    total_value = sum(self.game.player_values[player][i] * self.game.items[i]
-                                    for i in range(self.game.num_items))
+                    total_value = np.dot(self.game.player_values[player], self.game.items)
                     kept_value = total_value - given_value
                     
-                    # Compare with outside offer
                     if kept_value < self.game.outside_offer_values[player]:
                         return False
                         
