@@ -1,20 +1,19 @@
 from offer import Offer
 
 def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: int, W2: int, w: int, R: int, g: float, r: int, history: dict, current_offer: Offer = None, player_num: int = 0) -> str:
-    # Determine player numbers
-    my_player_num = player_num + 1  # Convert to 1-based for display
+    
+    my_player_num = player_num + 1  
     other_player_num = 2 if my_player_num == 1 else 1
     
-    # Format history
-    # Format history
+   
     history_str = ""
     for round_num in range(len(history[0]) + len(history[1])):
         player = round_num % 2
-        round_idx = round_num // 2  # This gives us the actual round number
+        round_idx = round_num // 2  
         if round_idx < len(history[player]):
             offer = history[player][round_idx]
         if isinstance(offer, Offer):
-            # Use round_idx + 1 instead of round_num + 1
+            
             history_str += f"\nRound {round_idx + 1}: Player {player + 1} offered {offer.offer}"
         elif offer is True:
             history_str += f"\nRound {round_idx + 1}: Player {player + 1} ACCEPTED"
@@ -23,23 +22,23 @@ def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: 
 
     current_offer_str = f"\nCurrent offer on the table: {current_offer.offer if current_offer else 'None'}"
     
-    # Determine available actions based on game state
+    
     if r == 1 and my_player_num == 1:
         action_prompt = f"""
         What is your action? As the first player, you can:
         - WALK to walk away
-        - A list of numbers [n1, n2, n3, n4] representing your initial offer (what you give to Player 2)"""
+        - A list of numbers [n1, n2, ...] representing your initial offer (what you give to Player 2)"""
     elif current_offer is None:
         action_prompt = f"""
         What is your action? You can:
         - WALK to walk away
-        - A list of numbers [n1, n2, n3, n4] representing your offer (what you give to Player {other_player_num})"""
+        - A list of numbers [n1, n2, ...] representing your offer (what you give to Player {other_player_num})"""
     else:
         action_prompt = f"""
     What is your action? You can:
     - ACCEPT to accept the current offer
     - WALK to walk away
-    - A list of numbers [n1, n2, n3, n4] representing your counteroffer (what you give to Player {other_player_num})"""
+    - A list of numbers [n1, n2, ...] representing your counteroffer (what you give to Player {other_player_num})"""
 
     return f"""
     You and another agent have to negotiate a division of items between the two of you.

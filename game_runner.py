@@ -18,15 +18,14 @@ class NegotitaionGame:
         self.item_values = item_value_range
         self.gamma = gamma
         self.max_rounds = max_rounds
-        self.outside_offer_value_range = outside_offer_value_range  # Store the range
-        self.outside_offer_values = None  # Will store the actual values
+        self.outside_offer_value_range = outside_offer_value_range  
+        self.outside_offer_values = None  
         self.player_values = {0: None, 1: None}
         self.reset()
 
     def reset(self):
         self.player_values[0] = np.random.randint(self.item_values[0], self.item_values[1], self.num_items)
         self.player_values[1] = np.random.randint(self.item_values[0], self.item_values[1], self.num_items)
-        # Fix: Use outside_offer_value_range instead of outside_offer_values
         self.outside_offer_values = np.random.randint(
             self.outside_offer_value_range[0], 
             self.outside_offer_value_range[1], 
@@ -37,7 +36,7 @@ class NegotitaionGame:
         self.current_offer = None
         self.in_progress = True
 
-    def step(self):  # Remove the 'offer' parameter
+    def step(self):  
         """Execute one step of the negotiation"""
         agent = self.players[self.current_player]
     
@@ -54,7 +53,7 @@ class NegotitaionGame:
             r = (len(self.history[0]) + len(self.history[1])) // 2 + 1,
             history=self.history,
             current_offer=self.current_offer,
-            player_num=self.current_player  # Add this line
+            player_num=self.current_player  
         ) 
         print(prompt)
 
@@ -140,7 +139,6 @@ class GameEvaluator:
         """
         if type(offer) is bool:
             return True
-        # Check non-negative values
         if any(q < 0 for q in offer.offer):
             raise ValueError("Invalid offer: Negative quantities are not allowed")
             
