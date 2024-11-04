@@ -1,8 +1,8 @@
-from agent import Agent
+from agents.agent import Agent
 from offer import Offer
 import json
 
-from agent import Agent
+from agents.agent import Agent
 from offer import Offer
 import json
 
@@ -18,7 +18,7 @@ class LLMAgent(Agent):
         You must respond in one of these formats ONLY:
         1. {"action": "ACCEPT"} - to accept the current offer
         2. {"action": "WALK"} - to walk away from negotiations
-        3. {"action": "COUNTEROFFER", "offer": [n1, n2, n3, n4]} - where n1-n4 are numbers representing your counteroffer. You recieve the items left over in your offer to the other player.
+        3. {"action": "COUNTEROFFER", "offer": [n1, n2, ...]} - where n1, n2, ... are numbers representing your counteroffer. You recieve the items left over from your offer to the other player.
 
         Ensure your response is valid JSON and matches one of these exact formats."""
         

@@ -1,5 +1,5 @@
 from offer import Offer
-from make_prompt import make_prompt
+from prompting.make_prompt import make_prompt
 import numpy as np
 import json
 
@@ -138,7 +138,8 @@ class GameEvaluator:
         - True if offer is valid
         - False if offer is invalid
         """
-       
+        if type(offer) is bool:
+            return True
         # Check non-negative values
         if any(q < 0 for q in offer.offer):
             raise ValueError("Invalid offer: Negative quantities are not allowed")
