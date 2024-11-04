@@ -1,5 +1,5 @@
-from offer import Offer
-from make_prompt import make_prompt
+from utils.offer import Offer
+from prompts.make_prompt import make_prompt
 import numpy as np
 import json
 
