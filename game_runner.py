@@ -30,6 +30,7 @@ class NegotitaionGame:
         self.history = {0: [], 1: []}
         self.current_offer = None
         self.in_progress = True
+        self.current_round = 0
 
     def step(self, offer: Offer):
         agent = self.players[self.current_player]
@@ -45,7 +46,7 @@ class NegotitaionGame:
             r=len(self.history[0]) + len(self.history[1])
         ))
 
-        if offer == True:
+        if offer == True or offer == False:
             self.in_progress = False
         
         if self.current_player == 0:
@@ -54,44 +55,10 @@ class NegotitaionGame:
             self.history[1].append(offer)
 
         self.current_player = 1 - self.current_player
+        if self.current_player == 0:
+            self.current_round += 1
+
+        if self.current_round >= self.max_rounds:
+            self.in_progress = False
 
 
-class GameEvaluator:
-    def __init__(self, game: NegotitaionGame):
-        self.game = game
-
-    def evaluate_outside_offer_consistency(self):
-        for player in [0, 1]:
-            for offer in self.game.history[player]:
-                if isinstance(offer, Offer):
-                    given_value = np.dot(self.game.player_values[player], offer.offer)
-                    
-                    total_value = np.dot(self.game.player_values[player], self.game.items)
-                    kept_value = total_value - given_value
-                    
-                    if kept_value < self.game.outside_offer_values[player]:
-                        return False
-                        
-        return True
-    
-    def evaluate_offer_increasing(self):
-        for player in [0, 1]:
-            opponent = 1 - player
-            for i, offer in enumerate(self.game.history[player]):
-                if isinstance(offer, Offer):
-                    given_value = np.dot(self.game.player_values[player], offer.offer)
-                    total_value = np.dot(self.game.player_values[player], self.game.items)
-                    kept_value = total_value - given_value
-
-                    # Should this have a discount?
-                    if player == 0 and i >= 1:
-                        prev_offer = self.game.history[opponent][i]
-                        opp_offer_value = np.dot(self.game.player_values[player], prev_offer.offer)
-                    else:
-                        prev_offer = self.game.history[opponent][i-1]
-                        opp_offer_value = np.dot(self.game.player_values[player], prev_offer.offer)
-                    
-                    if kept_value < opp_offer_value:
-                        return False
-                        
-        return True
