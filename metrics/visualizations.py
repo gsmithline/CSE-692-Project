@@ -3,14 +3,50 @@ import numpy as np
 
 def plot_discounted_values(rounds, p1_values, p2_values, max_rounds):
     plt.figure(figsize=(10, 6))
-    plt.plot(rounds, p1_values, 'b-o', label='Player 1 Value')
-    plt.plot(rounds, p2_values, 'r-o', label='Player 2 Value')
+    
+    # Separate values by who made the offer
+    p1_offer_indices = [i for i in range(len(rounds)) if i % 2 == 0]  # P1's offers
+    p2_offer_indices = [i for i in range(len(rounds)) if i % 2 == 1]  # P2's offers
+    
+    # Plot 4 separate lines:
+    # Value to P1 from P1's offers (blue circles)
+    plt.plot([rounds[i] for i in p1_offer_indices], 
+             [p1_values[i] for i in p1_offer_indices], 
+             'b-o', label='P1 value from P1 offers', 
+             markerfacecolor='white', markersize=10)
+    
+    # Value to P2 from P1's offers (red circles)
+    plt.plot([rounds[i] for i in p1_offer_indices], 
+             [p2_values[i] for i in p1_offer_indices], 
+             'r-o', label='P2 value from P1 offers', 
+             markerfacecolor='white', markersize=10)
+    
+    # Value to P1 from P2's offers (blue squares)
+    plt.plot([rounds[i] for i in p2_offer_indices], 
+             [p1_values[i] for i in p2_offer_indices], 
+             'b-s', label='P1 value from P2 offers', 
+             markerfacecolor='white', markersize=10)
+    
+    # Value to P2 from P2's offers (red squares)
+    plt.plot([rounds[i] for i in p2_offer_indices], 
+             [p2_values[i] for i in p2_offer_indices], 
+             'r-s', label='P2 value from P2 offers', 
+             markerfacecolor='white', markersize=10)
+    
+    # Add vertical lines to separate rounds
+    for r in range(1, max(rounds)):
+        plt.axvline(x=r+0.5, color='gray', linestyle='--', alpha=0.3)
+    
+    # Customize the plot
     plt.xlabel('Round')
     plt.xticks(range(1, max(rounds)+1))
     plt.ylabel('Discounted Value')
-    plt.title('Discounted Values of Offers Over Time')
-    plt.legend()
-    plt.grid(True)
+    plt.title('Discounted Values by Offer Type\n(○: P1 Offers, □: P2 Counter-offers)')
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.grid(True, alpha=0.3)
+    
+    # Adjust layout to prevent legend cutoff
+    plt.tight_layout()
     plt.show()
 
 def plot_offer_evolution(game, rounds, p1_offers, p2_offers):
