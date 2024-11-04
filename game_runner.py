@@ -61,6 +61,26 @@ class NegotitaionGame:
         # Get agent's response
         offer = agent.give_offer(prompt)
 
+        evaluator = GameEvaluator(self)
+        try:
+            if evaluator.validate_offer(offer):
+                if offer is True:  # Accept current offer
+                    self.in_progress = False
+                elif offer is False:  # Walk away
+                    self.in_progress = False
+                    self.current_offer = None
+                else:  # New offer
+                    self.current_offer = offer
+                    if self.current_player == 0:
+                        self.history[0].append(offer)
+                    else:
+                        self.history[1].append(offer)
+        except ValueError as e:
+            print(f"Game terminated due to invalid offer: {str(e)}")
+            self.in_progress = False
+            self.current_offer = None
+            return
+        '''
         if offer is True:  # Accept current offer
             self.in_progress = False
         elif offer is False:  # Walk away
@@ -72,10 +92,10 @@ class NegotitaionGame:
                 self.history[0].append(offer)
             else:
                 self.history[1].append(offer)
-
+        '''
         self.current_player = 1 - self.current_player
 
-    def run(self):
+    def run(self): 
         """Run the game until completion or max rounds reached"""
         while self.in_progress and len(self.history[0]) + len(self.history[1]) < self.max_rounds:
             self.step()
@@ -106,4 +126,25 @@ class GameEvaluator:
                     if kept_value < self.game.outside_offer_values[player]:
                         return False
                         
+        return True
+
+    def validate_offer(self, offer: Offer):
+        """
+        Validates if an offer is legal:
+        - All quantities must be non-negative
+        - No quantity can exceed available items
+        
+        Returns:
+        - True if offer is valid
+        - False if offer is invalid
+        """
+       
+        # Check non-negative values
+        if any(q < 0 for q in offer.offer):
+            raise ValueError("Invalid offer: Negative quantities are not allowed")
+            
+        # Check if quantities exceed available items
+        if any(q > max_q for q, max_q in zip(offer.offer, self.game.items)):
+            raise ValueError("Invalid offer: Quantities exceed available items")
+            
         return True
