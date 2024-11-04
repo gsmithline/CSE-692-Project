@@ -1,0 +1,31 @@
+1. Discounted Values Over Time: 
+This graph tracks how each player values the proposed divisions over time. 
+Blue lines represent Player 1's perspective, while red lines represent Player 2's. 
+Circles (○) indicate offers made by Player 1, while squares (□) show Player 2's counter-offers. 
+The downward trend in values over rounds reflects the time discount factor (γ), 
+showing how delay reduces the ultimate value of any agreement. 
+When lines converge, it suggests players are approaching a mutually acceptable deal.
+
+2. Offer Evolution Plot
+This visualization shows how players propose to divide each item type across rounds. 
+Each subplot represents one item type, with the y-axis showing how many units are 
+offered to Player 2. Blue lines track Player 1's offers, while red lines show Player 
+2's counter-offers. Converging lines indicate agreement on that item's distribution, 
+while diverging lines highlight items under contention. This helps identify which 
+items are causing negotiation friction and how preferences for different 
+items evolve during bargaining.
+
+3. Negotiation Gap Plot 
+This plot measures the relative difference in value between players' positions, 
+normalized by their total value. The green line shows (P1_value - P2_value)/(P1_value + P2_value), 
+with positive values indicating Player 1 getting more value and negative values favoring Player 2. 
+Values closer to zero suggest more balanced offers. The trend over rounds shows whether players are moving 
+toward or away from equitable solutions, with circles and squares distinguishing between P1 and P2's offers respectively.
+
+4. Basic Fairness Plot
+This visualization shows how the total value is split between players over time. 
+Blue lines show Player 1's share of total value, red lines show Player 2's share, 
+and a green dashed line marks the 50-50 split reference point. Circles indicate P1's offers, 
+squares show P2's counter-offers. This helps assess whether the negotiation is trending 
+toward a fair division of value or if one player is consistently capturing more value than the other. 
+The plot reveals potential power imbalances and whether players are prioritizing fairness in their negotiations.

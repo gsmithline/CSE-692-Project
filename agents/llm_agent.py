@@ -29,10 +29,12 @@ class LLMAgent(Agent):
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt}
                 ],
-                "temperature": 0.7,
                 "max_tokens": 500,
                 "stream": False
             }
+            # "temperature": 0.,
+            #"temperature": 2.0,
+
             
             try:
                 response = self.llm.run(api_request)
