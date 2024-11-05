@@ -1,9 +1,9 @@
 import numpy as np
 from utils.offer import Offer
-from game import NegotiationGame
+from game_runner import NegotitaionGame
 
 class GameEvaluator:
-    def __init__(self, game: NegotiationGame):
+    def __init__(self, game: NegotitaionGame):
         self.game = game
 
     def evaluate_outside_offer_consistency(self):
