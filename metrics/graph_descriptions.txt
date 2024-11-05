@@ -4,7 +4,7 @@ Blue lines represent Player 1's perspective, while red lines represent Player 2'
 Circles (○) indicate offers made by Player 1, while squares (□) show Player 2's counter-offers. 
 The downward trend in values over rounds reflects the time discount factor (γ), 
 showing how delay reduces the ultimate value of any agreement. 
-When lines converge, it suggests players are approaching a mutually acceptable deal.
+
 
 2. Offer Evolution Plot
 This visualization shows how players propose to divide each item type across rounds. 

@@ -141,11 +141,10 @@ def plot_fairness(rounds, p1_values, p2_values):
 def plot_fairness(rounds, p1_values, p2_values):
     plt.figure(figsize=(10, 6))
     
-    # Split by who made the offer
-    p1_offer_indices = [i for i in range(len(rounds)) if i % 2 == 0]  # P1's offers
-    p2_offer_indices = [i for i in range(len(rounds)) if i % 2 == 1]  # P2's offers
+    p1_offer_indices = [i for i in range(len(rounds)) if i % 2 == 0]  
+    p2_offer_indices = [i for i in range(len(rounds)) if i % 2 == 1]  
     
-    # Plot P1's offers
+  
     fairness_p1_offers = [(p1_values[i]/(p1_values[i]+p2_values[i]), 
                           p2_values[i]/(p1_values[i]+p2_values[i])) 
                          for i in p1_offer_indices]
@@ -154,7 +153,7 @@ def plot_fairness(rounds, p1_values, p2_values):
     plt.plot(rounds[::2], [f[1] for f in fairness_p1_offers], 'r-o', 
              label='P2 Share (P1 offers)', markerfacecolor='white')
     
-    # Plot P2's offers
+    
     fairness_p2_offers = [(p1_values[i]/(p1_values[i]+p2_values[i]), 
                           p2_values[i]/(p1_values[i]+p2_values[i])) 
                          for i in p2_offer_indices]
