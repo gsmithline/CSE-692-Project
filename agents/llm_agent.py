@@ -1,10 +1,7 @@
 from agents.agent import Agent
-from offer import Offer
+from utils.offer import Offer
 import json
 
-from agents.agent import Agent
-from offer import Offer
-import json
 
 class LLMAgent(Agent):
     def __init__(self, llm_type="llama", api_key=None, player_num=None):

@@ -1,5 +1,5 @@
-from offer import Offer
-from prompting.make_prompt import make_prompt
+from utils.offer import Offer
+from prompts.make_prompt import make_prompt
 import numpy as np
 import json
 
@@ -15,7 +15,8 @@ class NegotitaionGame:
 
         self.players = [player1_agent, player2_agent]
         
-        self.item_values = item_value_range
+        self.item_value_range = item_value_range
+
         self.gamma = gamma
         self.max_rounds = max_rounds
         self.outside_offer_value_range = outside_offer_value_range  
@@ -24,8 +25,8 @@ class NegotitaionGame:
         self.reset()
 
     def reset(self):
-        self.player_values[0] = np.random.randint(self.item_values[0], self.item_values[1], self.num_items)
-        self.player_values[1] = np.random.randint(self.item_values[0], self.item_values[1], self.num_items)
+        self.player_values[0] = np.random.randint(self.item_value_range[0], self.item_value_range[1], self.num_items)
+        self.player_values[1] = np.random.randint(self.item_value_range[0], self.item_value_range[1], self.num_items)
         self.outside_offer_values = np.random.randint(
             self.outside_offer_value_range[0], 
             self.outside_offer_value_range[1], 
@@ -35,6 +36,7 @@ class NegotitaionGame:
         self.history = {0: [], 1: []}
         self.current_offer = None
         self.in_progress = True
+        self.current_round = 0
 
     def step(self):  
         """Execute one step of the negotiation"""
@@ -43,7 +45,7 @@ class NegotitaionGame:
         prompt = make_prompt(
             T=self.num_items,
             quantities=self.items,
-            V=self.item_values[1],
+            V=self.item_value_range[1],
             values=self.player_values[self.current_player],
             W1=self.outside_offer_value_range[1],
             W2=self.outside_offer_value_range[0],

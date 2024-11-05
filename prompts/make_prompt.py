@@ -1,4 +1,4 @@
-from offer import Offer
+from utils.offer import Offer
 
 def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: int, W2: int, w: int, R: int, g: float, r: int, history: dict, current_offer: Offer = None, player_num: int = 0) -> str:
     

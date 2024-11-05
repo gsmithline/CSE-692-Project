@@ -1,5 +1,5 @@
 from agents.agent import Agent
-from offer import Offer
+from utils.offer import Offer
 import numpy as np
 
 class SimpleAgent(Agent):

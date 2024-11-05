@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from offer import Offer
+from utils.offer import Offer
 import openai
 from llamaapi import LlamaAPI
 import os
