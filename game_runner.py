@@ -23,6 +23,7 @@ class NegotitaionGame:
         self.outside_offer_values = None  
         self.player_values = {0: None, 1: None}
         self.reset()
+        self.final_action_player = self.players[1] #default to player 2 as the final action player of final player in final round
 
     def reset(self):
         self.player_values[0] = np.random.randint(self.item_value_range[0], self.item_value_range[1], self.num_items)
@@ -67,9 +68,11 @@ class NegotitaionGame:
             if evaluator.validate_offer(offer):
                 if offer is True:  # Accept current offer
                     self.in_progress = False
+                    self.final_action_player = self.players[self.current_player]
                 elif offer is False:  # Walk away
                     self.in_progress = False
                     self.current_offer = None
+                    self.final_action_player = self.players[self.current_player]
                 else:  # New offer
                     self.current_offer = offer
                     if self.current_player == 0:
