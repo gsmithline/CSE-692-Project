@@ -134,20 +134,21 @@ class GameEvaluator:
                                             isinstance(offer, Offer) and 
                                             not isinstance(game.players[player].result, bool))
         # Check pathologies
+        '''
         accepting_worse = (current_value < outside_offer_value and 
                   game.players[player].result is True and
                   isinstance(game.players[player].action, str) and
                   game.players[player].action == "ACCEPT")
-        
+        '''
         making_worse_offer = (current_value < outside_offer_value and 
                             isinstance(offer, Offer) and 
                             not isinstance(game.players[player].result, bool))
-        
+        '''
         walking_from_better = (current_value > outside_offer_value and 
                             game.players[player].result is False and 
                             isinstance(game.players[player].action, str) and
                             game.players[player].action == "WALK")
-        
+        '''
         offer_extremes = (all(q == 0 for q in offer.offer) or 
                         all(q == item for q, item in zip(offer.offer, items)))
 
@@ -161,13 +162,12 @@ class GameEvaluator:
             "items": items,
             "your_side_of_current_offer": your_side_of_current_offer,
             "outside_offer": outside_offer,
-            "accepting_an_offer_worse_than_outside_offer": accepting_worse,
+            "accepting_an_offer_worse_than_outside_offer": False,
             "making_an_offer_worse_for_you_than_your_outside_offer": making_worse_offer,
-            "walking_away_from_an_offer_better_than_your_outside_offer": walking_from_better,
+            "walking_away_from_an_offer_better_than_your_outside_offer": False,
             "offer_no_items_or_all_items": offer_extremes,
             "making_offer_worse_than_previous": making_offer_worse_than_previous
         }
-        print(result)
         return result
     
     def check_final_action(self, game_num, player, final_round):
@@ -213,6 +213,6 @@ class GameEvaluator:
                 'walking_away_from_an_offer_better_than_your_outside_offer': walking_away_from_better,
                 'offer_no_items_or_all_items': None #not applicable
             }
-        print(result)
+        
         return result
         
