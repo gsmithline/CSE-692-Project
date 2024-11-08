@@ -129,7 +129,7 @@ class GameEvaluator:
         if round_num > 0 and len(game.history[1-player]) >= round_num:
             previous_offer = game.history[1-player][round_num-1]
             your_side_of_previous_offer = items - np.array(previous_offer.offer)
-            previous_value = np.dot(your_side_of_previous_offer, value) * game.gamma ** round_num
+            previous_value = np.dot(your_side_of_previous_offer, value) * game.gamma ** (round_num - 1)
             making_offer_worse_than_previous = (current_value < previous_value and 
                                             isinstance(offer, Offer) and 
                                             not isinstance(game.players[player].result, bool))
@@ -144,7 +144,9 @@ class GameEvaluator:
                             not isinstance(game.players[player].result, bool))
         
         walking_from_better = (current_value > outside_offer_value and 
-                            game.players[player].result is False)
+                            game.players[player].result is False and 
+                            isinstance(game.players[player].action, str) and
+                            game.players[player].action == "WALK")
         
         offer_extremes = (all(q == 0 for q in offer.offer) or 
                         all(q == item for q, item in zip(offer.offer, items)))
@@ -190,11 +192,10 @@ class GameEvaluator:
             outside_offer_value = outside_offer * game.gamma ** (final_round)
             
             # Check pathologies based on final action
-            if game.final_action_player.action == "WALK":
+            if game.final_action_player.action == "WALK" or game.final_action_player.action == "COUNTEROFFER":
                 walking_away_from_better = (value_of_last_offer_to_you > outside_offer_value)
             elif game.final_action_player.action == "ACCEPT" or game.final_action_player.action == "COUNTEROFFER":
                 accepting_worse = (value_of_last_offer_to_you < outside_offer_value)
-            #outside_offer_rational = value_of_last_offer_to_you  >= outside_offer * game.gamma ** (final_round)
             result = {
                 'game_num': game_num,
                 'round_num': final_round + 1,
