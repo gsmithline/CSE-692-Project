@@ -35,7 +35,6 @@ class LLMAgent(Agent):
             # "temperature": 0.,
             #"temperature": 2.0,
 
-            
             try:
                 response = self.llm.run(api_request)
                 print("Raw API Response:", response.json())

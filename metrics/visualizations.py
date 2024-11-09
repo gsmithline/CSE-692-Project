@@ -7,7 +7,7 @@ def plot_discounted_values(rounds, p1_values, p2_values, max_rounds):
     p1_offer_indices = [i for i in range(len(rounds)) if i % 2 == 0]  # P1's offers
     p2_offer_indices = [i for i in range(len(rounds)) if i % 2 == 1]  # P2's offers
     
-    
+    # Plot P1 offers at integer rounds
     plt.plot([rounds[i] for i in p1_offer_indices], 
              [p1_values[i] for i in p1_offer_indices], 
              'b-o', label='P1 value from P1 offers', 
@@ -18,12 +18,13 @@ def plot_discounted_values(rounds, p1_values, p2_values, max_rounds):
              'r-o', label='P2 value from P1 offers', 
              markerfacecolor='white', markersize=10)
     
-    plt.plot([rounds[i] for i in p2_offer_indices], 
+    # Plot P2 offers at x.5 rounds
+    plt.plot([rounds[i] + 0.5 for i in p2_offer_indices], 
              [p1_values[i] for i in p2_offer_indices], 
              'b-s', label='P1 value from P2 offers', 
              markerfacecolor='white', markersize=10)
     
-    plt.plot([rounds[i] for i in p2_offer_indices], 
+    plt.plot([rounds[i] + 0.5 for i in p2_offer_indices], 
              [p2_values[i] for i in p2_offer_indices], 
              'r-s', label='P2 value from P2 offers', 
              markerfacecolor='white', markersize=10)
@@ -32,7 +33,7 @@ def plot_discounted_values(rounds, p1_values, p2_values, max_rounds):
         plt.axvline(x=r+0.5, color='gray', linestyle='--', alpha=0.3)
     
     plt.xlabel('Round')
-    plt.xticks(range(1, max(rounds)+1))
+    plt.xticks([i + 0.5 for i in range(0, max(rounds)+1)], [f"{i+1}" if i % 1 == 0 else f"{i+0.5}" for i in range(0, max(rounds)+1)])
     plt.ylabel('Discounted Value')
     plt.title('Discounted Values by Offer Type\n(○: P1 Offers, □: P2 Counter-offers)')
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
@@ -61,13 +62,17 @@ def plot_offer_evolution(game, rounds, p1_offers, p2_offers):
         row = i // 2
         col = i % 2
         
-        # Plot with consistent round numbers
-        axs[row, col].plot(valid_rounds, [h[i] for h in p1_offers], 'b-o', label='P1 Offers')
-        axs[row, col].plot(valid_rounds, [h[i] for h in p2_offers], 'r-o', label='P2 Offers')
+        # Plot P1 offers at integer rounds and P2 offers at x.5 rounds
+        p1_x = list(valid_rounds)
+        p2_x = [r + 0.5 for r in valid_rounds]
+        
+        axs[row, col].plot(p2_x, [h[i] for h in p1_offers], 'b-o', label='P1 Offers')
+        axs[row, col].plot(p1_x, [h[i] for h in p2_offers], 'r-o', label='P2 Offers')
         axs[row, col].set_title(f'Item {i+1}')
         axs[row, col].set_xlabel('Round')
         axs[row, col].set_ylabel('Units')
-        axs[row, col].set_xticks(range(1, max(valid_rounds) + 1))
+        axs[row, col].set_xticks([j + 0.5 for j in range(0, max(valid_rounds)+1)])
+        axs[row, col].set_xticklabels([f"{j+1}" if j % 1 == 0 else f"{j+0.5}" for j in range(0, max(valid_rounds)+1)])
         axs[row, col].set_yticks(range(0, game.items[i] + 1))
         axs[row, col].legend()
         axs[row, col].grid(True, alpha=0.3)
@@ -78,6 +83,7 @@ def plot_offer_evolution(game, rounds, p1_offers, p2_offers):
     
     plt.tight_layout()
     plt.show()
+
 def plot_negotiation_gap(rounds, p1_values, p2_values):
     plt.figure(figsize=(10, 6))
     
@@ -88,7 +94,7 @@ def plot_negotiation_gap(rounds, p1_values, p2_values):
     # Calculate gaps for P1's offers
     gaps_p1_offers = [(p1_values[i] - p2_values[i])/(p1_values[i] + p2_values[i]) 
                       for i in p1_offer_indices]
-    plt.plot(rounds[::2], gaps_p1_offers, 'g-o', 
+    plt.plot([r + 0.5 for r in rounds[::2]], gaps_p1_offers, 'g-o', 
              label='Value Gap (P1 offers)', markerfacecolor='white')
     
     # Calculate gaps for P2's offers
@@ -101,7 +107,7 @@ def plot_negotiation_gap(rounds, p1_values, p2_values):
     plt.xlabel('Round')
     plt.ylabel('Normalized Value Difference (P1 - P2)/(P1 + P2)')
     plt.title('Normalized Negotiation Gap Over Time\n(○: P1 Offers, □: P2 Counter-offers)')
-    plt.xticks(range(1, max(rounds)+1))
+    plt.xticks([i + 0.5 for i in range(0, max(rounds)+1)], [f"{i+1}" if i % 1 == 0 else f"{i+0.5}" for i in range(0, max(rounds)+1)])
     plt.legend()
     plt.grid(True)
     plt.show()
