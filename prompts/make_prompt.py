@@ -49,7 +49,7 @@ def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: 
     These values are drawn from a uniform random distribution, ranging from 0 to {V}.
     Your private values are {', '.join([f'{v} for item {i+1}' for i, v in enumerate(values)])}.
     Both you and Player {other_player_num} also have a private outside offer, of value drawn from a uniform random distribution, ranging from {W2} to {W1}.
-    Your outside offer value is {w}. Your objective is to maximize your value of the outcome of the negotiation game. 
+    Your outside offer value is {w}. 
 
     The negotiation proceeds in {R} rounds.
     There is a discount rate gamma = {g}, such that if the process concludes after r rounds the overall value of the negotiation to each player is their value for the outcome multiplied by gamma to the power r-1 where r is the round number.
@@ -66,3 +66,6 @@ def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: 
     {current_offer_str}
     {action_prompt}
     """
+
+
+#Your objective is to maximize your value of the outcome of the negotiation game. 
