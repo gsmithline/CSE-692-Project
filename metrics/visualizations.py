@@ -4,36 +4,47 @@ import numpy as np
 def plot_discounted_values(rounds, p1_values, p2_values, max_rounds):
     plt.figure(figsize=(10, 6))
     
+    # Determine the indices for P1 and P2 offers
     p1_offer_indices = [i for i in range(len(rounds)) if i % 2 == 0]  # P1's offers
     p2_offer_indices = [i for i in range(len(rounds)) if i % 2 == 1]  # P2's offers
     
     # Plot P1 offers at integer rounds
-    plt.plot([rounds[i] for i in p1_offer_indices], 
+    p1_x = [rounds[i] for i in p1_offer_indices]
+    plt.plot(p1_x, 
              [p1_values[i] for i in p1_offer_indices], 
              'b-o', label='P1 value from P1 offers', 
              markerfacecolor='white', markersize=10)
     
-    plt.plot([rounds[i] for i in p1_offer_indices], 
+    plt.plot(p1_x, 
              [p2_values[i] for i in p1_offer_indices], 
              'r-o', label='P2 value from P1 offers', 
              markerfacecolor='white', markersize=10)
     
     # Plot P2 offers at x.5 rounds
-    plt.plot([rounds[i] + 0.5 for i in p2_offer_indices], 
+    p2_x = [rounds[i] + 0.5 for i in p2_offer_indices]
+    plt.plot(p2_x, 
              [p1_values[i] for i in p2_offer_indices], 
              'b-s', label='P1 value from P2 offers', 
              markerfacecolor='white', markersize=10)
     
-    plt.plot([rounds[i] + 0.5 for i in p2_offer_indices], 
+    plt.plot(p2_x, 
              [p2_values[i] for i in p2_offer_indices], 
              'r-s', label='P2 value from P2 offers', 
              markerfacecolor='white', markersize=10)
     
-    for r in range(1, max(rounds)):
-        plt.axvline(x=r+0.5, color='gray', linestyle='--', alpha=0.3)
+    # Draw vertical lines to separate rounds
+    for r in range(1, max_rounds + 1):
+        plt.axvline(x=r - 0.5, color='gray', linestyle='--', alpha=0.3)
+    
+    # Set x-ticks at both integer and half-integer positions
+    xticks = []
+    xticklabels = []
+    for i in range(1, max_rounds + 1):
+        xticks.extend([i - 0.5, i])
+        xticklabels.extend(['', str(i)])
+    plt.xticks(xticks, xticklabels)
     
     plt.xlabel('Round')
-    plt.xticks([i + 0.5 for i in range(0, max(rounds)+1)], [f"{i+1}" if i % 1 == 0 else f"{i+0.5}" for i in range(0, max(rounds)+1)])
     plt.ylabel('Discounted Value')
     plt.title('Discounted Values by Offer Type\n(○: P1 Offers, □: P2 Counter-offers)')
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
@@ -53,34 +64,41 @@ def plot_offer_evolution(game, rounds, p1_offers, p2_offers):
     print(f"Number of P2 offers: {len(p2_offers)}")
     
     # Use the actual number of rounds we have data for
-    valid_rounds = range(1, max(len(p1_offers), len(p2_offers)) + 1)
+    max_round = max(len(p1_offers), len(p2_offers))
+    valid_rounds = range(1, max_round + 1)
     
-    # Make sure axs is always 2D
     axs = np.array(axs).reshape(num_rows, 2)
     
     for i in range(game.num_items):
         row = i // 2
         col = i % 2
         
-        # Plot P1 offers at integer rounds and P2 offers at x.5 rounds
         p1_x = list(valid_rounds)
-        p2_x = [r + 0.5 for r in valid_rounds]
+        p2_x = [r + 0.5 for r in valid_rounds[:len(p2_offers)]]
         
-        axs[row, col].plot(p2_x, [h[i] for h in p1_offers], 'b-o', label='P1 Offers')
-        axs[row, col].plot(p1_x, [h[i] for h in p2_offers], 'r-o', label='P2 Offers')
+        axs[row, col].plot(p1_x[:len(p1_offers)], [h[i] for h in p1_offers], 'b-o', label='P1 Offers')
+        axs[row, col].plot(p2_x, [h[i] for h in p2_offers], 'r-o', label='P2 Offers')
         axs[row, col].set_title(f'Item {i+1}')
         axs[row, col].set_xlabel('Round')
         axs[row, col].set_ylabel('Units')
-        axs[row, col].set_xticks([j + 0.5 for j in range(0, max(valid_rounds)+1)])
-        axs[row, col].set_xticklabels([f"{j+1}" if j % 1 == 0 else f"{j+0.5}" for j in range(0, max(valid_rounds)+1)])
+        
+        xticks = []
+        xticklabels = []
+        for r in range(1, max_round + 1):
+            xticks.append(r)
+            xticklabels.append(str(r))
+            xticks.append(r + 0.5)
+            xticklabels.append('')
+        axs[row, col].set_xticks(xticks)
+        axs[row, col].set_xticklabels(xticklabels)
+        
         axs[row, col].set_yticks(range(0, game.items[i] + 1))
         axs[row, col].legend()
         axs[row, col].grid(True, alpha=0.3)
-    
-    # Remove extra subplot if odd number of items
+        
     if game.num_items % 2 == 1:
         fig.delaxes(axs[-1, -1])
-    
+        
     plt.tight_layout()
     plt.show()
 
