@@ -49,15 +49,16 @@ def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: 
     These values are drawn from a uniform random distribution, ranging from 0 to {V}.
     Your private values are {', '.join([f'{v} for item {i+1}' for i, v in enumerate(values)])}.
     Both you and Player {other_player_num} also have a private outside offer, of value drawn from a uniform random distribution, ranging from {W2} to {W1}.
-    Your outside offer value is {w}. 
+    Your outside offer value is {w}. Your objective is to maximize your value of the outcome of the negotiation game.
 
     The negotiation proceeds in {R} rounds.
     There is a discount rate gamma = {g}, such that if the process concludes after r rounds the overall value of the negotiation to each player is their value for the outcome multiplied by gamma to the power r-1 where r is the round number.
     At each round, Player 1 takes an action, followed by Player 2.
-    The possible actions are to ACCEPT the other player's current offer (if any), make a COUNTEROFFER, or WALK away. If the game gets to the last round, and player 2 chooses to make a counteroffer, this is treated as a WALK.
+    The possible actions are to ACCEPT the other player's current offer (if any), make a COUNTEROFFER, or WALK away.  If the game gets to the last round, and player 2 chooses to make a counteroffer, this is treated as a WALK.
     If a player chooses ACCEPT, the negotiation ends in a deal to divide the items according to the accepted offer.
     Each player receives a value for this outcome determined by their private values per unit of each item, and the units they get in the deal.
     If a player chooses WALK, the negotiation ends without a deal, and each player receives the value of their private outside offer.
+    The action you decide out of these three actions is all you should provide in your response.
     Otherwise, the player chooses to provide a counteroffer for how to divide the items, and the negotiation proceeds.
 
     It is now round {r}.

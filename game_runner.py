@@ -80,11 +80,13 @@ class NegotitaionGame:
                         self.history[0].append(offer)
                     else:
                         self.history[1].append(offer)
-        except ValueError as e:
+        except ValueError as e: #If offer is invalid, terminate game and treat as walk away
             print(f"Game terminated due to invalid offer: {str(e)}")
             self.in_progress = False
             self.current_offer = None
-            return
+            self.final_action_player = self.players[self.current_player]
+            offer = False
+            
         '''
         if offer is True:  # Accept current offer
             self.in_progress = False

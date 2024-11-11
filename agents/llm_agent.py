@@ -28,7 +28,6 @@ class LLMAgent(Agent):
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt}
                 ],
-                'temperature': 1.0,
                 "max_tokens": 500,
                 "stream": False
             }
@@ -51,7 +50,12 @@ class LLMAgent(Agent):
                 print(f"Error with LLM response: {e}")
                 if 'response' in locals():
                     print("Full response:", response.json())
+                self.result = False
+                result = {}
+                result["action"] = "WALK"
+                self.action = "WALK"
                 print("Defaulting to WALK")
+                
                 return False
                 
         else: #OTHER LLM MODELS
@@ -69,6 +73,8 @@ class LLMAgent(Agent):
             except Exception as e:
                 print(f"Error with OpenAI response: {e}")
                 print("Defaulting to WALK")
+                self.result = False
+                self.action = "WALK"
                 return False
 
         try:
@@ -85,6 +91,9 @@ class LLMAgent(Agent):
             elif result["action"] == "COUNTEROFFER":
                 if not isinstance(result["offer"], list):
                     print("Invalid offer format, defaulting to WALK")
+                    self.result = False
+                    result["action"] = "WALK"
+                    self.action = "WALK"
                     return False
                 offer = [int(x) for x in result["offer"]]
                 self.result = Offer(player=self.player_num, offer=offer)
@@ -92,8 +101,14 @@ class LLMAgent(Agent):
                 return Offer(player=self.player_num, offer=offer)
             else:
                 print(f"Invalid action {result['action']}, defaulting to WALK")
+                self.result = False
+                self.action = "WALK"
+                result["action"] = "WALK"
                 return False
         except (KeyError, TypeError, ValueError) as e:
             print(f"Error processing result: {e}")
             print("Defaulting to WALK")
+            self.result = False
+            self.action = "WALK"
+            result["action"] = "WALK"
             return False
