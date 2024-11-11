@@ -2,10 +2,10 @@ from utils.offer import Offer
 from prompts.make_prompt import make_prompt
 import numpy as np
 import json
-
+import pandas as pd
 
 class NegotitaionGame:
-    def __init__(self, player1_agent, player2_agent, num_items=4, item_value_range=[0, 101], gamma=0.9, max_rounds=10, outside_offer_value_range=[0, 101]):
+    def __init__(self, player1_agent, player2_agent, num_items=4, item_value_range=[0, 101], gamma=0.9, max_rounds=10, outside_offer_value_range=[0, 101], game_results=pd.DataFrame()):
         if type(num_items) == int:
             self.items = np.random.poisson(4, num_items)
             self.num_items = num_items
@@ -16,6 +16,7 @@ class NegotitaionGame:
         self.players = [player1_agent, player2_agent]
         
         self.item_value_range = item_value_range
+        self.game_results = game_results
 
         self.gamma = gamma
         self.max_rounds = max_rounds
@@ -23,6 +24,7 @@ class NegotitaionGame:
         self.outside_offer_values = None  
         self.player_values = {0: None, 1: None}
         self.reset()
+        self.final_action_player = self.players[1] #default to player 2 as the final action player of final player in final round
 
     def reset(self):
         self.player_values[0] = np.random.randint(self.item_value_range[0], self.item_value_range[1], self.num_items)
@@ -67,20 +69,24 @@ class NegotitaionGame:
             if evaluator.validate_offer(offer):
                 if offer is True:  # Accept current offer
                     self.in_progress = False
+                    self.final_action_player = self.players[self.current_player]
                 elif offer is False:  # Walk away
                     self.in_progress = False
                     self.current_offer = None
+                    self.final_action_player = self.players[self.current_player]
                 else:  # New offer
                     self.current_offer = offer
                     if self.current_player == 0:
                         self.history[0].append(offer)
                     else:
                         self.history[1].append(offer)
-        except ValueError as e:
+        except ValueError as e: #If offer is invalid, terminate game and treat as walk away
             print(f"Game terminated due to invalid offer: {str(e)}")
             self.in_progress = False
             self.current_offer = None
-            return
+            self.final_action_player = self.players[self.current_player]
+            offer = False
+            
         '''
         if offer is True:  # Accept current offer
             self.in_progress = False

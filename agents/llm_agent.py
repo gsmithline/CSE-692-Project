@@ -8,6 +8,8 @@ class LLMAgent(Agent):
         super().__init__(llm_type=llm_type, api_key=api_key)
         self.player_num = player_num
         self.llm_type = llm_type
+        self.result = None
+        self.action = None
         
     def give_offer(self, prompt: str) -> Offer | bool:
         system_prompt = """You are an AI negotiator participating in a negotiation game. 
@@ -32,7 +34,6 @@ class LLMAgent(Agent):
             # "temperature": 0.,
             #"temperature": 2.0,
 
-            
             try:
                 response = self.llm.run(api_request)
                 print("Raw API Response:", response.json())
@@ -49,7 +50,12 @@ class LLMAgent(Agent):
                 print(f"Error with LLM response: {e}")
                 if 'response' in locals():
                     print("Full response:", response.json())
+                self.result = False
+                result = {}
+                result["action"] = "WALK"
+                self.action = "WALK"
                 print("Defaulting to WALK")
+                
                 return False
                 
         else: #OTHER LLM MODELS
@@ -60,32 +66,49 @@ class LLMAgent(Agent):
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": prompt}
                     ],
-                    temperature=0.7,
                     response_format={ "type": "json_object" }
                 )
                 result = json.loads(response.choices[0].message.content)
+                self.result = result
             except Exception as e:
                 print(f"Error with OpenAI response: {e}")
                 print("Defaulting to WALK")
+                self.result = False
+                self.action = "WALK"
                 return False
 
         try:
             print("Parsed result:", result)
             
             if result["action"] == "ACCEPT":
+                self.result = True
+                self.action = "ACCEPT"
                 return True
             elif result["action"] == "WALK":
+                self.result = False
+                self.action = "WALK"
                 return False
             elif result["action"] == "COUNTEROFFER":
                 if not isinstance(result["offer"], list):
                     print("Invalid offer format, defaulting to WALK")
+                    self.result = False
+                    result["action"] = "WALK"
+                    self.action = "WALK"
                     return False
                 offer = [int(x) for x in result["offer"]]
+                self.result = Offer(player=self.player_num, offer=offer)
+                self.action = "COUNTEROFFER"
                 return Offer(player=self.player_num, offer=offer)
             else:
                 print(f"Invalid action {result['action']}, defaulting to WALK")
+                self.result = False
+                self.action = "WALK"
+                result["action"] = "WALK"
                 return False
         except (KeyError, TypeError, ValueError) as e:
             print(f"Error processing result: {e}")
             print("Defaulting to WALK")
+            self.result = False
+            self.action = "WALK"
+            result["action"] = "WALK"
             return False
