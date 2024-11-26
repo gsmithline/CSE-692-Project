@@ -1,11 +1,12 @@
 import numpy as np
 from utils.offer import Offer
-from game import NegotiationGame
+from game_runner import NegotitaionGame
 
 class GameEvaluator:
-    def __init__(self, game: NegotiationGame):
+    def __init__(self, game: NegotitaionGame):
         self.game = game
-
+        self.pathology_counter_1 = 0
+        self.pathology_counter_2 = 0
     def evaluate_outside_offer_consistency(self):
         for player in [0, 1]:
             for offer in self.game.history[player]:
@@ -41,3 +42,11 @@ class GameEvaluator:
                         return False
                         
         return True
+    
+    def offer_no_items_or_all_items(self, game_round = 0, player = 0):
+        offer = self.game.history[player][game_round]
+        if isinstance(offer, Offer):
+            all_zeros = all(val == 0 for val in offer.offer)
+            all_max = all(val == item for val, item in zip(offer.offer, self.game.items))
+            return all_zeros or all_max
+        return False
