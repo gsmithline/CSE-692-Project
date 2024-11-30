@@ -1,0 +1,11 @@
+game_num,outside_offer_consistency,offer_increasing,envy_free_strict,envy_free_exclude_one_item
+0,False,False,True,True
+1,False,False,False,True
+2,False,True,True,True
+3,False,False,False,True
+4,True,False,False,False
+5,True,True,True,True
+6,False,True,True,True
+7,True,True,True,True
+8,False,True,False,True
+9,False,True,True,True
