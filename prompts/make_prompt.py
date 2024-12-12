@@ -20,7 +20,7 @@ def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: 
         elif offer is False:
             history_str += f"\nRound {round_idx + 1}: Player {player + 1} WALKED away"  
 
-    current_offer_str = f"\nCurrent offer on the table: {current_offer.offer if current_offer else 'None'}"
+    current_offer_str = f"\nCurrent offer on the table (the amount of each item being offered to you): {current_offer.offer if current_offer else 'None'}"
     
     
     if r == 1 and my_player_num == 1:
@@ -47,9 +47,20 @@ def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: 
     There are {', '.join([f'{q} units of item {i+1}' for i, q in enumerate(quantities)])} to divide.
     Both you and Player {other_player_num} have a private value per unit of each item type.
     These values are drawn from a uniform random distribution, ranging from 0 to {V}.
-    Your private values are {', '.join([f'{v} for item {i+1}' for i, v in enumerate(values)])}.
+    Your private values are {', '.join([str(v) + ' for item ' + str(i+1) for i, v in enumerate(values)])}.
     Both you and Player {other_player_num} also have a private outside offer, of value drawn from a uniform random distribution, ranging from {W2} to {W1}.
-    Your outside offer value is {w}. Your objective is to maximize your value of the outcome of the negotiation game.
+    Your outside offer value is {w}. Your objective is to maximize your value of the outcome of the negotiation game. Remember, you have a guaranteed alternative: your outside offer.
+
+    Before making any counteroffer, you should calculate its total value to you and compare it to your outside offer value of {w}. For example, if you were considering offering the other player 2 units of each item (keeping 3 units of each for yourself), you would calculate:
+    3 units of item 1 = 3 × {values[0]} = {3*values[0]} (multiplying units by your value per unit)
+    3 units of item 2 = 3 × {values[1]} = {3*values[1]} (multiplying units by your value per unit)
+    3 units of item 3 = 3 × {values[2]} = {3*values[2]} (multiplying units by your value per unit)
+    3 units of item 4 = 3 × {values[3]} = {3*values[3]} (multiplying units by your value per unit)
+    3 units of item 5 = 3 × {values[4]} = {3*values[4]} (multiplying units by your value per unit)
+    Total value = {sum([3*values[i] for i in range(T)])} (sum of all item values)
+    
+    This would be {'greater than' if sum([3*values[i] for i in range(T)]) > w else 'less than'} your outside offer of {w}.
+    Only make offers where your portion has greater value than your outside offer.
 
     The negotiation proceeds in {R} rounds.
     There is a discount rate gamma = {g}, such that if the process concludes after r rounds the overall value of the negotiation to each player is their value for the outcome multiplied by gamma to the power r-1 where r is the round number.
@@ -58,15 +69,36 @@ def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: 
     If a player chooses ACCEPT, the negotiation ends in a deal to divide the items according to the accepted offer.
     Each player receives a value for this outcome determined by their private values per unit of each item, and the units they get in the deal.
     If a player chooses WALK, the negotiation ends without a deal, and each player receives the value of their private outside offer.
-    The action you decide out of these three actions is all you should provide in your response.
-    Otherwise, the player chooses to provide a counteroffer for how to divide the items, and the negotiation proceeds.
+
+    Let's solve this step by step:
+
+    1) First, let's analyze the current situation:
+    - What is my outside offer value? 
+    - What are my item values?
+    - What is the current offer (if any)?
+    - What round are we in and what is the discount factor?
+
+    2) Then, let's calculate:
+    - For the current offer (if any): What would be my total value if I accept?
+    - For potential counteroffers: What would be my total value for different divisions?
+    - How do these compare to my outside offer value?
+    - How does the discount factor affect these values?
+
+    3) Finally, let's decide:
+    - Should I accept the current offer?
+    - Should I walk away with my outside offer?
+    - Or should I make a specific counteroffer?
+
+    Please show your reasoning step by step, then provide your response in exactly one of these formats (if you do not do this your response will be invalid and treated as a WALK):
+    {{"action": "ACCEPT"}} - to accept the current offer
+    {{"action": "WALK"}} - to walk away from negotiations  
+    {{"action": "COUNTEROFFER", "offer": [n1, n2, ...]}} - where n1, n2, ... are numbers representing your counteroffer
+
+    Any response not in these exact formats will be invalid and treated as a WALK. If you provide a counteroffer, it must be a valid offer, otherwise it will be treated as a WALK.
 
     It is now round {r}.
 
     Negotiation history:{history_str}
     {current_offer_str}
     {action_prompt}
-    """
-
-
-#Your objective is to maximize your value of the outcome of the negotiation game. 
+"""
