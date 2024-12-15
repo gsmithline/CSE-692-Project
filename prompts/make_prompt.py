@@ -60,7 +60,6 @@ def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: 
     Total value = {sum([3*values[i] for i in range(T)])} (sum of all item values)
     
     This would be {'greater than' if sum([3*values[i] for i in range(T)]) > w else 'less than'} your outside offer of {w}.
-    Only make offers where your portion has greater value than your outside offer.
 
     The negotiation proceeds in {R} rounds.
     There is a discount rate gamma = {g}, such that if the process concludes after r rounds the overall value of the negotiation to each player is their value for the outcome multiplied by gamma to the power r-1 where r is the round number.
@@ -84,20 +83,10 @@ def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: 
     - How do these compare to my outside offer value?
     - How does the discount factor affect these values?
 
-    3) Let's evaluate the outcome:
-    - Compare the calculated values from step 2 for each possible action (ACCEPT/WALK/COUNTEROFFER).
-    - Identify which action gives me the highest value after accounting for discounting.
-    - If choosing to COUNTEROFFER or ACCEPT, verify that my chosen action's value exceeds my outside offer.
-    - If choosing to WALK, verify that my outside offer value exceeds the value of the outcome of counter offering or accepting.
-    - If choosing to COUNTEROFFER, double check that my counteroffer is valid and beneficial.
-    - Explain why my chosen action is optimal compared to the alternatives.
-
-    4) Let's decide:
+    3) Let's decide:
     - Should I accept the current offer?
     - Should I walk away with my outside offer?
     - Or should I make a specific COUNTEROFFER?
-    
-   
 
     Please show your reasoning step by step, then provide your action in one of these formats in your response (if you do not do this your response will be invalid and treated as a WALK):
     {{"action": "ACCEPT"}} - to accept the current offer
@@ -113,23 +102,3 @@ def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: 
     {action_prompt}
 """
 
-
-
-
-
-
-
-
-'''
-For example, if you reached a deal where you got two units of each item you'd have:
-    2 units of item 1 = 2 × {values[0]} = {2*values[0]} (multiplying units by value per unit)
-    2 units of item 2 = 2 × {values[1]} = {2*values[1]} (multiplying units by value per unit)
-    2 units of item 3 = 2 × {values[2]} = {2*values[2]} (multiplying units by value per unit)
-    2 units of item 4 = 2 × {values[3]} = {2*values[3]} (multiplying units by value per unit)
-    2 units of item 5 = 2 × {values[4]} = {2*values[4]} (multiplying units by value per unit)
-    Total value = {sum([2*values[i] for i in range(T)])} (sum of all item values)
-    
-    If you were to accept this division, your total value would be {sum([2*values[i] for i in range(T)])}.
-    This would be {'greater than' if sum([2*values[i] for i in range(T)]) > w else 'less than'} your outside offer of {w}.
-    The difference would be {abs(sum([2*values[i] for i in range(T)]) - w)} {'in your favor' if sum([2*values[i] for i in range(T)]) > w else 'against you'}.
-'''
