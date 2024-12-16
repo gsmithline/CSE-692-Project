@@ -1,5 +1,6 @@
 from utils.offer import Offer
 from prompts.make_prompt import make_prompt
+from prompts.make_prompt_bargain import make_prompt_bargain
 import numpy as np
 import json
 import pandas as pd
@@ -74,6 +75,11 @@ class NegotitaionGame:
                     self.in_progress = False
                     self.current_offer = None
                     self.final_action_player = self.players[self.current_player]
+                elif len(offer.offer) != self.num_items:
+                    print("Invalid offer: Incorrect number of items")
+                    self.in_progress = False
+                    self.current_offer = None
+                    self.final_action_player = self.players[self.current_player]
                 else:  # New offer
                     self.current_offer = offer
                     if self.current_player == 0:
@@ -132,6 +138,7 @@ class GameEvaluator:
                     
                     if kept_value < self.game.outside_offer_values[player]:
                         return False
+                    
                         
         return True
 
