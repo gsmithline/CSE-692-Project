@@ -31,18 +31,11 @@ class NegotitaionGame:
         self.player_values[0] = np.random.randint(self.item_value_range[0], self.item_value_range[1], self.num_items) 
         self.player_values[1] = np.random.randint(self.item_value_range[0], self.item_value_range[1], self.num_items)
         
-        # Calculate total value for each player
+
         total_value_player0 = int(np.ceil(np.dot(self.items, self.player_values[0]) * .5)) #NOTE: CHANGE % FOR EXPERIMENTS 
         total_value_player1 = int(np.ceil(np.dot(self.items, self.player_values[1]) * .5))
         
-        # Ensure total values are greater than 1 to avoid issues with randint
-        ''' 
-        if total_value_player0 <= 1:
-            total_value_player0 = 2  # Adjust as needed
-        if total_value_player1 <= 1:
-            total_value_player1 = 2  # Adjust as needed
-        '''
-        # Generate outside offer values individually
+        
         self.outside_offer_values = np.array([
             np.random.randint(1, total_value_player0),
             np.random.randint(1, total_value_player1)

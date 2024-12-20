@@ -101,7 +101,7 @@ class LLMAgent(Agent):
         
         if self.llm_type == "llama":
             api_request = {
-                "model": "llama3.3-70b",
+                "model": "llama3.1-405b",
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt}
