@@ -6,7 +6,7 @@ import json
 import pandas as pd
 
 class NegotitaionGame:
-    def __init__(self, player1_agent, player2_agent, num_items=4, item_value_range=[0, 101], gamma=0.9, max_rounds=10, outside_offer_value_range=[0, 101], game_results=pd.DataFrame(), envy_results=pd.DataFrame()):
+    def __init__(self, player1_agent, player2_agent, num_items=4, item_value_range=[0, 101], gamma=0.9, max_rounds=10, game_results=pd.DataFrame(), envy_results=pd.DataFrame()):
         if type(num_items) == int:
             self.items = np.random.poisson(4, num_items)
             self.num_items = num_items
@@ -21,26 +21,38 @@ class NegotitaionGame:
         self.envy_results = envy_results
         self.gamma = gamma
         self.max_rounds = max_rounds
-        self.outside_offer_value_range = outside_offer_value_range  
+        #self.outside_offer_value_range = outside_offer_value_range  
         self.outside_offer_values = None  
         self.player_values = {0: None, 1: None}
         self.reset()
         self.final_action_player = self.players[1] #default to player 2 as the final action player of final player in final round
 
     def reset(self):
-        self.player_values[0] = np.random.randint(self.item_value_range[0], self.item_value_range[1], self.num_items)
+        self.player_values[0] = np.random.randint(self.item_value_range[0], self.item_value_range[1], self.num_items) 
         self.player_values[1] = np.random.randint(self.item_value_range[0], self.item_value_range[1], self.num_items)
-        self.outside_offer_values = np.random.randint(
-            self.outside_offer_value_range[0], 
-            self.outside_offer_value_range[1], 
-            2
-        )
+        
+        # Calculate total value for each player
+        total_value_player0 = int(np.ceil(np.dot(self.items, self.player_values[0]) * .5)) #NOTE: CHANGE % FOR EXPERIMENTS 
+        total_value_player1 = int(np.ceil(np.dot(self.items, self.player_values[1]) * .5))
+        
+        # Ensure total values are greater than 1 to avoid issues with randint
+        ''' 
+        if total_value_player0 <= 1:
+            total_value_player0 = 2  # Adjust as needed
+        if total_value_player1 <= 1:
+            total_value_player1 = 2  # Adjust as needed
+        '''
+        # Generate outside offer values individually
+        self.outside_offer_values = np.array([
+            np.random.randint(1, total_value_player0),
+            np.random.randint(1, total_value_player1)
+        ])
+        
         self.current_player = 0
         self.history = {0: [], 1: []}
         self.current_offer = None
         self.in_progress = True
         self.current_round = 0
-
     def step(self):  
         """Execute one step of the negotiation"""
         agent = self.players[self.current_player]
@@ -50,15 +62,17 @@ class NegotitaionGame:
             quantities=self.items,
             V=self.item_value_range[1],
             values=self.player_values[self.current_player],
-            W1=self.outside_offer_value_range[1],
-            W2=self.outside_offer_value_range[0],
+            W1= int(np.ceil(np.dot(self.items, self.player_values[0]) * .5)) if self.current_player == 0 else int(np.ceil(np.dot(self.items, self.player_values[1]) * .5)), #NOTE: CHANGE % FOR EXPERIMENTS 
+            W2=1,
             w=self.outside_offer_values[self.current_player],
             R=self.max_rounds,
             g=self.gamma,
             r = (len(self.history[0]) + len(self.history[1])) // 2 + 1,
             history=self.history,
             current_offer=self.current_offer,
-            player_num=self.current_player  
+            player_num=self.current_player,
+            p1_outside_offer=[1, int(np.ceil(np.dot(self.items, self.player_values[0]) * .5))], #NOTE: CHANGE % FOR EXPERIMENTS 
+            p2_outside_offer=[1, int(np.ceil(np.dot(self.items, self.player_values[1]) * .5))]
         ) 
         print(prompt)
 

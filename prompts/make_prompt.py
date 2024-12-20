@@ -1,6 +1,6 @@
 from utils.offer import Offer
-
-def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: int, W2: int, w: int, R: int, g: float, r: int, history: dict, current_offer: Offer = None, player_num: int = 0) -> str:
+import numpy as np
+def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: int, W2: int, w: int, R: int, g: float, r: int, history: dict, current_offer: Offer = None, player_num: int = 0, p1_outside_offer: list[int] = None, p2_outside_offer: list[int] = None) -> str:
     
     my_player_num = player_num + 1  
     other_player_num = 2 if my_player_num == 1 else 1
@@ -48,9 +48,8 @@ def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: 
     Both you and Player {other_player_num} have a private value per unit of each item type.
     These values are drawn from a uniform random distribution, ranging from 0 to {V}.
     Your private values are {', '.join([str(v) + ' for item ' + str(i+1) for i, v in enumerate(values)])}.
-    Both you and Player {other_player_num} also have a private outside offer, of value drawn from a uniform random distribution, ranging from {W2} to {W1}.
-    Your outside offer value is {w}. In theory, this {w} could be viewed as your “reservation value.” It could be seen as the threshold below which any proposed division would be inferior to your guaranteed baseline, and above which you improve upon that baseline. This reservation value could serve as a key reference point, guiding your decisions on when to accept, reject, or propose offers.
-    Your objective is to maximize your value of the outcome of the negotiation game. Remember, you have a guaranteed alternative: your outside offer.
+    You have a private outside offer drawn from a uniform random distribution ranging from {p1_outside_offer[0] if my_player_num == 1 else p2_outside_offer[0]} to {p1_outside_offer[1] if my_player_num == 1 else p2_outside_offer[1]}. Player {other_player_num} has a private outside offer drawn from a uniform random distribution ranging from {p2_outside_offer[0] if my_player_num == 1 else p1_outside_offer[0]} to {p2_outside_offer[1] if my_player_num == 1 else p1_outside_offer[1]}.
+    Your outside offer value is {w}. Your objective is to maximize your value of the outcome of the negotiation game. Remember, you have a guaranteed alternative: your outside offer.
 
     Before making any counteroffer, you should calculate its total value to you and compare it to your outside offer value of {w}. For example, if you were considering offering the other player 2 units of each item (keeping 3 units of each for yourself), you would calculate:
     3 units of item 1 = 3 × {values[0]} = {3*values[0]} (multiplying units by your value per unit)
@@ -104,4 +103,5 @@ def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: 
     {current_offer_str}
     {action_prompt}
 """
+
 
