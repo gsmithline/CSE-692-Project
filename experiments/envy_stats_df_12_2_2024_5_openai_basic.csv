@@ -1,0 +1,17 @@
+game_num,round_num,step_num,player,is_strict_ef,is_one_item_ef,is_final_allocation,final_strict_ef,final_one_item_ef,outside_consistent,offer_increasing
+0,1,1,1,True,False,False,False,False,True,True
+0,1,2,2,False,False,False,False,False,True,True
+0,2,1,1,False,False,True,True,True,True,True
+0,2,2,2,True,False,True,True,True,True,True
+1,1,1,1,False,False,True,True,True,False,True
+1,1,2,2,True,False,True,True,True,False,True
+2,1,1,1,True,False,False,False,False,False,True
+2,1,2,2,False,False,False,False,False,False,True
+2,2,1,1,True,False,True,True,True,False,True
+2,2,2,2,False,False,True,True,True,False,True
+3,1,1,1,True,False,True,True,True,False,True
+3,1,2,2,False,False,True,True,True,False,True
+4,1,1,1,False,False,False,False,False,True,True
+4,1,2,2,True,False,False,False,False,True,True
+4,2,1,1,False,False,True,True,False,True,True
+4,2,2,2,True,False,True,True,False,True,True

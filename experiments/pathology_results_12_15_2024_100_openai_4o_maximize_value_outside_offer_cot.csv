@@ -1,0 +1,218 @@
+game_num,round_num,player,discount_rate,offer,value,items,your_side_of_current_offer,outside_offer,accepting_an_offer_worse_than_outside_offer,making_an_offer_worse_for_you_than_your_outside_offer,walking_away_from_an_offer_better_than_your_outside_offer,offer_no_items_or_all_items,making_offer_worse_than_previous
+0,1,1,1.0,"[1, 1, 1, 4, 4]",628.0,[3 3 4 4 9],,117.0,False,False,False,False,False
+0,1,2,1.0,"[1, 1, 1, 4, 4]",757.0,[3 3 4 4 9],,547.0,False,False,False,False,False
+1,1,1,1.0,"[1, 1, 0, 1, 1]",1215.0,[5 4 2 6 4],,904.0,False,False,False,False,False
+1,1,2,1.0,"[1, 1, 0, 1, 1]",222.0,[5 4 2 6 4],,226.0,True,False,False,False,False
+2,1,1,1.0,"[0, 2, 1, 1, 1]",566.0,[1 5 4 4 4],,192.0,False,False,False,False,False
+3,1,1,1.0,"[3, 1, 2, 1, 0]",620.0,[6 4 4 3 1],,44.0,False,False,False,False,False
+3,1,2,1.0,"[3, 0, 0, 1, 1]",500.40000000000003,[6 4 4 3 1],500.40000000000003,981.0,False,True,False,False,False
+3,2,1,0.9,"[3, 0, 0, 1, 1]",243.0,[6 4 4 3 1],,39.6,False,False,False,False,False
+4,1,1,1.0,[],,[3 6 4 2 4],,,,,,,
+5,1,1,1.0,"[0, 0, 0, 3, 5]",1419.0,[5 4 8 3 5],,720.0,False,False,False,False,False
+5,1,2,1.0,"[2, 0, 3, 0, 0]",990.0,[5 4 8 3 5],990.0,682.0,False,False,False,False,False
+5,2,1,0.9,"[0, 0, 3, 3, 5]",1026.0,[5 4 8 3 5],1026.0,648.0,False,False,False,False,False
+5,2,2,0.9,"[0, 0, 4, 0, 0]",939.6,[5 4 8 3 5],939.6,613.8000000000001,False,False,False,False,False
+5,3,1,0.81,[],,[5 4 8 3 5],,,,,,,
+6,1,1,1.0,"[0, 5, 0, 2, 2]",747.0,[3 5 5 3 2],,276.0,False,False,False,False,False
+7,1,1,1.0,"[0, 0, 0, 1, 2]",911.0,[3 3 0 2 6],,231.0,False,False,False,False,False
+7,1,2,1.0,"[0, 0, 0, 1, 2]",62.0,[3 3 0 2 6],,47.0,False,False,False,False,False
+8,1,1,1.0,"[3, 3, 1, 2, 3]",355.0,[6 5 2 3 6],,219.0,False,False,False,False,False
+8,1,2,1.0,"[3, 3, 1, 2, 3]",504.0,[6 5 2 3 6],,460.0,False,False,False,False,False
+9,1,1,1.0,"[1, 3, 2, 1, 2]",293.0,[2 6 5 1 2],,639.0,False,True,False,False,False
+9,1,2,1.0,"[1, 3, 2, 1, 2]",507.0,[2 6 5 1 2],,313.0,False,False,False,False,False
+10,1,1,1.0,"[5, 2, 3, 3, 3]",317.0,[5 4 6 3 4],,677.0,False,True,False,False,False
+10,1,2,1.0,"[5, 2, 3, 3, 3]",1228.0,[5 4 6 3 4],,624.0,False,False,False,False,False
+11,1,1,1.0,"[0, 1, 1, 2, 3]",950.0,[4 8 1 5 6],,818.0,False,False,False,False,False
+11,1,2,1.0,"[2, 5, 0, 1, 1]",363.6,[4 8 1 5 6],363.6,347.0,False,False,False,False,False
+11,2,1,0.9,"[1, 4, 0, 1, 1]",711.0,[4 8 1 5 6],711.0,736.2,False,True,False,False,False
+11,2,2,0.9,"[1, 4, 0, 0, 2]",319.14000000000004,[4 8 1 5 6],319.14000000000004,312.3,False,False,False,False,False
+11,3,1,0.81,[],,[4 8 1 5 6],,,,,,,
+12,1,1,1.0,[],,[2 6 1 2 6],,,,,,,
+13,1,1,1.0,"[4, 2, 0, 0, 0]",398.0,[8 5 0 1 1],,380.0,False,False,False,False,False
+13,1,2,1.0,"[4, 2, 0, 0, 0]",278.0,[8 5 0 1 1],,87.0,False,False,False,False,False
+14,1,1,1.0,"[2, 3, 4, 2, 3]",400.0,[3 5 7 4 5],,272.0,False,False,False,False,False
+14,1,2,1.0,"[2, 3, 4, 2, 3]",639.0,[3 5 7 4 5],,438.0,False,False,False,False,False
+15,1,1,1.0,"[2, 5, 4, 0, 4]",396.0,[2 5 4 4 4],,577.0,False,True,False,False,False
+15,1,2,1.0,"[2, 5, 4, 0, 4]",537.0,[2 5 4 4 4],,534.0,False,False,False,False,False
+16,1,1,1.0,"[0, 3, 1, 0, 1]",241.0,[1 4 2 1 2],,940.0,False,True,False,False,False
+16,1,2,1.0,"[0, 3, 1, 0, 1]",285.0,[1 4 2 1 2],,217.0,False,False,False,False,False
+17,1,1,1.0,"[1, 2, 0, 2, 3]",601.0,[3 5 1 5 6],,634.0,False,True,False,False,False
+18,1,1,1.0,"[0, 5, 0, 1, 3]",485.0,[2 7 1 3 5],,68.0,False,False,False,False,False
+18,1,2,1.0,"[1, 2, 1, 1, 3]",531.0,[2 7 1 3 5],531.0,773.0,False,True,False,False,False
+18,2,1,0.9,"[1, 2, 1, 1, 3]",316.8,[2 7 1 3 5],,61.2,False,False,False,False,False
+19,1,1,1.0,"[1, 1, 2, 2, 2]",767.0,[2 3 5 6 5],,108.0,False,False,False,False,False
+19,1,2,1.0,"[0, 1, 2, 1, 2]",641.7,[2 3 5 6 5],641.7,574.0,False,False,False,False,False
+19,2,1,0.9,"[0, 1, 2, 1, 2]",310.5,[2 3 5 6 5],,97.2,False,False,False,False,False
+20,1,1,1.0,"[0, 0, 0, 5, 0]",707.0,[3 5 4 5 2],,477.0,False,False,False,False,False
+20,1,2,1.0,"[3, 5, 0, 0, 0]",554.4,[3 5 4 5 2],554.4,260.0,False,False,False,False,False
+20,2,1,0.9,"[0, 2, 2, 0, 0]",529.2,[3 5 4 5 2],529.2,429.3,False,False,False,False,False
+20,2,2,0.9,"[0, 2, 2, 0, 0]",284.40000000000003,[3 5 4 5 2],,234.0,False,False,False,False,False
+21,1,1,1.0,"[2, 3, 1, 1, 3]",1066.0,[3 7 3 6 5],,548.0,False,False,False,False,False
+21,1,2,1.0,"[2, 3, 1, 1, 3]",584.0,[3 7 3 6 5],,232.0,False,False,False,False,False
+22,1,1,1.0,"[0, 0, 3, 2, 3]",790.0,[3 3 8 5 5],,770.0,False,False,False,False,False
+23,1,1,1.0,"[0, 1, 1, 1, 2]",1158.0,[2 4 4 6 3],,105.0,False,False,False,False,False
+24,1,1,1.0,[],,[4 5 5 0 5],,,,,,,
+25,1,1,1.0,"[0, 3, 0, 2, 1]",540.0,[3 5 2 4 4],,54.0,False,False,False,False,False
+25,1,2,1.0,"[0, 3, 0, 2, 1]",304.0,[3 5 2 4 4],,713.0,True,False,False,False,False
+26,1,1,1.0,"[1, 4, 3, 0, 2]",981.0,[1 7 6 2 5],,892.0,False,False,False,False,False
+26,1,2,1.0,"[1, 4, 3, 0, 2]",360.0,[1 7 6 2 5],,14.0,False,False,False,False,False
+27,1,1,1.0,[],,[6 2 6 5 1],,,,,,,
+28,1,1,1.0,"[1, 1, 0, 0, 0]",414.0,[1 1 1 3 4],,509.0,False,True,False,False,False
+28,1,2,1.0,"[0, 0, 1, 3, 0]",369.90000000000003,[1 1 1 3 4],369.90000000000003,819.0,False,True,False,False,False
+28,2,1,0.9,[],,[1 1 1 3 4],,,,,,,
+29,1,1,1.0,[],,[1 4 3 1 4],,,,,,,
+30,1,1,1.0,"[2, 1, 0, 3, 0]",857.0,[6 4 1 7 1],,857.0,False,False,False,False,False
+30,1,2,1.0,"[2, 1, 0, 3, 0]",389.0,[6 4 1 7 1],,394.0,True,False,False,False,False
+31,1,1,1.0,"[0, 0, 1, 1, 0]",519.0,[3 2 3 2 1],,584.0,False,True,False,False,False
+31,1,2,1.0,"[0, 0, 1, 1, 0]",162.0,[3 2 3 2 1],,24.0,False,False,False,False,False
+32,1,1,1.0,"[0, 2, 2, 0, 2]",420.0,[2 3 6 1 3],,683.0,False,True,False,False,False
+32,1,2,1.0,"[0, 2, 2, 0, 2]",312.0,[2 3 6 1 3],,277.0,False,False,False,False,False
+33,1,1,1.0,"[1, 3, 2, 0, 5]",965.0,[ 5  5  6  2 10],,957.0,False,False,False,False,False
+33,1,2,1.0,"[1, 3, 2, 0, 5]",941.0,[ 5  5  6  2 10],,400.0,False,False,False,False,False
+34,1,1,1.0,"[1, 2, 3, 1, 4]",856.0,[ 4  3 10  1  6],,519.0,False,False,False,False,False
+34,1,2,1.0,"[0, 0, 2, 0, 2]",1186.2,[ 4  3 10  1  6],1186.2,976.0,False,False,False,False,False
+34,2,1,0.9,"[0, 1, 4, 0, 2]",932.4,[ 4  3 10  1  6],932.4,467.1,False,False,False,False,False
+34,2,2,0.9,"[1, 1, 4, 0, 2]",861.84,[ 4  3 10  1  6],861.84,878.4,False,True,False,False,False
+34,3,1,0.81,[],,[ 4  3 10  1  6],,,,,,,
+35,1,1,1.0,"[2, 2, 1, 3, 2]",906.0,[4 4 3 6 5],,343.0,False,False,False,False,False
+35,1,2,1.0,"[2, 2, 1, 3, 2]",441.0,[4 4 3 6 5],,32.0,False,False,False,False,False
+36,1,1,1.0,"[0, 0, 2, 2, 2]",926.0,[3 7 3 4 5],,303.0,False,False,False,False,False
+36,1,2,1.0,"[0, 2, 0, 3, 2]",1034.1000000000001,[3 7 3 4 5],1034.1000000000001,800.0,False,False,False,False,False
+36,2,1,0.9,"[0, 2, 0, 3, 2]",306.0,[3 7 3 4 5],,272.7,False,False,False,False,False
+37,1,1,1.0,"[0, 1, 6, 0, 2]",493.0,[3 6 7 4 2],,913.0,False,True,False,False,False
+38,1,1,1.0,"[1, 3, 4, 7, 1]",308.0,[3 4 5 9 2],,254.0,False,False,False,False,False
+38,1,2,1.0,"[1, 3, 4, 7, 1]",855.0,[3 4 5 9 2],,757.0,False,False,False,False,False
+39,1,1,1.0,"[1, 0, 1, 3, 2]",726.0,[4 1 3 7 4],,69.0,False,False,False,False,False
+40,1,1,1.0,"[1, 0, 1, 5, 0]",491.0,[4 3 1 5 1],,384.0,False,False,False,False,False
+40,1,2,1.0,"[1, 0, 1, 5, 0]",295.0,[4 3 1 5 1],,113.0,False,False,False,False,False
+41,1,1,1.0,"[1, 0, 2, 0, 2]",482.0,[3 2 6 3 7],,442.0,False,False,False,False,False
+41,1,2,1.0,"[0, 2, 2, 0, 2]",533.7,[3 2 6 3 7],533.7,737.0,False,True,False,False,False
+41,2,1,0.9,[],,[3 2 6 3 7],,,,,,,
+42,1,1,1.0,"[1, 0, 1, 1, 1]",386.0,[4 2 5 6 5],,388.0,False,True,False,False,False
+43,1,1,1.0,"[1, 0, 2, 1, 2]",565.0,[2 4 4 3 6],,289.0,False,False,False,False,False
+43,1,2,1.0,"[0, 1, 0, 0, 1]",1026.0,[2 4 4 3 6],1026.0,626.0,False,False,False,False,False
+43,2,1,0.9,"[1, 1, 3, 1, 3]",405.90000000000003,[2 4 4 3 6],405.90000000000003,260.1,False,False,False,False,False
+43,2,2,0.9,"[0, 0, 2, 1, 3]",771.12,[2 4 4 3 6],771.12,563.4,False,False,False,False,False
+43,3,1,0.81,[],,[2 4 4 3 6],,,,,,,
+44,1,1,1.0,"[4, 4, 1, 1, 0]",480.0,[4 5 4 6 2],,479.0,False,False,False,False,False
+44,1,2,1.0,"[1, 4, 1, 3, 0]",518.4,[4 5 4 6 2],518.4,574.0,False,True,False,False,False
+44,2,1,0.9,"[4, 5, 2, 0, 0]",464.40000000000003,[4 5 4 6 2],464.40000000000003,431.1,False,False,False,False,False
+45,1,1,1.0,"[1, 2, 0, 0, 1]",792.0,[5 6 1 2 3],,857.0,False,True,False,False,False
+45,1,2,1.0,"[1, 2, 0, 0, 1]",226.0,[5 6 1 2 3],,2.0,False,False,False,False,False
+46,1,1,1.0,"[2, 3, 0, 0, 1]",1011.0,[5 7 0 2 5],,359.0,False,False,False,False,False
+46,1,2,1.0,"[2, 5, 0, 2, 3]",496.8,[5 7 0 2 5],496.8,561.0,False,True,False,False,True
+46,2,1,0.9,"[2, 5, 0, 2, 3]",822.6,[5 7 0 2 5],,323.1,False,False,False,False,False
+47,1,1,1.0,"[2, 8, 0, 3, 7]",867.0,[5 9 5 6 9],,325.0,False,False,False,False,False
+47,1,2,1.0,"[2, 8, 0, 3, 7]",1099.0,[5 9 5 6 9],,112.0,False,False,False,False,False
+48,1,1,1.0,"[0, 2, 3, 1, 1]",1425.0,[4 6 8 6 3],,163.0,False,False,False,False,False
+49,1,1,1.0,"[1, 0, 1, 1, 1]",312.0,[4 1 4 3 1],,295.0,False,False,False,False,False
+50,1,1,1.0,"[3, 2, 5, 3, 2]",762.0,[ 8  4 10  6  4],,711.0,False,False,False,False,False
+50,1,2,1.0,"[2, 1, 5, 2, 2]",963.9,[ 8  4 10  6  4],963.9,158.0,False,False,False,False,False
+50,2,1,0.9,"[2, 1, 5, 2, 2]",849.6,[ 8  4 10  6  4],849.6,639.9,False,False,False,False,False
+50,2,2,0.9,"[2, 1, 5, 2, 2]",614.7,[ 8  4 10  6  4],,142.20000000000002,False,False,False,False,False
+51,1,1,1.0,"[1, 1, 1, 1, 1]",544.0,[5 4 5 4 3],,165.0,False,False,False,False,False
+51,1,2,1.0,"[5, 3, 0, 0, 1]",867.6,[5 4 5 4 3],867.6,577.0,False,False,False,False,False
+51,2,1,0.9,"[5, 3, 0, 0, 1]",229.5,[5 4 5 4 3],,148.5,False,False,False,False,False
+52,1,1,1.0,"[2, 1, 3, 1, 2]",562.0,[2 2 5 5 3],,327.0,False,False,False,False,False
+53,1,1,1.0,"[3, 1, 2, 1, 2]",742.0,[7 2 4 3 5],,272.0,False,False,False,False,False
+54,1,1,1.0,"[1, 0, 0, 1, 0]",852.0,[3 2 4 3 2],,678.0,False,False,False,False,False
+55,1,1,1.0,"[0, 1, 3, 2, 0]",681.0,[3 3 7 5 2],,667.0,False,False,False,False,False
+55,1,2,1.0,"[0, 0, 3, 0, 2]",435.6,[3 3 7 5 2],435.6,630.0,False,True,False,False,False
+55,2,1,0.9,[],,[3 3 7 5 2],,,,,,,
+56,1,1,1.0,"[0, 1, 0, 2, 0]",532.0,[1 8 2 4 1],,692.0,False,True,False,False,False
+56,1,2,1.0,"[1, 3, 0, 1, 1]",368.1,[1 8 2 4 1],368.1,874.0,False,True,False,False,False
+56,2,1,0.9,[],,[1 8 2 4 1],,,,,,,
+57,1,1,1.0,"[1, 1, 2, 1, 2]",951.0,[4 3 7 3 7],,701.0,False,False,False,False,False
+57,1,2,1.0,"[1, 1, 2, 1, 2]",455.0,[4 3 7 3 7],,168.0,False,False,False,False,False
+58,1,1,1.0,"[1, 0, 1, 0, 0]",571.0,[2 3 4 1 0],,852.0,False,True,False,False,False
+59,1,1,1.0,"[2, 2, 3, 3, 1]",437.0,[3 3 7 7 4],,240.0,False,False,False,False,False
+59,1,2,1.0,"[2, 2, 3, 3, 1]",844.0,[3 3 7 7 4],,525.0,False,False,False,False,False
+60,1,1,1.0,"[1, 1, 2, 0, 1]",694.0,[4 4 5 3 2],,825.0,False,True,False,False,False
+60,1,2,1.0,"[2, 3, 0, 1, 1]",756.9,[4 4 5 3 2],756.9,530.0,False,False,False,False,False
+60,2,1,0.9,"[1, 2, 4, 1, 1]",388.8,[4 4 5 3 2],388.8,742.5,False,True,False,False,False
+60,2,2,0.9,"[1, 2, 4, 1, 1]",541.8000000000001,[4 4 5 3 2],,477.0,False,False,False,False,False
+61,1,1,1.0,[],,[ 2 11  4  2  5],,,,,,,
+62,1,1,1.0,"[2, 2, 3, 1, 4]",856.0,[3 5 7 4 5],,798.0,False,False,False,False,False
+62,1,2,1.0,"[2, 2, 3, 1, 4]",458.0,[3 5 7 4 5],,212.0,False,False,False,False,False
+63,1,1,1.0,[],,[8 7 3 2 3],,,,,,,
+64,1,1,1.0,[],,[4 4 5 2 4],,,,,,,
+65,1,1,1.0,[],,[3 5 1 2 4],,,,,,,
+66,1,1,1.0,"[3, 1, 0, 1, 3]",596.0,[7 5 0 3 6],,301.0,False,False,False,False,False
+66,1,2,1.0,"[3, 1, 0, 1, 3]",620.0,[7 5 0 3 6],,618.0,False,False,False,False,False
+67,1,1,1.0,"[1, 1, 1, 1, 1]",433.0,[3 5 4 2 3],,30.0,False,False,False,False,False
+67,1,2,1.0,"[1, 5, 1, 0, 2]",478.8,[3 5 4 2 3],478.8,460.0,False,False,False,False,False
+67,2,1,0.9,"[1, 5, 1, 0, 2]",295.2,[3 5 4 2 3],,27.0,False,False,False,False,False
+68,1,1,1.0,"[2, 1, 3, 2, 2]",405.0,[7 2 8 5 4],,756.0,False,True,False,False,False
+68,1,2,1.0,"[2, 1, 3, 2, 2]",627.0,[7 2 8 5 4],,107.0,False,False,False,False,False
+69,1,1,1.0,"[2, 1, 2, 1, 1]",584.0,[5 3 5 2 4],,548.0,False,False,False,False,False
+70,1,1,1.0,"[0, 0, 0, 6, 3]",490.0,[3 4 2 6 3],,937.0,False,True,False,False,False
+71,1,1,1.0,"[1, 1, 3, 0, 0]",649.0,[1 1 3 4 5],,581.0,False,False,False,False,False
+71,1,2,1.0,"[1, 1, 3, 0, 0]",249.0,[1 1 3 4 5],,99.0,False,False,False,False,False
+72,1,1,1.0,"[5, 5, 0, 3, 5]",163.0,[6 6 0 4 6],,901.0,False,True,False,False,False
+72,1,2,1.0,"[5, 5, 0, 3, 5]",745.0,[6 6 0 4 6],,175.0,False,False,False,False,False
+73,1,1,1.0,"[1, 2, 1, 1, 2]",1159.0,[6 5 4 4 6],,370.0,False,False,False,False,False
+73,1,2,1.0,"[0, 0, 0, 0, 1]",651.6,[6 5 4 4 6],651.6,915.0,False,True,False,False,False
+73,2,1,0.9,"[1, 1, 1, 2, 1]",1104.3,[6 5 4 4 6],1104.3,333.0,False,False,False,False,False
+74,1,1,1.0,"[1, 1, 0, 3, 0]",567.0,[4 2 3 3 2],,323.0,False,False,False,False,False
+75,1,1,1.0,"[0, 1, 6, 2, 2]",481.0,[ 1  5 11  4  3],,322.0,False,False,False,False,False
+75,1,2,1.0,"[0, 1, 6, 2, 2]",516.0,[ 1  5 11  4  3],,483.0,False,False,False,False,False
+76,1,1,1.0,"[0, 2, 0, 2, 0]",1071.0,[2 6 3 5 5],,776.0,False,False,False,False,False
+76,1,2,1.0,"[0, 3, 3, 0, 5]",498.6,[2 6 3 5 5],498.6,390.0,False,False,False,False,False
+76,2,1,0.9,"[1, 1, 1, 3, 1]",821.7,[2 6 3 5 5],821.7,698.4,False,False,False,False,False
+76,2,2,0.9,"[0, 5, 3, 1, 5]",358.02000000000004,[2 6 3 5 5],358.02000000000004,351.0,False,False,False,False,False
+76,3,1,0.81,[],,[2 6 3 5 5],,,,,,,
+77,1,1,1.0,"[1, 1, 0, 0, 0]",880.0,[2 6 5 3 6],,326.0,False,False,False,False,False
+77,1,2,1.0,"[1, 1, 1, 0, 3]",1201.5,[2 6 5 3 6],1201.5,534.0,False,False,False,False,False
+77,2,1,0.9,"[1, 1, 1, 0, 3]",328.5,[2 6 5 3 6],,293.40000000000003,False,False,False,False,False
+78,1,1,1.0,"[1, 3, 1, 3, 2]",979.0,[4 8 3 6 4],,35.0,False,False,False,False,False
+78,1,2,1.0,"[1, 3, 1, 3, 2]",455.0,[4 8 3 6 4],,29.0,False,False,False,False,False
+79,1,1,1.0,"[0, 0, 0, 0, 0]",1268.0,[6 4 6 4 0],,977.0,False,False,False,True,False
+79,1,2,1.0,"[3, 2, 3, 3, 0]",243.9,[6 4 6 4 0],243.9,124.0,False,False,False,False,False
+79,2,1,0.9,[],,[6 4 6 4 0],,,,,,,
+80,1,1,1.0,"[3, 0, 0, 2, 2]",348.0,[3 3 3 2 2],,818.0,False,True,False,False,False
+80,1,2,1.0,"[0, 3, 0, 1, 0]",603.0,[3 3 3 2 2],603.0,650.0,False,True,False,False,False
+80,2,1,0.9,[],,[3 3 3 2 2],,,,,,,
+81,1,1,1.0,"[0, 2, 5, 4, 2]",497.0,[2 6 5 5 2],,160.0,False,False,False,False,False
+81,1,2,1.0,"[0, 2, 5, 4, 2]",756.0,[2 6 5 5 2],,51.0,False,False,False,False,False
+82,1,1,1.0,"[0, 2, 1, 1, 4]",711.0,[3 8 4 3 4],,532.0,False,False,False,False,False
+82,1,2,1.0,"[0, 0, 0, 0, 0]",648.9,[3 8 4 3 4],648.9,825.0,False,True,False,True,False
+82,2,1,0.9,[],,[3 8 4 3 4],,,,,,,
+83,1,1,1.0,"[0, 2, 3, 0, 4]",746.0,[2 7 3 4 4],,155.0,False,False,False,False,False
+83,1,2,1.0,"[1, 0, 1, 2, 2]",913.5,[2 7 3 4 4],913.5,797.0,False,False,False,False,False
+83,2,1,0.9,"[1, 0, 1, 2, 2]",246.6,[2 7 3 4 4],,139.5,False,False,False,False,False
+84,1,1,1.0,"[0, 2, 2, 1, 0]",460.0,[1 3 4 3 2],,978.0,False,True,False,False,False
+84,1,2,1.0,"[0, 2, 2, 1, 0]",230.0,[1 3 4 3 2],,12.0,False,False,False,False,False
+85,1,1,1.0,"[0, 2, 0, 1, 6]",795.0,[1 3 7 1 6],,189.0,False,False,False,False,False
+85,1,2,1.0,"[0, 1, 1, 0, 6]",595.8000000000001,[1 3 7 1 6],595.8000000000001,826.0,False,True,False,False,False
+85,2,1,0.9,"[0, 2, 2, 0, 6]",597.6,[1 3 7 1 6],597.6,170.1,False,False,False,False,False
+86,1,1,1.0,"[0, 0, 3, 2, 5]",925.0,[2 6 9 4 8],,83.0,False,False,False,False,False
+86,1,2,1.0,"[0, 0, 3, 2, 5]",702.0,[2 6 9 4 8],,202.0,False,False,False,False,False
+87,1,1,1.0,[],,[1 0 5 4 1],,,,,,,
+88,1,1,1.0,"[0, 0, 4, 2, 4]",586.0,[1 5 4 3 5],,698.0,False,True,False,False,False
+88,1,2,1.0,"[0, 0, 4, 2, 4]",726.0,[1 5 4 3 5],,190.0,False,False,False,False,False
+89,1,1,1.0,"[1, 2, 0, 0, 2]",706.0,[6 4 2 2 4],,868.0,False,True,False,False,False
+90,1,1,1.0,"[2, 2, 0, 1, 0]",775.0,[6 6 1 6 5],,289.0,False,False,False,False,False
+90,1,2,1.0,"[2, 6, 1, 0, 0]",1135.8,[6 6 1 6 5],1135.8,512.0,False,False,False,False,False
+90,2,1,0.9,"[3, 1, 0, 3, 1]",497.7,[6 6 1 6 5],497.7,260.1,False,False,False,False,False
+90,2,2,0.9,"[3, 1, 0, 3, 1]",533.7,[6 6 1 6 5],,460.8,False,False,False,False,False
+91,1,1,1.0,"[1, 2, 0, 3, 2]",706.0,[2 4 1 7 5],,566.0,False,False,False,False,False
+91,1,2,1.0,"[0, 1, 0, 4, 1]",699.3000000000001,[2 4 1 7 5],699.3000000000001,528.0,False,False,False,False,False
+91,2,1,0.9,"[0, 1, 0, 3, 2]",712.8000000000001,[2 4 1 7 5],712.8000000000001,509.40000000000003,False,False,False,False,False
+91,2,2,0.9,"[1, 1, 0, 3, 2]",587.25,[2 4 1 7 5],587.25,475.2,False,False,False,False,False
+91,3,1,0.81,[],,[2 4 1 7 5],,,,,,,
+92,1,1,1.0,"[1, 1, 0, 2, 2]",302.0,[4 2 3 5 5],,437.0,False,True,False,False,False
+92,1,2,1.0,"[2, 1, 1, 3, 2]",512.1,[4 2 3 5 5],512.1,441.0,False,False,False,False,False
+92,2,1,0.9,[],,[4 2 3 5 5],,,,,,,
+93,1,1,1.0,[],,[3 5 3 6 1],,,,,,,
+94,1,1,1.0,"[0, 1, 2, 2, 2]",457.0,[2 6 4 2 2],,391.0,False,False,False,False,False
+94,1,2,1.0,"[0, 1, 1, 0, 0]",640.8000000000001,[2 6 4 2 2],640.8000000000001,573.0,False,False,False,False,False
+94,2,1,0.9,"[0, 2, 1, 1, 1]",383.40000000000003,[2 6 4 2 2],383.40000000000003,351.90000000000003,False,False,False,False,False
+95,1,1,1.0,"[1, 0, 0, 0, 2]",1086.0,[6 4 3 1 6],,821.0,False,False,False,False,False
+96,1,1,1.0,"[0, 1, 0, 2, 1]",733.0,[1 5 2 8 2],,611.0,False,False,False,False,False
+96,1,2,1.0,"[0, 1, 0, 3, 0]",577.8000000000001,[1 5 2 8 2],577.8000000000001,470.0,False,False,False,False,False
+96,2,1,0.9,"[0, 0, 0, 6, 1]",607.5,[1 5 2 8 2],607.5,549.9,False,False,False,False,False
+97,1,1,1.0,"[1, 1, 0, 1, 1]",1061.0,[4 4 1 4 4],,413.0,False,False,False,False,False
+98,1,1,1.0,"[4, 1, 3, 0, 0]",189.0,[4 1 4 1 2],,623.0,False,True,False,False,False
+99,1,1,1.0,"[2, 2, 0, 1, 1]",366.0,[5 4 1 3 2],,952.0,False,True,False,False,False
+99,1,2,1.0,"[0, 0, 1, 2, 2]",770.4,[5 4 1 3 2],770.4,831.0,False,True,False,False,False
+99,2,1,0.9,[],,[5 4 1 3 2],,,,,,,

@@ -1,6 +1,6 @@
 from utils.offer import Offer
-
-def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: int, W2: int, w: int, R: int, g: float, r: int, history: dict, current_offer: Offer = None, player_num: int = 0) -> str:
+import numpy as np
+def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: int, W2: int, w: int, R: int, g: float, r: int, history: dict, current_offer: Offer = None, player_num: int = 0, p1_outside_offer: list[int] = None, p2_outside_offer: list[int] = None) -> str:
     
     my_player_num = player_num + 1  
     other_player_num = 2 if my_player_num == 1 else 1
@@ -48,7 +48,7 @@ def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: 
     Both you and Player {other_player_num} have a private value per unit of each item type.
     These values are drawn from a uniform random distribution, ranging from 0 to {V}.
     Your private values are {', '.join([str(v) + ' for item ' + str(i+1) for i, v in enumerate(values)])}.
-    Both you and Player {other_player_num} also have a private outside offer, of value drawn from a uniform random distribution, ranging from {W2} to {W1}.
+    You have a private outside offer drawn from a uniform random distribution ranging from {p1_outside_offer[0] if my_player_num == 1 else p2_outside_offer[0]} to {p1_outside_offer[1] if my_player_num == 1 else p2_outside_offer[1]}. Player {other_player_num} has a private outside offer drawn from a uniform random distribution ranging from {p2_outside_offer[0] if my_player_num == 1 else p1_outside_offer[0]} to {p2_outside_offer[1] if my_player_num == 1 else p1_outside_offer[1]}.
     Your outside offer value is {w}. Your objective is to maximize your value of the outcome of the negotiation game. Remember, you have a guaranteed alternative: your outside offer.
 
     Before making any counteroffer, you should calculate its total value to you and compare it to your outside offer value of {w}. For example, if you were considering offering the other player 2 units of each item (keeping 3 units of each for yourself), you would calculate:
@@ -76,8 +76,10 @@ def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: 
     - What are my item values?
     - What is the current offer (if any)?
     - What round are we in and what is the discount factor?
+    {f"- If I am considering making a counteroffer, what is the next round's discount factor (as that counteroffer will be realized in the next round, hence the discount factor will be gamma^(r+1-1) as opposed to gamma^(r-1) for the current round)?" if my_player_num == 2 else ""}
 
     2) Then, let's calculate:
+    - What is the current discount factor, gamma^(r-1)?
     - For the current offer (if any): What would be my total value if I accept?
     - For potential counteroffers: What would be my total value for different divisions?
     - How do these compare to my outside offer value?
@@ -101,4 +103,5 @@ def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: 
     {current_offer_str}
     {action_prompt}
 """
+
 
