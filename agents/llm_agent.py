@@ -101,45 +101,77 @@ class LLMAgent(Agent):
         
         if self.llm_type == "llama":
             api_request = {
-                "model": "llama3.1-405b",
+                "model": "llama3.3-70b",
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt}
                 ],
-                
-                "max_tokens": 2000
+                "max_tokens": 1024,
+                #"temperature": 0.7,
+                #"top_p": 0.9,
+                #"top_k": 40
             }
-        
-            #"temperature": 0.,
-            #"temperature": 2.0,
             
             try:
                 response = self.llm.run(api_request)
-
                 print("Raw API Response:", response.text)
-                # Extract the action from the response text
-                result_content = response.json()['choices'][0]['message']['content']
+                
+                # Check if response is successful
+                if response.status_code != 200:
+                    print(f"API request failed with status code: {response.status_code}")
+                    print(f"Error message: {response.text}")
+                    raise Exception("API request failed")
+                
+                try:
+                    response_json = json.loads(response.text)
+                except json.JSONDecodeError as e:
+                    print(f"Failed to parse API response as JSON: {e}")
+                    print(f"Raw response: {response.text}")
+                    raise
+                
+                if 'choices' not in response_json:
+                    print("Response missing 'choices' field")
+                    print(f"Full response: {response_json}")
+                    raise Exception("Invalid API response format")
+                
+                result_content = response_json['choices'][0]['message']['content']
+                print("Extracted content:", result_content)
+                
                 # Find the JSON string at the end of the text and clean it
                 json_start = result_content.rfind('{')
+                if json_start == -1:
+                    print("No JSON object found in response content")
+                    print(f"Content: {result_content}")
+                    raise Exception("No JSON found in response")
+                    
                 json_str = result_content[json_start:].strip()
                 # Remove any trailing text after the JSON
-                json_end = json_str.rfind('}') 
+                json_end = json_str.rfind('}')
                 if json_end >= 0:
                     json_str = json_str[:json_end+1]
-                result = json.loads(json_str)
+                
+                try:
+                    result = json.loads(json_str)
+                except json.JSONDecodeError as e:
+                    print(f"Failed to parse extracted JSON: {e}")
+                    print(f"Extracted JSON string: {json_str}")
+                    raise
+                
                 print("Parsed result:", result)
                 self.result = result
                 self.action = result["action"]
+                
             except Exception as e:
                 print(f"Error with LLM response: {e}")
+                print("Response details:")
                 if 'response' in locals():
-                    print("Full response:", response.json())
-                self.result = False
+                    print(f"Status code: {response.status_code}")
+                    print(f"Response text: {response.text}")
+                print("Defaulting to WALK")
                 result = {}
                 result["action"] = "WALK"
+                self.result = False
                 self.action = "WALK"
-                print("Defaulting to WALK")
-                
                 return False
                 
         elif self.llm_type == "openai": #OTHER LLM MODELS
@@ -182,7 +214,7 @@ class LLMAgent(Agent):
         elif self.llm_type == "anthropic":
             try:
                 response = self.llm.messages.create(
-                    model="claude-3-5-sonnet-20241022",
+                    model="claude-3-opus-20240229", #claude-3-opus-20240229 , claude-3-5-sonnet-20241022
                     system=system_prompt,
                     messages=[
                         {"role": "user", "content": prompt}

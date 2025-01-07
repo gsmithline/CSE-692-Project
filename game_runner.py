@@ -32,8 +32,8 @@ class NegotitaionGame:
         self.player_values[1] = np.random.randint(self.item_value_range[0], self.item_value_range[1], self.num_items)
         
 
-        total_value_player0 = int(np.ceil(np.dot(self.items, self.player_values[0]) * .5)) #NOTE: CHANGE % FOR EXPERIMENTS 
-        total_value_player1 = int(np.ceil(np.dot(self.items, self.player_values[1]) * .5))
+        total_value_player0 = int(np.ceil(np.dot(self.items, self.player_values[0]) * 1)) #NOTE: CHANGE % FOR EXPERIMENTS 
+        total_value_player1 = int(np.ceil(np.dot(self.items, self.player_values[1]) * 1))
         
         
         self.outside_offer_values = np.array([
@@ -55,7 +55,7 @@ class NegotitaionGame:
             quantities=self.items,
             V=self.item_value_range[1],
             values=self.player_values[self.current_player],
-            W1= int(np.ceil(np.dot(self.items, self.player_values[0]) * .5)) if self.current_player == 0 else int(np.ceil(np.dot(self.items, self.player_values[1]) * .5)), #NOTE: CHANGE % FOR EXPERIMENTS 
+            W1= int(np.ceil(np.dot(self.items, self.player_values[0]) * 1)) if self.current_player == 0 else int(np.ceil(np.dot(self.items, self.player_values[1]) * 1)), #NOTE: CHANGE % FOR EXPERIMENTS 
             W2=1,
             w=self.outside_offer_values[self.current_player],
             R=self.max_rounds,
@@ -64,8 +64,8 @@ class NegotitaionGame:
             history=self.history,
             current_offer=self.current_offer,
             player_num=self.current_player,
-            p1_outside_offer=[1, int(np.ceil(np.dot(self.items, self.player_values[0]) * .5))], #NOTE: CHANGE % FOR EXPERIMENTS 
-            p2_outside_offer=[1, int(np.ceil(np.dot(self.items, self.player_values[1]) * .5))]
+            p1_outside_offer=[1, int(np.ceil(np.dot(self.items, self.player_values[0]) * 1))], #NOTE: CHANGE % FOR EXPERIMENTS 
+            p2_outside_offer=[1, int(np.ceil(np.dot(self.items, self.player_values[1]) * 1))]
         ) 
         print(prompt)
 
