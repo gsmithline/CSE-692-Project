@@ -7,6 +7,7 @@ import os
 import time
 import anthropic
 import google.generativeai as genai
+from pydantic import BaseModel
 
 
 class LLMAgent(Agent):
@@ -176,10 +177,11 @@ class LLMAgent(Agent):
                 
         elif self.llm_type == "openai": #OTHER LLM MODELS
             try:
-                model = "gpt-4o"
+                model = "gpt-o1" #gpt-4o #TODO: check OpenAI API type 
+                response = {}
                 if model == "gpt-4o":
                     response = openai.ChatCompletion.create(
-                        model="gpt-4o",
+                        model="o1-2024-12-17", #o1-2024-12-17 #gpt-4o
                         messages=[
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": prompt}
@@ -188,20 +190,32 @@ class LLMAgent(Agent):
                     #n=1,
                     #stop=None
                     )
-                    print("Raw API Response:", response)
+                elif model == "gpt-o1":
+                    response = openai.ChatCompletion.create(
+                        model="o1-2024-12-17",
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": prompt}
+                        ],
+                        max_tokens=1024,
+                        #response_format=js
+
+                    )
+
+                print("Raw API Response:", response)
                     # Extract the action from the response text
-                    result_content = response.choices[0].message.content
+                result_content = response.choices[0].message.content
                     # Find the JSON string at the end of the text and clean it
-                    json_start = result_content.rfind('{')
-                    json_str = result_content[json_start:].strip()
+                json_start = result_content.rfind('{')
+                json_str = result_content[json_start:].strip()
                     # Remove any trailing text after the JSON
-                    json_end = json_str.rfind('}') 
-                    if json_end >= 0:
-                        json_str = json_str[:json_end+1]
-                    result = json.loads(json_str)
-                    print("Parsed result:", result)
-                    self.result = result
-                    self.action = result["action"]
+                json_end = json_str.rfind('}') 
+                if json_end >= 0:
+                    json_str = json_str[:json_end+1]
+                result = json.loads(json_str)
+                print("Parsed result:", result)
+                self.result = result
+                self.action = result["action"]
             except Exception as e:
                 print(f"Error with OpenAI response: {e}")
                 print("Defaulting to WALK")
