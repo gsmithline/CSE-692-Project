@@ -46,7 +46,7 @@ def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: 
     There are {T} types of items, called item 1 through item {T}.
     There are {', '.join([f'{q} units of item {i+1}' for i, q in enumerate(quantities)])} to divide.
     Both you and Player {other_player_num} have a private value per unit of each item type.
-    These values are drawn from a uniform random distribution, ranging from 0 to {V}.
+    These values are drawn from a uniform random distribution, ranging from 1 to {V}.
     Your private values are {', '.join([str(v) + ' for item ' + str(i+1) for i, v in enumerate(values)])}.
     You have a private outside offer drawn from a uniform random distribution ranging from {p1_outside_offer[0] if my_player_num == 1 else p2_outside_offer[0]} to {p1_outside_offer[1] if my_player_num == 1 else p2_outside_offer[1]}. Player {other_player_num} has a private outside offer drawn from a uniform random distribution ranging from 1 to the value they would get from the maximum offer (the offer that gives them all the items).
     Your outside offer value is {w}. Your objective is to maximize your value of the outcome of the negotiation game. Remember, you have a guaranteed alternative: your outside offer.
