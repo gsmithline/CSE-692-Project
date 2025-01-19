@@ -58,7 +58,7 @@ def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: 
         prompt = make_prompt_circle2(T, quantities, V, values, W1, W2, w, R, g, r, history, current_offer, player_num, p1_outside_offer, p2_outside_offer, circle)
     elif circle == 3:
         prompt = make_prompt_circle3(T, quantities, V, values, W1, W2, w, R, g, r, history, current_offer, player_num, p1_outside_offer, p2_outside_offer, circle)
-    elif circle == 4:
+    #elif circle == 4:
     else:
         raise ValueError(f"Circle {circle} not supported")
     
