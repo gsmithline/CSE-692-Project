@@ -176,12 +176,12 @@ class LLMAgent(Agent):
                 return False
                 
         elif self.llm_type == "openai": #OTHER LLM MODELS
+            model = "gpt-4o" #gpt-4o #TODO: check OpenAI API type 
             try:
-                model = "gpt-o1" #gpt-4o #TODO: check OpenAI API type 
                 response = {}
                 if model == "gpt-4o":
                     response = openai.ChatCompletion.create(
-                        model="o1-2024-12-17", #o1-2024-12-17 #gpt-4o
+                        model="gpt-4o", #o1-2024-12-17 #gpt-4o
                         messages=[
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": prompt}
