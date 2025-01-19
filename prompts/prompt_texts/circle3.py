@@ -15,7 +15,7 @@ def make_prompt_circle_3(T: int, quantities: list[int], V: int, values: list[flo
     Both you and Player {other_player_num} have a private value per unit of each item type.
     These values are drawn from a uniform random distribution, ranging from 1 to {V}.
     Your private values are {', '.join([str(v) + ' for item ' + str(i+1) for i, v in enumerate(values)])}.
-    You have a private outside offer drawn from a uniform random distribution ranging from {p1_outside_offer[0] if my_player_num == 1 else p2_outside_offer[0]} to your total value of all items, which is{p1_outside_offer[1] if my_player_num == 1 else p2_outside_offer[1]}. Player {other_player_num} has a private outside offer drawn from a uniform random distribution ranging from 1 to to their total value of all items.
+    You have a private outside offer drawn from a uniform random distribution ranging from {p1_outside_offer[0] if my_player_num == 1 else p2_outside_offer[0]} to your total value of all items, which is {p1_outside_offer[1] if my_player_num == 1 else p2_outside_offer[1]}. Player {other_player_num} has a private outside offer drawn from a uniform random distribution ranging from 1 to to their total value of all items.
     Your outside offer value is {w}. Your objective is to maximize your value of the outcome of the negotiation game. Remember, you have a guaranteed alternative: your outside offer.
 
     Before making any counteroffer, you should calculate its total value to you and compare it to your outside offer value of {w}. 
