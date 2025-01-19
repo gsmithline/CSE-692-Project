@@ -1,9 +1,7 @@
 game_id,round_id,player_id,given_value,kept_value,opponent_bundle_value,is_envy_free
-1,1,1,140,824,754,True
-1,2,1,572,392,717,False
-1,1,2,141,636,683,False
-1,2,2,186,591,281,True
-2,1,1,423,745,745,True
-2,1,2,425,312,312,True
-3,1,1,268,411,411,True
-3,1,2,547,553,553,True
+2,1,1,146,837,592,True
+2,2,1,342,641,591,True
+2,1,2,281,323,540,False
+2,2,2,295,309,399,False
+3,1,1,566,541,541,True
+3,1,2,526,459,459,True
