@@ -6,7 +6,7 @@ import json
 import pandas as pd
 
 class NegotitaionGame:
-    def __init__(self, player1_agent, player2_agent, num_items=4, item_value_range=[0, 101], gamma=0.9, max_rounds=10, game_results=pd.DataFrame(), envy_results=pd.DataFrame()):
+    def __init__(self, player1_agent, player2_agent, num_items=4, item_value_range=[0, 101], gamma=0.9, max_rounds=10, game_results=pd.DataFrame(), envy_results=pd.DataFrame(), circle: int = 0):
         if type(num_items) == int:
             self.items = np.random.poisson(4, num_items)
             self.num_items = num_items
@@ -26,6 +26,7 @@ class NegotitaionGame:
         self.player_values = {0: None, 1: None}
         self.reset()
         self.final_action_player = self.players[1] #default to player 2 as the final action player of final player in final round
+        self.circle = circle
 
     def reset(self):
         self.player_values[0] = np.random.randint(self.item_value_range[0], self.item_value_range[1], self.num_items) 
@@ -65,7 +66,8 @@ class NegotitaionGame:
             current_offer=self.current_offer,
             player_num=self.current_player,
             p1_outside_offer=[1, int(np.ceil(np.dot(self.items, self.player_values[0]) * 1))], #NOTE: CHANGE % FOR EXPERIMENTS 
-            p2_outside_offer=[1, int(np.ceil(np.dot(self.items, self.player_values[1]) * 1))]
+            p2_outside_offer=[1, int(np.ceil(np.dot(self.items, self.player_values[1]) * 1))],
+            circle = self.circle
         ) 
         print(prompt)
 
