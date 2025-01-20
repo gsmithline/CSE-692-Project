@@ -156,11 +156,12 @@ class LLMAgent(Agent):
                 except json.JSONDecodeError as e:
                     print(f"Failed to parse extracted JSON: {e}")
                     print(f"Extracted JSON string: {json_str}")
+
                     raise
                 
                 print("Parsed result:", result)
                 self.result = result
-                self.action = result["action"]
+                self.action = result["action"] 
                 
             except Exception as e:
                 print(f"Error with LLM response: {e}")
@@ -172,7 +173,7 @@ class LLMAgent(Agent):
                 result = {}
                 result["action"] = "WALK"
                 self.result = False
-                self.action = "WALK"
+                self.action = "INVALID WALK"
                 return False
                 
         elif self.llm_type == "openai": #OTHER LLM MODELS
@@ -222,7 +223,7 @@ class LLMAgent(Agent):
                 result = {}
                 result["action"] = "WALK"
                 self.result = False
-                self.action = "WALK"
+                self.action = "INVALID WALK"
                 return False
 
         elif self.llm_type == "anthropic":
@@ -255,7 +256,7 @@ class LLMAgent(Agent):
                 result = {}
                 result["action"] = "WALK"
                 self.result = False
-                self.action = "WALK"
+                self.action = "INVALID WALK"
                 return False
         elif self.llm_type == "gemini":
             try:
@@ -279,7 +280,7 @@ class LLMAgent(Agent):
                 result = {}
                 result["action"] = "WALK"
                 self.result = False
-                self.action = "WALK"
+                self.action = "INVALID WALK"
                 return False
         else:
             raise ValueError(f"Invalid LLM type: {self.llm_type}")

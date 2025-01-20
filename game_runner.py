@@ -27,6 +27,7 @@ class NegotitaionGame:
         self.reset()
         self.final_action_player = self.players[1] #default to player 2 as the final action player of final player in final round
         self.circle = circle
+        self.valid_walk = None
 
     def reset(self):
         self.player_values[0] = np.random.randint(self.item_value_range[0], self.item_value_range[1], self.num_items) 
