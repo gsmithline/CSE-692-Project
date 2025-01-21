@@ -171,7 +171,7 @@ class LLMAgent(Agent):
                     print(f"Response text: {response.text}")
                 print("Defaulting to WALK")
                 result = {}
-                result["action"] = "WALK"
+                result["action"] = "INVALID WALK"
                 self.result = False
                 self.action = "INVALID WALK"
                 return False
@@ -221,7 +221,7 @@ class LLMAgent(Agent):
                 print(f"Error with OpenAI response: {e}")
                 print("Defaulting to WALK")
                 result = {}
-                result["action"] = "WALK"
+                result["action"] = "INVALID WALK"
                 self.result = False
                 self.action = "INVALID WALK"
                 return False
@@ -254,7 +254,7 @@ class LLMAgent(Agent):
                 print(f"Error with OpenAI response: {e}")
                 print("Defaulting to WALK")
                 result = {}
-                result["action"] = "WALK"
+                result["action"] = "INVALID WALK"
                 self.result = False
                 self.action = "INVALID WALK"
                 return False
@@ -278,7 +278,7 @@ class LLMAgent(Agent):
                 print(f"Error with Gemini response: {e}")
                 print("Defaulting to WALK")
                 result = {}
-                result["action"] = "WALK"
+                result["action"] = "INVALID WALK"
                 self.result = False
                 self.action = "INVALID WALK"
                 return False
@@ -300,8 +300,8 @@ class LLMAgent(Agent):
                 if not isinstance(result["offer"], list):
                     print("Invalid offer format, defaulting to WALK")
                     self.result = False
-                    result["action"] = "WALK"
-                    self.action = "WALK"
+                    result["action"] = "INVALID WALK"
+                    self.action = "INVALID WALK"
                     return False
                 offer = [int(x) for x in result["offer"]]
                 self.result = Offer(player=self.player_num, offer=offer)
@@ -310,13 +310,13 @@ class LLMAgent(Agent):
             else:
                 print(f"Invalid action {result['action']}, defaulting to WALK")
                 self.result = False
-                self.action = "WALK"
-                result["action"] = "WALK"
+                self.action = "INVALID WALK"
+                result["action"] = "INVALID WALK"
                 return False
         except (KeyError, TypeError, ValueError) as e:
             print(f"Error processing result: {e}")
             print("Defaulting to WALK")
             self.result = False
-            self.action = "WALK"
-            result["action"] = "WALK"
+            self.action = "INVALID WALK"
+            result["action"] = "INVALID WALK"
             return False
