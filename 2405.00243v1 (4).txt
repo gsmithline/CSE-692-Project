@@ -1,0 +1,2757 @@
+A Meta-Game Evaluation Framework for Deep Multiagent Reinforcement
+Learning
+Zun Li1
+Li! ,, Michael P. Wellman2
+P. Wellman?
+‘Google DeepMind, 7University ofMichigan
+lizun@ google.com, wellman@umich.edu
+1Google DeepMind, 2University of Michigan
+lizun@google.com, wellman@umich.edu
+Abstract
+Evaluating deep multiagent reinforcement learning
+(MARL) algorithms is complicated by stochastic-
+ity in training and sensitivity ofagent performance
+to the behavior ofother agents. We propose a meta-
+game evaluation framework for deep MARL, by
+framing each MARL algorithm as a meta-strategy,
+and repeatedly sampling normal-form empirical
+games over combinations ofmeta-strategies result-
+ing from different random seeds. Each empirical
+game captures both self-play and cross-play fac-
+tors across seeds. These empirical games pro-
+vide the basis for constructing a sampling distribu-
+tion, using bootstrapping, over a variety of game
+analysis statistics. We use this approach to eval-
+uate state-of-the-art deep MARL algorithms on a
+class ofnegotiation games. From statistics on indi-
+vidual payoffs, social welfare, and empirical best-
+response graphs, we uncover strategic relation-
+ships among self-play, population-based, model-
+free, and model-based MARL methods. We also
+investigate the effect ofrun-time search as a meta-
+strategy operator, and find via meta-game analysis
+that the search version ofa meta-strategy generally
+leads to improved performance.
+Evaluating deep multiagent reinforcement learning
+(MARL) algorithms is complicated by stochastic-
+ity in training and sensitivity of agent performance
+to the behavior of other agents. We propose a meta-
+game evaluation framework for deep MARL, by
+framing each MARL algorithm as a meta-strategy,
+and repeatedly sampling normal-form empirical
+games over combinations of meta-strategies result-
+ing from different random seeds. Each empirical
+game captures both self-play and cross-play fac-
+tors across seeds. These empirical games pro-
+vide the basis for constructing a sampling distribu-
+tion, using bootstrapping, over a variety of game
+analysis statistics. We use this approach to eval-
+uate state-of-the-art deep MARL algorithms on a
+class of negotiation games. From statistics on indi-
+vidual payoffs, social welfare, and empirical best-
+response graphs, we uncover strategic relation-
+ships among self-play, population-based, model-
+free, and model-based MARL methods. We also
+investigate the effect of run-time search as a meta-
+strategy operator, and find via meta-game analysis
+that the search version of a meta-strategy generally
+leads to improved performance.
+1 Introduction
+1 Introduction
+Evaluating complex AI algorithms requires careful attention
+to stochastic factors. Deep reinforcement learning (RL) al-
+gorithms in particular are subject to randomness within the
+algorithm and the operational environment, and variations
+with choices of hyperparameters and initial conditions. It is
+conventional to address these uncertainties in part by aggre-
+gating results across multiple runs [Bellemare er al., 2013;
+Moachada ot el 9918], Deep multiagent RL (MARL) algo-
+rithms nresent these issues, and additional challenges due to
+wpeett wuiv.actions. Evaluating performance against humans
+has be >=scurss of compelling demonstrations [Silver et
+Qi oe ue. tal, 2019; Wurman et al., 2022; Perolat
+Evaluating complex AI algorithms requires careful attention
+to stochastic factors. Deep reinforcement learning (RL) al-
+gorithms in particular are subject to randomness within the
+algorithm and the operational environment, and variations
+with choices of hyperparameters and initial conditions. It is
+conventional to address these uncertainties in part by aggre-
+gating results across multiple runs [Bellemare et al., 2013;
+Machado et al., 2018]. Deep multiagent RL (MARL) algo-
+rithms present these issues, and additional challenges due to
+agent interactions. Evaluating performance against humans
+has been one source of compelling demonstrations [Silver et
+al., 2016; Vinyals et al., 2019; Wurman et al., 2022; Perolat
+et al., 2022], but this approach is limited by the range of tasks
+*, w,..1 2
++.”
+“1: Wits ‘4 7a
+«
+3 approach
+by
+range
+-Xpertise exists, and the cost of engaging
+for which human expertise exists, and the cost of engaging
+it vs oer stole. Generally speaking, we lack evalua-
+when it is available. Generally speaking, we lack evalua-
+tion protocols for comparing different MARL methods in a
+statistically principled way.
+In purely adversarial (i.e., two-player zero-sum) environ-
+tion protocols for comparing different MARL methods in a
+statistically principled way.
+In purely adversarial (i.e., two-player zero-sum) environ-
+ments, distance to Nash equilibrium may be a sufficient met-
+ric [Brown et al., 2020; Schmid et al., 2023], as all equilib-
+ria are interchangeably optimal. More generally, where there
+are multiple equilibria or where we do not necessarily expect
+equilibrium behavior, the metrics for MARL performance
+may be less clear. In collaborative domains, global team re-
+turn is the common objective [Foerster et al., 2018; Rashid
+et al., 2020], however complex learning dynamics may lead
+agents using the same MARL algorithm to equilibria of dis-
+tinct machine conventions in different runs [Hu et al., 2020].
+We seek an approach to evaluating deep MARL in
+general-sum domains. We propose a meta-game evaluation
+framework (§5), which frames MARL algorithms as meta-
+strategies: mapping games and random seeds to joint poli-
+cies. We sample seed combinations to generate meta-game
+instances, from which we compute evaluation metrics of in-
+terest based on game-theoretic solution concepts. Through
+resampling and bootstrap techniques, we generate a statisti-
+cal characterization ofalgorithm performance in these games.
+Our contributions:
+¢
+meta-game evaluation framework.
+• The meta-game evaluation framework.
+• A new search algorithm for
+e
+new
+games,
+games,
+algorithm
+imperfect
+imperfect information
+Information-Set
+Gumbel Information-Set
+Tree
+Monte-Carlo Tree
+Search (§6), based on the recent development of Gumbel
+AlphaZero [Danihelka et al., 2022].al.,2022].
+Search (§6),
+AlphaZero [Danihelka
+¢ Extensive experiments on state-of-the-art MARL algo-
+rithms (§7.2) on a class of negotiation games (§7.1), il-
+lustrating the framework and providing new evidence re-
+garding the algorithms studied.
+• Extensive experiments on state-of-the-art MARL algo-
+rithms (§7.2) on a class of negotiation games (§7.1), il-
+lustrating the framework and providing new evidence re-
+garding the algorithms studied.
+2 Related Work
+2 Related Work
+While evaluating single-agent deep RL algorithms is well-
+studied [Henderson et al., 2018; Jordan et al., 2020; Agar-
+wal et al., 2021], there are relatively few works that consider
+evaluation principles for deep MARL [Gronauer and Diepold,
+2022]. Typically, agents are evaluated against a selected set
+of background opponents or emergent behaviors in certain
+contexts [Lowe et al., 2017; Leibo et al., 2021]. Other work
+has defined evaluation protocols for cooperative settings [Pa-
+poudakis et al., 2020; Gorsane et al., 2022], where a global
+et al., 2020; Agar-
+While evaluating single-agent deep RL algorithms is well-
+studied [Henderson et al., 2018;
+wal et al., 2021], there are relatively few works that consider
+evaluation principles for deep MARL [Gronauer and Diepold,
+2022]. Typically, agents are evaluated against a selected set
+of background opponents or emergent behaviors in certain
+contexts [Lowe et al., 2017; Leibo et al., 2021]. Other work
+has defined evaluation protocols for cooperative settings [Pa-
+poudakis et al., 2020; Gorsane et al., 2022], where a global
+development of
+ments, distance to Nash equilibrium may be a sufficient met-
+ric [Brown et al., 2020; Schmid et al., 2023], as all equilib-
+ria are interchangeably optimal. More generally, where there
+are multiple equilibria or where we do not necessarily expect
+equilibrium behavior, the metrics for MARL performance
+may be less clear. In collaborative domains, global team re-
+turn is the common objective [Foerster et al., 2018; Rashid
+et al., 2020], however complex learning dynamics may lead
+agents using the same MARL algorithm to equilibria of dis-
+tinct machine conventions in different runs [Hu et al., 2020].
+We seek an approach to evaluating deep MARL in
+general-sum domains. We propose a meta-game evaluation
+framework (§5), which frames MARL algorithms as meta-
+strategies: mapping games and random seeds to joint poli-
+cies. We sample seed combinations to generate meta-game
+instances, from which we compute evaluation metrics of in-
+terest based on game-theoretic solution concepts. Through
+resampling and bootstrap techniques, we generate a statisti-
+cal characterization of algorithm performance in these games.
+Our contributions:
+A Meta-Game Evaluation Framework for Deep Multiagent Reinforcement
+Learning
+arX1iv:2405.00243v1 [cs.MA] 30 Apr 2024
+arXiv:2405.00243v1 [cs.MA] 30 Apr 2024
+
+team reward is well-defined. Our scenario falls into the agent-
+vs-agent category of Balduzzi et al. [2018], who argue for the
+necessity of comprehensively considering the possible joint
+interactions.
+Kiekintveld and Wellman [2008] employed a concept of
+meta-games for evaluating general game-playing methods. In
+their setting, meta-strategies map normal-form game specifi-
+cations to strategy choices. Treutlein et al. [2021] construct
+label-free coordination (LFC) games among instances of a
+cooperative MARL algorithm, in order to study zero-shot co-
+ordination [Hu et al., 2020]. LFC games are a kind of meta-
+game in our sense, as they take dynamic game descriptions
+(Dec-POMDPs) as input.
+Bootstrapping is a non-parametric statistical approach that
+constructs sampling distributions for any specified statistic
+by resampling from the original dataset [Davison and Hink-
+ley, 1997]. Bootstrapping techniques have been applied in
+machine learning methods such as aggregating decision-tree
+models [Breiman, 1996]. Wiedenbeck et al. [2014] applied
+the bootstrap for statistical analysis of game-theoretic models
+estimated from simulations.
+3 Game Theory Preliminaries
+A normal-form representation of a game G consists of a
+player set N = {1, . . . ,N}, and for each player i ∈ N
+a pure strategy space Πi and a utility function ui : Π → R.
+Π = Π1 × · · · × ΠN is the joint pure strategy space. A
+mixed strategy σi ∈ ∆(Πi) for player i defines a probability
+distribution over that player’s pure strategy space. Player i’s
+payoff for choosing σi while others play σ−i = (σj)j̸=i is
+given by expectation over the respective mixtures: ui(σ) =
+Eπi∼σi,π−i∼σ−i [u(πi, π−i)].
+The regret of player i who plays σi when others are play-
+ing σ−i is REGRETi(σi, σ−i) = maxπ′
+i∈Πi ui(π′
+i, σ−i) −
+ui(σi, σ−i). A Nash equilibrium (NE) is a mixed
+strategy profile σ such that nobody has positive regret:
+∀i. REGRETi(σi, σ−i) = 0. As a measure of approximation
+to NE, we define SUMREGRET(σ) =
+P
+ally visualized by a tree) with a world state or history h that
+is not necessarily fully observable by every player. At each
+state h, starting with the initial state h0, there is a single
+player τ(h) ∈ N ∪ {c}, where c is the chance player, des-
+ignated to select an action a ∈ A(h). The chance player
+chooses according to a fixed random policy. Player i ∈ N
+chooses according to its information state/set, si(h), which
+comprises the information that i has observed at h. Often
+si(h) is represented by a concatenation of public and private
+action-observation histories. Following action a, the world
+transits to h′ = ha until a terminal state z ∈ Z is reached.
+Then each player i ∈ N receives a utility ui(z) as a func-
+tion of z. A behavioral strategy or policy, πi, of player i is a
+mapping from i’s infostates to distributions over actions. For
+EFGs we overload Πi to refer to the set of behavioral strate-
+gies of player i. A joint behavioral strategy profile π thus
+induces a probability distribution over the terminal states and
+we define ui(π) as the expected payoff for player i under this
+distribution. In this paper, we consider EFGs with perfect
+recall, that is, information sets si(h) distinguish all actions
+i had taken to reach h. A consequence is that any mixed
+strategy σi ∈ ∆(Πi) is payoff-equivalent to some behavioral
+strategy πi ∈ Πi [Aumann, 1964].
+4 Multiagent Training Algorithms
+i REGRETi(σi, σ−i).
+If a game is known to be symmetric, we can reduce its
+normal-form description complexity. Formally, in a symmet-
+ric game, players share the same strategy space Π1 = · · · =
+ΠN = Π, and utility function u1 = · · · = uN = u. Further-
+more, each player’s utility is permutation-invariant to other
+players’ strategies. For symmetric games we overload Π to
+refer to the common individual strategy space, rather than the
+joint space. In a symmetric profile, every player adopts the
+same (generally mixed) strategy. Solutions in symmetric pro-
+files are guaranteed to exist in relevant settings [Nash, 1951;
+Cheng et al., 2004; Hefti, 2017], and are generally preferred
+absent any basis for breaking symmetry [Kreps, 1990].
+Also given symmetry, let u(σ′, σ) be the expected payoff
+of a player when it chooses a strategy σ′ ∈ ∆(Π) while the
+other N − 1 play the same mixed strategy σ ∈ ∆(Π). We
+thus have REGRET(σ′, σ) = maxπ′∈Π u(π′, σ) − u(σ′, σ).
+A symmetric NE strategy σ satisfies REGRET(σ, σ) = 0.
+An extensive-form game (EFG) representation goes be-
+yond normal form to include temporal and information struc-
+ture. Effectively, an EFG defines a dynamical system (usu-
+We define a multiagent training algorithm (MATA) M as
+a stochastic procedure that produces a policy profile π =
+M(G, Θ, ω) for an EFG. In general, the input EFG G can-
+not be tractably represented as an explicit game tree. Instead,
+we assume the game is given in the form of a black-box sim-
+ulator that the algorithm can exercise by submitting actions
+and receiving observations and rewards. Θ is the set of hy-
+perparameters of the algorithm, and ω is a random seed. If G
+is symmetric, then it is often natural to constrain the output
+π to be likewise symmetric (i.e., single policy to be played
+by all). More generally, π is a policy profile. For the Alp-
+haZero MATA, for example, G could be represented by a Go
+simulator, and Θwould include the learning rate schedule and
+neural architecture. The output profile π specifies Go-playing
+policies for white and black, respectively.
+A MATA is effectively a form of meta-strategy: a proce-
+dure that given a game G, generates a strategy profile for G.
+We can employ the MATA to play from the perspective of any
+particular player i, simply by selecting the ith element π(i) of
+the output profile.
+A key issue for analysis of MATAs is uncertainty in strat-
+egy generation. It has been well observed (e.g., by Hu et al.
+[2020]) that a MATA with the same G and Θ but different ω
+may generate policies with vastly different strategic behav-
+iors. For example, in a negotiation game, different runs of a
+MATA may lead to strategies that adopt distinct offering con-
+ventions. In the present work, we assume the hyperparame-
+ters Θm for each MATAMm have been fixed, so the uncer-
+tainty in behavior of a training algorithm is fully captured by
+the random seeds. Note that there is always discretion about
+what one considers a distinct MATA M versus a parametric
+variation, so it is possible to bring choice among hyperparam-
+eter settings within the scope of our analysis framework.
+
+5 Meta-Game Evaluation Framework
+Given M different MATAs {(M1, Θ1), . . . , (MM, ΘM)}
+with associated hyperperameters, how can we evaluate their
+relative performance with respect to a given game G? View-
+ing the MATAs simply as game-solvers, we could focus on
+measures of their effectiveness in deriving a solution—for
+example, time and accuracy of convergence to Nash equi-
+librium. Viewing the MATAs’ role as generating strategies
+to play a game, however, requires a different focus that con-
+siders the interaction with other strategy generators. This is
+particularly salient for games that have a multiplicity of so-
+lutions (the general case), or for which the operable solution
+concept may be open to question. Consequently, we propose
+to analyze competing MATAs by framing their interaction as
+itself a game. As MATAs are meta-strategies, we refer to this
+approach as a meta-game evaluation framework.
+As noted above, we are particularly concerned with uncer-
+tainty in the results of multiagent training. In analysis of the
+MATA meta-game, therefore, we aim to characterize the im-
+plications of this uncertainty in probabilistic form.
+5.1 Empirical Game-Theoretic Analysis
+Our approach employs empirical game-theoretic analysis
+(EGTA), a methodology for reasoning about games through
+agent-based simulation [Tuyls et al., 2020; Wellman, 2016].
+EGTA aligns with our assumption that the game of interest
+G is defined by a black-box simulator. In the typical fram-
+ing, EGTA operates by estimating an empirical game model
+in normal form over an enumerated strategy set. The enu-
+merated strategies are a small selection from the full strategy
+space of the extensive game represented by the simulator.
+We employ EGTA with respect to an N-player game of in-
+terest G, and strategies defined by the output of MATAs. The
+meta-game is likewise over N players, and is symmetric re-
+gardless of whether G is symmetric or not. Let ˆπm denote the
+output from MATA m, for instance ˆπm = Mm(G, Θm, ω):
+the result from running the MATA on G for a particular ran-
+dom seed. We also allow that ˆπm be an aggregate of pol-
+icy profiles from multiple random seeds. From these MATA-
+generated profiles ˆΠ = {ˆπ1, . . . , ˆπM}, we construct an em-
+pirical meta-game MG( ˆΠ) over policy space ˆΠ as follows.
+If the base game G is symmetric, then the ˆπm are single-
+player policies, and we estimate the meta-game utility func-
+tion by the standard EGTA approach of simulating profiles
+over
+Πˆ. If G is not symmetric, then each ˆπ ∈ Πˆ is an
+N-player profile for G. Simulating a meta-game profile
+(ˆπ1, . . . , ˆπN) of these base-game profiles entails first assign-
+ing the ˆπ to players, according to a random permutation perm
+drawn uniformly from the N! possibilities. Then it simulates
+a play where player i of MG plays ˆπi(perm(i)) as if it is
+player perm(i) in G. This construction also corresponds to
+an EFG beginning with a root chance node that uniformly
+chooses among N! different outcomes, each followed by a
+copy of the original EFG with player indices permuted.
+Symmetry of the meta-game reflects a view that, for multi-
+agent training, developing effective strategies for each of the
+player positions is equally important. If this were not the case,
+or if one wished to perform an analysis of the differential ef-
+fectiveness of various MATAs from the perspectives of dif-
+ferent players or roles, a non-symmetric (or role-symmetric)
+meta-game model could be constructed instead.
+5.2 Meta-Game Evaluation Procedure
+Just as single-agent RL algorithms are statistically evalu-
+ated by return performance across different random seeds,
+we can analyze strategic properties among MATAs across
+different combinations of seeds. Let X denote statistics
+characterizing the strategic properties of interest (discussed
+below). Given an N-player game G and parametrized
+MATAs {(M1, Θ1), . . . , (MM, ΘM)}, our evaluation pro-
+cedure comprises of the following steps:
+1. Select a finite set of seeds Ωm for each MATA m. Gen-
+erate ˆπm(ω) =Mm(G, Θm, ω) for each ω ∈ Ωm.
+2. For each m, uniformly sample |Ωm| seeds from
+Ωm with replacement, yielding the sequence
+(ω1, . . . , ω|Ωm|). Let ˆπm be a profile that that is
+payoff-equivalent to a uniform mixture over the multiset
+{ˆπm(ω1), . . . , ˆπm(ω|Ωm|)}.
+3. Given ˆΠ = {ˆπ1, . . . , ˆπM}, estimate the symmetric em-
+pirical meta-game MG( ˆΠ) as described in §5.1.
+4. Compute the statistics-of-interest X from MG( ˆΠ)
+5. Repeat Steps 2 through 4. Estimated profile payoffs
+should be memoized for reuse across iterations. Ob-
+tain an empirical distribution of X and report statistical
+properties ofX.
+One way to understand this evaluation procedure is to view
+each MATA as a mixed strategy, selecting policies uniformly
+over the possible random seeds. The “ground-truth” meta-
+game represents an expectation over the results of this ran-
+domization. The empirical meta-game estimates this from fi-
+nite samples Ωm. By resampling from these seeds at hand,
+Step 2 constructs multiple empirical games among MATAs,
+from which we construct sampling distributions over X us-
+ing bootstrapping.
+There are a variety of choices for statistics X to gather.
+The only requirement is that X can be computed from
+the information in a normal-form game model. For exam-
+ple, one possible metric on MATA performance is uniform-
+score: average payoff against a uniform distribution over
+other MATAs. Such scores have been employed in a vari-
+ety of contexts, however putting equal weight on the possible
+counterparts is questionable, as they are not equally relevant
+[Balduzzi et al., 2018].
+An alternative proposed by Jordan et al. [2007] is NE-
+regret: REGRET(π, σ∗), where σ∗ is a symmetric mixed
+equilibrium of MG( ˆΠ). The motivation for this measure is
+that it focuses on behavior against rational opponents. Per-
+formance against obviously flawed opponents should carry
+much less weight, as they are less likely to be encountered in
+practice, all else equal.1 For games with multiple equilibria,
+1If however there is some basis to expect opponents who are
+flawed or boundedly rational in some particular way, then by all
+means it would make sense to measure regret with respect to a solu-
+tion concept capturing that basis.
+
+however, NE-regret is sensitive to the choice of solutions σ∗.
+This sensitivity is inherent to situations with multiple equilib-
+ria, but it can still be helpful to adopt a focal equilibrium to
+reduce ambiguity in analysis. Balduzzi et al. [2018] proposed
+Nash averaging, which is essentially NE-regret with respect
+to the max-entropy equilibrium. The intuition for preferring
+to evaluate with respect to higher-entropy solutions is that
+they reflect diversity, and thus reward robustness to a wide
+range of rational opponents.
+5.3 Max-Entropy Nash Equilibrium
+Computing max-entropy NE is hard in general, but practi-
+cally feasible to approximate for bi-matrix games of modest
+size. We adapt the mixed-integer programming formulation
+of Sandholm et al. [2005]:
+min
+σ∗
+X
+π∈ ˆΠ
+σ∗(π) log σ∗(π)
+s.t. ∀π ∈ ˆΠ. uπ =
+X
+π′∈ ˆΠ
+u∗ ≥ uπ, u∗ − uπ ≤ Ubπ, σ∗(π) ≤ 1 − bπ,
+σ∗(π) ≥ 0,
+X
+π
+σ∗(π) = 1, bπ ∈ {0, 1},
+(1)
+with real variables σ∗(π), uπ, binary variables bπ for each
+strategy π, and an equilibrium payoff real variable u∗. U is
+the maximum difference across payoffs. The variables bπ in-
+dicate whether strategy π is outside the equilibrium support.
+That is, bπ = 1 iff σ∗(π) = 0. Otherwise uπ = u∗: strate-
+gies in the support have the same payoff. The details of our
+implementation are in App. A.
+Although max-entropy NE is not generally unique, it
+narrows the possibilities considerably compared to uncon-
+strained (approximate or exact) NE.
+6 Search as a Meta-Strategy Operator
+Many MATAs produce a policy network p that maps directly
+from an infostate to a distribution over actions in a forward
+pass for every player. Recent work has found that leverag-
+ing computation at run-time and adding search to p can im-
+prove performance in large EFG domains [Silver et al., 2018;
+Brown et al., 2020; Schmid et al., 2023]. As a case study for
+our meta-game evaluation framework, we apply it to investi-
+gate the effect of search as a general policy improver.
+Toward that end, we propose a heuristic search method
+for large EFGs based on information-set MCTS (IS-MCTS)
+[Cowling et al., 2012] and Gumbel AlphaZero [Danihelka et
+al., 2022]. Alg. 1 presents the procedure, Gumbel IS-MCTS,
+in detail. Parameterized by a policy net p and a value net v,
+Gumbel IS-MCTS conducts multiple passes over the game-
+tree guided by v and p at an input infostate s, and outputs an
+action a for decision-making. We can apply this procedure
+to a variety of underlying MATAs, as a meta-strategy oper-
+ator: transforming M to M′ (with additional hyperparame-
+ters like simulation budget). The meta-strategy M′ in effect
+adds run-time search to the output policy p of M. Unlike
+AlphaZero—which uses the same MCTS method for training
+σ∗(π′)u(π, π′),
+Algorithm 1 Gumbel IS-MCTS
+1: function Gumbel-Search(s, v, p)
+2: ∀(s, a). R(s, a) ← 0, C(s, a) ← 0
+3: ∀a ∈ A(s). sample g(a) ∼ Gumbel(0),
+4:
+5:
+6:
+7:
+8:
+9:
+10:
+11:
+12:
+13:
+14:
+15:
+16:
+17:
+18:
+19:
+20:
+21:
+22:
+23:
+24:
+25:
+repeat
+Sample a world state: h ∼ Pr(h | s, p)
+while do
+if h is terminal then
+r ← payoffs of players Break
+else if i ≜ τ(h) is chance then
+a ← sample according to chance
+else if si(h) not in search tree then
+Add si(h) to search tree
+r ← v(si(h)). Break
+else if si(h) is root node s then
+a,Aˆ ← one step of sequential halving (Alg. 3)
+based on GS(s, a) and remaining actions in Aˆ
+else
+Select a according to Eq.(3) in App. B.2.
+end if
+h ← ha
+end while
+for (si, a) in this trajectory do
+Increment R(si, a) by ri, C(si, a) by 1.
+end for
+until num sim simulations done
+return Action a that remains in Aˆ
+26: end function
+and run-time, with meta-strategy operators we can explore a
+variety of MATAs as training-time methods which produce
+v and p for search at test-time [Sokota et al., 2024] (details
+in §7.2).
+Just like MCTS, IS-MCTS incrementally builds and tra-
+verses a search tree and aggregates statistics such as visit
+counts C(s, a) and aggregated values R(s, a) for visited
+(s, a) pairs. During each simulation of the search (line 5),
+a world state is sampled from a posterior belief Pr(h | s, p)
+assuming the opponents played according to p prior to s. In
+our test domains, Pr(h | s, p) can be computed exactly via
+Bayes’s rule, where in larger domains, using particle filtering
+[Silver and Veness, 2010] or deep generative models [Hu et
+al., 2021; Li et al., 2023] to approximate Pr(h | s, p) are
+possible. Further technical details are provided in App. B.
+The key feature of Gumbel IS-MCTS is how it selects ac-
+tions at the search nodes. At the beginning of the search
+(line 3), a Gumbel random variable, g(a), is sampled i.i.d.
+for each legal action a of the root, for later use in action se-
+lection. At the root (line 15), the algorithm treats each legal
+action as an arm of a stochastic bandit, and uses a sequential-
+halving algorithm [Pepels et al., 2014] (Alg. 3) to distribute
+the simulation budget. Sequential-halving algorithms usu-
+ally are designed for minimizing the simple regret [Bubeck
+et al., 2009], which is the regret at the last-iteration action
+recommendation. By contrast, UCB-style algorithms are usu-
+ally designed for minimizing the accumulated regret during
+an online learning process. For a game-playing search algo-
+Aˆ ← A(s)
+
+available
+items
+1
+2
+3
+draw
+valuations w1
+w2
+Player 1
+offer
+1
+2
+0
+Player 2
+offer
+0
+1
+3
+…
+reached at the tth round, player i receives payoff γtwi · oi.
+Otherwise both players receive zero payoff.
+DoND is a family of challenging general-sum environ-
+Figure 1: Example start of sequential bargaining game instance.
+rithm, minimizing simple regret makes more sense in terms
+of producing a single optimal action at a decision point.
+We assign to each arm a a Gumbel score GS(s, a) =
+g(a) + logit p(s, a) + G(ˆq(s, a)). The second term is the
+logit of a produced by p, and the third term is a monotone
+transformation of the action value ˆq(s, a), which is estimated
+by R(s, a), C(s, a), and v. The intuition is that a high ˆq(s, a)
+value indicates a direction for policy improvement. Indeed,
+the improved policy Imp(p)(s, a) ≜ SoftMax(logit p(s, a)+
+G(ˆq(s, a))) provably achieves higher expected values Dani-
+helka et al. [2022, App. B]. The forms of G and ˆq is detailed
+in App. B.1.
+Adding Gumbel noise g(a) implements the “Gumbel top-
+K-trick”: deterministically selecting the top K actions ac-
+cording to GS(s, a) is equivalent to sampling K actions from
+Imp(p)(s, a) without replacement [Huijben et al., 2022].
+The Gumbel score induces a low-variance non-deterministic
+action selection of the root node during the sequential halv-
+ing process, which encourages exploration while distributing
+the simulation budget toward actions likely to yield higher
+expected values.
+At a non-root node (line 17), an action is selected to mini-
+mize the discrepancy between Imp(p) and the produced vis-
+ited frequency (details in App. B.2). At the end of the search,
+Gumbel IS-MCTS outputs the action a that survives the se-
+quential halving procedure.
+7 Evaluation Study
+7.1 Domain: Alternating Negotiation
+We test our MATAs and evaluation framework in the con-
+text of a two-player negotiation game. The particular version
+we study, called “Deal-or-No-Deal” (DoND) by Lewis et al.
+[2017], is a family of two-player negotiation games where
+the players alternate proposals to divide a pool of resources:
+three different goods available in various amounts. At the
+start of the game, quantities of goods in the pool and players’
+private valuations for units of each good are sampled from a
+known distribution. The valuation distribution is constrained
+to fix a constant value for both players of the aggregate pool:
+c · w1 = c · w2 = 10. For example, in Fig. 1, the pool of
+goods can be represented as c = [1, 2, 3]. The negotiation
+proceeds through alternating proposals for dividing the re-
+sources. In this example, player 1 first proposes o1 = [1, 2, 0]
+for itself which entails o2 = c − o1 = [0, 0, 3] for player 2.
+Player 2 rejects and proposes a counter-offer, to which 1 may
+either agree or continue bargaining. For a particular game
+parametrization Barg(T, ε, γ), the game ends if either (1) a
+deal is made, (2) a maximum number of rounds T is reached,
+or (3) chance decides to terminate the game, which happens at
+every round with probability ε. If an agreement (o1, o2) was
+ments with imperfect information. Players have a common
+interest in reaching a deal (and quickly, for γ < 1), and the
+different ways of dividing the pool have different total value.
+In our studies, we sample configurations uniformly from a
+database of 6796 published by Lewis et al. [2017]. This leads
+to prohibitive complexity: a game with T = 10 has O(1011)
+infosets for every player, which is intractable for enumeration
+(detailed in App. G), and grows exponentially with T.
+7.2 Benchmark Algorithms
+Our meta-game evaluation considers the following M = 17
+MATAs. These algorithms represent a comprehensive set
+of state-of-the-art MARL algorithms, including methods us-
+ing self-play based training, population based training, and
+model-free and model-based approaches. Details are below
+and in App. D.
+Independent/Multiagent PPO (IDPPO/MAPPO)
+Both IDPPO and MAPPO train policy and value nets using
+self-play trajectories by minimizing the trust-region clipped
+loss [Schulman et al., 2017] using the generalized advantage
+estimator (GAE) [Mnih et al., 2016]. Value nets are trained
+by minimizing L2 loss from the targets produced by GAEs.
+In IDPPO each player maintains its own policy and value nets
+whereas in MAPPO [Yu et al., 2022] players share the same
+neural nets.
+Regularized Nash Dynamics (R-NaD) and NFSP
+Both R-NaD [Perolat et al., 2021] and Neural Fictitious Self-
+Play (NFSP) [Heinrich and Silver, 2016] are self-play model-
+free MARL algorithms originally designed for purely adver-
+sarial settings. R-NaD has recently shown success in pro-
+ducing human-level agents in Stratego [Perolat et al., 2022],
+where it iteratively trains policy nets by minimizing NeuRD
+loss [Hennes et al., 2020] and value nets using the V-Trace
+estimator [Espeholt et al., 2018] on a sequence of regularized
+games. NFSP mimics the classic fictitious play algorithm
+[Heinrich and Silver, 2016] by alternating between training a
+supervised learning net that summarizes historical plays and
+training a DQN policy that serves as a best response.
+Policy Space Response Oracles (PSRO) and FCP
+PSRO [Lanctot et al., 2017] and Fictitious Co-Play (FCP)
+[Strouse et al., 2021] are two population-based MARL al-
+gorithms. PSRO is an EGTA method that iteratively adds
+policies that are best responses to the current solution. We
+use max-entropy Nash as the solution concept (solving an
+asymmetric version of (1)), and PPO as the best-response
+method. We consider two ways of extracting the final agents:
+(i) PSRO: using the final-iteration solution and (ii) PSRO-
+LAST: using the final-iteration best-response policies. FCP
+has notably demonstrated success in collaborating with hu-
+mans from scratch [Strouse et al., 2021]. FCP builds a pop-
+ulation by picking policies of different skill levels on multi-
+ple self-play runs, and trains final best responses against such
+populations. Our implementation of FCP uses IDPPO to gen-
+erate self-play runs, picks the agents based on social welfare,
+and uses PPO as the best-response method.
+
+Gumbel Search and Vanilla AlphaZero-style Search
+We include the following variants of Gumbel IS-MCTS:
+(i) G-Search: Using Gumbel IS-MCTS for both training the
+networks (Alg. 4) at training time and conducting search at
+test time. (ii) G-Search-PN: Using search at training time,
+but only policy net without search at test time. (iii) G-
+Search-IDPPO: Using IDPPO to train the policy and value
+nets, based on which Gumbel IS-MCTS executes test-time
+search. (iv) G-Search-MAPPO and (v) G-Search-R-NaD are
+similarly defined. In addition, we implement an extension
+of the original AlphaZero-style MCTS to IS-MCTS. The
+differences between this search method (Alg. 2 in App. C)
+and Gumbel IS-MCTS are in the mechanisms for explo-
+ration (e.g., Dirichlet noise) and action selection (e.g., PUCT)
+within the search tree. We include (vi) VA-Search: Using
+this search for both training time and test time, and (vii) VA-
+Search-PN: similarly defined as (ii).
+Heuristic Strategies
+We further include the following baseline bargaining strate-
+gies: (i) Uniform, which uniformly samples among all le-
+gal actions at each decision point. (ii) Tough, which never
+agrees, and always proposes uniformly among offers that
+maximize its own payoff. (iii) Soft, which always agrees,
+or uniformly proposes among all offers if it is the first-mover.
+7.3 Experimental Setup
+All methods are implemented within the programming model
+of OpenSpiel [Lanctot et al., 2019]. EachMATA that involves
+neural training uses models of approximately equal size (e.g.,
+number of layers, hidden nodes). The neural net inputs are
+likewise the same across all MATAs, and include complete
+history information (i.e., losslessly represent infosets) for the
+DoND game. For procedures that involve self-play or RL
+training we employ roughly the same number of training tra-
+jectories. For all search methods we use 200 simulations per
+call. We fine-tuned the learning rates based on SUMREGRET
+performance. Most of the MATAs reliably produce approxi-
+mate equilibria. Details are in App. E.
+We set |Ωm| = 10, m ∈ {1, . . . ,M}. To simplify the
+evaluation procedure, we pre-compute an empirical payoff
+matrix covering every policy pair: (ˆπm
+1 (ω), ˆπm′
+2 (ω′)), for
+m,m′ ∈ {1, . . . ,M}, ω and ω′ among the seeds sampled
+for Mm and Mm′ , respectively. For each payoff entry we
+run 2 × 104 simulations to compute the expected payoff. We
+then sample and analyze 106 M×M empirical meta-games
+from this matrix, per Steps 2–4 of §5.2, to obtain distributions
+over the statistics of interest.
+7.4 Results
+We test all 17 MATAs on two DoND instances: Barg(10, 0,
+1) and Barg(30, 0.125, 0.935). The two settings are qualita-
+tively different. The latter includes discounting and per-round
+ending probability, incentivizing the players to find and agree
+on a good deal in early rounds. Without these factors, the
+first game reduces to an ultimatum-game-like environment.
+Meta-game statistics are reported in Tables 1 and 2.
+In addition to NE-Regret and uniform scores, we also re-
+port a statistic we term the NE-Nash-Bargaining-Score (NE-
+NBS). The NE-NBS for MATA m in an empirical game is
+defined as the utility-product between πm and an opponent
+strategy σ∗: u(πm, σ∗) · u(σ∗, πm). Here σ∗ is a max-
+entropy Nash computed by (1). This statistic is intended to
+measure the effectiveness of an agent in achieving high social
+welfare and fairness with a rational opponent.
+From the tables we can see that while there is positive
+correlation between NE-Regret Scores and Uniform Scores,
+NE-Regret Scores are better at identifying the most robust
+MATAs: the rankings of the top four MATAs in NE-regret
+scores are the same for both environments, and from the em-
+pirical distribution plots in App. F we can see G-Search-R-
+NaD and G-Search consistently produce strategies that are se-
+lected in a max-entropy equilibrium support with high prob-
+ability. By contrast uniform-score comparisons can be dis-
+torted by non-salient success against weak strategies. It
+is also interesting to note positive correlation between NE-
+Regret and NE-NBS. This reflects the non-zero-sum nature
+of these environments.
+The performance of search-based agents is especially note-
+worthy. Three of the top four MATAs employ search at test
+time. All search methods are stronger than their policy net
+counterparts, confirming that IS-MCTS is a policy-improver
+in imperfect information games. We hypothesize that this
+is because a search-based algorithm is usually a better re-
+sponder to its policy network counterpart, while both behave
+strategically similarly against other methods. The relative
+strength among search-based algorithms mirrors that of their
+policy-net counterparts. In both environments, G-Search and
+VA-Search are among the top four. This suggests that using
+search at training time is compatible with the same search at
+test time, and produces better policy and value nets compared
+with other methods.
+We notice some algorithms behave qualitatively differ-
+ently in these two environments. We found FCP consistently
+produces collaborative strategies with rather high agreement
+probability. This may explain its better performance in the
+second environment, which encourages settling a deal in early
+rounds. Likewise, Soft achieves higher individual scores
+and NE-NBS in the second environment. By contrast, while
+Tough achieves better individual performance than Soft in the
+ultimatum game, it is still worse than all learning methods, as
+shown by its terrible NE-NBS values for both environments.
+Another interesting view is provided by best-response
+graphs. In a best-response graph for a game instance, strate-
+gies are vertices, and there is a directed edge (m1 → m2) iff
+m2 = argmaxm′ u(πm′ , πm1). We generate an aggregate
+graph for a MATA meta-game by recording the frequency of
+such edges in the sampled empirical games. These are shown
+for the two game settings in Fig. 2.
+The empirical best-response graphs support several obser-
+vations. First, many MATA vertices such as IDPPO and
+MAPPO have self-edges with non-negligible frequencies.
+This is consistent with previous observations that self-play
+MARL algorithms are likely to produce agents that overfit to
+themselves [Hu et al., 2020]. However, self-edges do not nec-
+essarily suggest poor generalization performances. For ex-
+ample, G-Search-NaD has a self-edge with a high probability
+in both environments, but still performs the best. Self-edges
+
+MATA Name
+G-Search-R-NaD
+G-Search
+R-NaD
+VA-Search
+G-Search-MAPPO
+PSRO-LAST
+PSRO
+G-Search-IDPPO
+G-Search-PN
+NE-Regret-Score Uniform-Score
+0.002±0.020
+6.158±0.040
+0.010±0.046
+0.045±0.043
+0.092±0.023
+0.354±0.047
+0.414±0.051
+0.417±0.055
+0.480±0.062
+0.575±0.048
+6.215±0.015
+5.977±0.027
+6.074±0.029
+6.038±0.027
+5.890±0.026
+5.904±0.022
+6.088±0.031
+5.811±0.013
+NE-NBS
+44.010±0.794
+44.345±0.496
+42.008±0.738
+MATA Name NE-Regret-Score Uniform-Score
+0.721±0.059
+MAPPO
+IDPPO
+NFSP
+40.836±0.551 VA-Search-PN
+37.808±0.962
+FCP
+39.187±0.762
+38.288±0.873
+36.385±1.317
+42.174±0.493
+Tough
+Soft
+Uniform
+0.766±0.133
+0.806±0.050
+0.843±0.071
+1.116±0.096
+1.801±0.093
+3.189±0.098
+4.274±0.062
+5.602±0.035
+5.645±0.050
+5.766±0.014
+5.570±0.026
+5.804±0.013
+4.017±0.031
+3.773±0.013
+2.391±0.004
+NE-NBS
+32.832±0.818
+30.240±2.051
+36.534±0.721
+36.540±0.717
+38.665±1.092
+6.581±0.137
+27.023±0.855
+11.980±0.494
+Table 1: Results for Barg(10, 0, 1), with 95% confidence intervals. MATAs are listed in increasing order of NE-Regret.
+MATA Name
+G-Search-R-NaD
+G-Search
+R-NaD
+VA-Search
+G-Search-PN
+FCP
+VA-Search-PN
+NFSP
+G-Search-IDPPO
+NE-Regret-Score Uniform-Score
+0.000±0.001
+6.147±0.013
+0.005±0.033
+0.045±0.010
+0.075±0.023
+0.294±0.019
+0.360±0.026
+0.412±0.033
+0.421±0.011
+0.450±0.038
+6.078±0.019
+6.121±0.012
+6.058±0.014
+5.833±0.016
+5.864±0.013
+5.668±0.014
+5.786±0.014
+5.820±0.019
+NE-NBS
+43.681±0.497
+MATA Name
+PSRO
+43.198±0.545 G-Search-MAPPO
+44.072±0.417
+IDPPO
+42.605±0.610
+42.285±0.448
+43.321±0.265
+40.314±0.325
+39.151±0.481
+36.997±0.432
+PSRO-LAST
+MAPPO
+Soft
+Uniform
+Tough
+NE-Regret-Score Uniform-Score
+0.488±0.056
+5.688±0.052
+0.729±0.095
+0.749±0.059
+0.906±0.213
+1.135±0.144
+1.918±0.018
+4.161±0.031
+4.542±0.082
+5.656±0.056
+5.504±0.042
+5.391±0.161
+5.306±0.086
+4.352±0.011
+2.370±0.007
+2.685±0.025
+NE-NBS
+39.851±0.728
+32.983±0.994
+36.350±0.685
+35.723±2.119
+31.878±1.378
+35.990±0.267
+12.562±0.211
+2.270±0.097
+Table 2: Results for Barg(30, 0.125, 0.935), with 95% confidence intervals. MATAs are listed in increasing order of NE-Regret.
+persist even after applying search as policy-improver at test
+time. For example, there are self-edges for G-Search-IDPPO
+and G-Search-MAPPO. This may suggest that there are cer-
+tain strategic correlations between a search agent and its pol-
+icy net counterpart. Interestingly, we also observe certain
+self-edge probabilities for PSRO and PSRO-LAST, which are
+normally regarded as population-based training methods. It
+could be that the equilibria selected at each iteration introduce
+correlations between different players. By contrast, NFSP
+and FCP are two MATAs without strong self-edges; both use
+a uniform distribution for opponent modeling, which may re-
+duce the correlation between player positions.
+Edges across MATAs illuminate strategic interaction struc-
+ture. Tough is unsurprisingly the best response to Soft. G-
+Search-NaD is a strong attractor in both graphs, as G-Search
+is in the first. Sometimes a search-based MATA is a best re-
+sponse to its policy-net counterpart, as illustrated by R-NaD
+to G-Search-R-NaD, and VA-Search-PN to VA-Search. This
+could also explain why MATAs such as G-Search-PN and
+VA-Search-PN do not have apparent self-edges.
+1.0
+g_search_r_nad
+g_search_pn
+g_search_mappo
+idppo
+g_search_idppo
+mappo
+g_search
+nfsp
+an
+psro
+va_search_pn
+psro_last
+va_search
+r_nad
+uniform
+soft
+tough
+0.0
+psro_last
+0.2
+r_nad
+uniform
+soft
+tough
+0.0
+Figure 2: Empirical best-response graphs for Barg(10, 0, 1) and
+Barg(30, 0.125, 0.935).
+References
+Rishabh Agarwal, Max Schwarzer, Pablo Samuel Castro,
+et al. Deep reinforcement learning at the edge of the statis-
+fcp
+psro
+0.4
+\
+=
+\ am
+va_search_pn
+va_search
+mappo
+0.6
+nfsp
+\
+\
+0.8
+idppo
+g_search_idppo
+a
+g_search
+t
+fcp
+~
+0.4
+0.6
+0.2
+Acknowledgment
+This work was supported in part by funding from the US
+Army Research Office (MURI grant W911NF-18-1-0208),
+and a grant from Open Philanthropy.
+g_search_r_nad
+g_search_pn
+g_search_mappo
+0.8
+1.0
+8 Conclusion
+We propose a meta-game evaluation framework for MARL in
+general-sum environments. Our approach is analogous to the
+evaluation process for single-agent RL, effectively aggregat-
+ing the strategic analysis procedures across possible worlds
+defined by different seed combinations. We illustrated the
+method by constructing a meta-game model over a compre-
+hensive set of multiagent training algorithms using deep RL
+on a class of negotiation games. The meta-game analysis
+evaluated the algorithms in multiple ways, most prominently
+through max entropy NE-regret ranking and the structure of
+best-response graphs. Bootstrap statistics provide a basis for
+assessing uncertainty in evaluation results.
+Experimental results support several interesting observa-
+tions about Gumbel IS-MCTS as a meta-strategy operator,
+especially regarding the value of search at both training time
+and test time, and on patterns of strategic interactions among
+the algorithms.
+A key feature of our evaluation framework is the flexibil-
+ity to investigate a variety of statistics of interest through a
+carefully structured process. Future work will focus on un-
+derstanding the robustness of alternative measures that can
+be employed for algorithm assessment through meta-games,
+and developing effective tools for statistical analysis.
+
+tical precipice. In 35th Int’l Conf. on Neural Information
+Processing Systems, pages 29304–29320, 2021.
+Robert J. Aumann. Mixed and behavior strategies in infi-
+nite extensive game. In M. Dresher, L. S. Shapley, and
+A. W. Tucker, editors, Advances in Game Theory, Annals
+of Mathematics Studies, pages 627–650. Princeton Univer-
+sity Press, 1964.
+David Balduzzi, Karl Tuyls, Julien Perolat, and Thore Grae-
+pel. Re-evaluating evaluation. In 32nd Int’l Conf. on Neu-
+ral Information Processing Systems, 2018.
+Marc G. Bellemare, Yavar Naddaf, Joel Veness, and Michael
+Bowling. The arcade learning environment: An evaluation
+platform for general agents. Journal of Artificial Intelli-
+gence Research, 47:253–279, 2013.
+Leo Breiman. Bagging predictors. Machine Learning,
+24:123–140, 1996.
+Noam Brown, Anton Bakhtin, Adam Lerer, and Qucheng
+Gong. Combining deep reinforcement learning and search
+for imperfect-information games. In 34th Int’l Conf. on
+Neural Information Processing Systems, pages 17057–
+17069, 2020.
+S´ebastien Bubeck, R´emi Munos, and Gilles Stoltz. Pure ex-
+ploration in multi-armed bandits problems. In 20th Int’l
+Conf. on Algorithmic Learning Theory, pages 23–37, 2009.
+Shih-Fen Cheng, Daniel M. Reeves, Yevgeniy Vorobeychik,
+and Michael P. Wellman. Notes on equilibria in symmetric
+games. In AAMAS-04 Workshop on Game-Theoretic and
+Decision-Theoretic Agents, 2004.
+Peter I. Cowling, Edward J. Powley, and Daniel Whitehouse.
+Information set Monte Carlo tree search. IEEE Trans-
+actions on Computational Intelligence and AI in Games,
+4:120–143, 2012.
+Ivo Danihelka, Arthur Guez, Julian Schrittwieser, and David
+Silver. Policy improvement by planning with Gumbel. In
+10th Int’l Conf. on Learning Representations, 2022.
+Anthony Christopher Davison and David Victor Hinkley.
+Bootstrap Methods and Their Application. Cambridge
+University Press, 1997.
+Lasse Espeholt, Hubert Soyer, Remi Munos, et al. IMPALA:
+Scalable distributed deep-RL with importance weighted
+actor-learner architectures. In 35th Int’l Conf. on Machine
+Learning, pages 1407–1416, 2018.
+Jakob Foerster, Gregory Farquhar, Triantafyllos Afouras,
+Nantas Nardelli, and Shimon Whiteson. Counterfactual
+multi-agent policy gradients. In 32nd AAAI Conf. on Ar-
+tificial Intelligence, 2018.
+Rihab Gorsane, Omayma Mahjoub, Ruan John de Kock,
+Roland Dubb, Siddarth Singh, and Arnu Pretorius. To-
+wards a standardised performance evaluation protocol for
+cooperative MARL. In 36th Int’l Conf. on Neural Informa-
+tion Processing Systems, pages 5510–5521, 2022.
+Sven Gronauer and Klaus Diepold. Multi-agent deep rein-
+forcement learning: A survey. Artificial Intelligence Re-
+view, 55:895–943, 2022.
+Gurobi Optimization, LLC. Gurobi Optimizer Reference
+Manual, 2023.
+Andreas Hefti. Equilibria in symmetric games: Theory
+and applications. Theoretical Economics, 12(3):979–1002,
+2017.
+Johannes Heinrich and David Silver. Deep reinforcement
+learning from self-play in imperfect-information games.
+arXiv preprint arXiv:1603.01121, 2016.
+Peter Henderson, Riashat Islam, Philip Bachman, et al. Deep
+reinforcement learning that matters. In 32nd AAAI Conf.
+on Artificial Intelligence, 2018.
+Daniel Hennes, Dustin Morrill, Shayegan Omidshafiei, et al.
+Neural replicator dynamics: Multiagent learning via hedg-
+ing policy gradients. In 19th Int’l Conf. on Autonomous
+Agents and Multi-Agent Systems, pages 492–501, 2020.
+Hengyuan Hu, Adam Lerer, Alex Peysakhovich, and Jakob
+Foerster. “Other-play” for zero-shot coordination. In 37th
+Int’l Conf. on Machine Learning, pages 4399–4410, 2020.
+Hengyuan Hu, Adam Lerer, Noam Brown, and Jakob Fo-
+erster. Learned belief search: Efficiently improving
+policies in partially observable settings. arXiv preprint
+arXiv:2106.09086, 2021.
+Iris A. M. Huijben, Wouter Kool, Max B. Paulus, and Ruud
+J. G. Van Sloun. A review of the Gumbel-max trick and
+its extensions for discrete stochasticity in machine learn-
+ing. IEEE Transactions on Pattern Analysis and Machine
+Intelligence, 45(2):1353–1371, 2022.
+Patrick R. Jordan, Christopher Kiekintveld, and Michael P.
+Wellman. Empirical game-theoretic analysis of the TAC
+supply chain game. In 6th Int’l Conf. on Autonomous
+Agents and Multi-Agent Systems, pages 1188–1195, 2007.
+Scott Jordan, Yash Chandak, Daniel Cohen, Mengxue Zhang,
+and Philip Thomas. Evaluating the performance of rein-
+forcement learning algorithms. In 37th Int’l Conf. on Ma-
+chine Learning, pages 4962–4973, 2020.
+Christopher Kiekintveld and Michael P. Wellman. Selecting
+strategies using empirical game models: An experimen-
+tal analysis of meta-strategies. In 7th Int’l Conf. on Au-
+tonomous Agents and Multi-Agent Systems, pages 1095–
+1101, 2008.
+David M. Kreps. Game Theory and Economic Modelling.
+Oxford University Press, 1990.
+Marc Lanctot, Vinicius Zambaldi, Audrunas Gruslys, et al. A
+unified game-theoretic approach to multiagent reinforce-
+ment learning. In 31st Int’l Conf. on Neural Information
+Processing Systems, pages 4190–4203, 2017.
+Marc Lanctot, Edward Lockhart, Jean-Baptiste Lespiau, et al.
+Openspiel: A framework for reinforcement learning in
+games. arXiv preprint arXiv:1908.09453, 2019.
+Joel Z. Leibo, Edgar A. Due˜nez-Guzman, Alexander Vezhn-
+evets, et al. Scalable evaluation of multi-agent reinforce-
+ment learning with Melting Pot. In 38th Int’l Conf. on Ma-
+chine Learning, pages 6187–6199, 2021.
+
+Mike Lewis, Denis Yarats, Yann N. Dauphin, Devi Parikh,
+and Dhruv Batra. Deal or no deal? End-to-end learning for
+negotiation dialogues. In Conference on Empirical Meth-
+ods in Natural Language Processing, 2017.
+Zun Li, Marc Lanctot, Kevin R. McKee, et al. Combin-
+ing tree-search, generative models, and Nash bargaining
+concepts in game-theoretic reinforcement learning. arXiv
+preprint arXiv:2302.00797, 2023.
+Ryan Lowe, Yi I. Wu, Aviv Tamar, Jean Harb, Pieter Abbeel,
+and Igor Mordatch. Multi-agent actor-critic for mixed
+cooperative-competitive environments. In 31st Int’l Conf.
+on Neural Information Processing Systems, 2017.
+Marlos C. Machado, Marc G. Bellemare, Erik Talvitie, Joel
+Veness, Matthew Hausknecht, and Michael Bowling. Re-
+visiting the arcade learning environment: Evaluation pro-
+tocols and open problems for general agents. Journal of
+Artificial Intelligence Research, 61:523–562, 2018.
+Volodymyr Mnih, Adria Puigdomenech Badia, Mehdi Mirza,
+et al. Asynchronous methods for deep reinforcement learn-
+ing. In 33rd Int’l Conf. on Machine Learning, pages 1928–
+1937, 2016.
+John Nash. Non-cooperative games. Annals ofMathematics,
+pages 286–295, 1951.
+Georgios Papoudakis, Filippos Christianos, Lukas Sch¨afer,
+and Stefano V. Albrecht. Comparative evaluation of co-
+operative multi-agent deep reinforcement learning algo-
+rithms. arXiv preprint arXiv:2006.07869, 2020.
+Tom Pepels, Tristan Cazenave, Mark H. M. Winands, and
+Marc Lanctot. Minimizing simple and cumulative regret
+in monte-carlo tree search. In ECAI-14 Workshop on Com-
+puter Games, pages 1–15, 2014.
+Julien Perolat, Remi Munos, Jean-Baptiste Lespiau,
+Shayegan Omidshafiei, et al. From Poincar´e recurrence
+to convergence in imperfect information games: Finding
+equilibrium via regularization. In 38th Int’l Conf. on
+Machine Learning, pages 8525–8535, 2021.
+Julien Perolat, Bart De Vylder, Daniel Hennes, et al. Master-
+ing the game of Stratego with model-free multiagent rein-
+forcement learning. Science, 378(6623):990–996, 2022.
+Tabish Rashid, Mikayel Samvelyan, Christian Schroeder
+De Witt, et al. Monotonic value function factorisation for
+deep multi-agent reinforcement learning. Journal of Ma-
+chine Learning Research, 21(178):7234–7284, 2020.
+Tuomas Sandholm, Andrew Gilpin, and Vincent Conitzer.
+Mixed-integer programming methods for finding Nash
+equilibria. In 19th AAAI Conf. on Artificial Intelligence,
+pages 495–501, 2005.
+Martin Schmid, Matej Moravcik, Neil Burch, and
+Rudolf Kadlec others. Student of games: A unified
+learning algorithm for both perfect and imperfect informa-
+tion games. Science Advances, 2023.
+John Schulman, Philipp Moritz, et al. High-dimensional con-
+tinuous control using generalized advantage estimation. In
+Fourth International Conference on Learning Representa-
+tions, 2016.
+John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Rad-
+ford, and Oleg Klimov. Proximal policy optimization al-
+gorithms. arXiv preprint arXiv:1707.06347, 2017.
+David Silver and Joel Veness. Monte-Carlo planning in large
+POMDPs. In 24th Int’l Conf. on Neural Information Pro-
+cessing Systems, volume 23, 2010.
+David Silver, Aja Huang, Chris J. Maddison, Arthur Guez,
+Laurent Sifre, George Van Den Driessche, et al. Mastering
+the game of Go with deep neural networks and tree search.
+Nature, 529(7587):484–489, 2016.
+David Silver, Thomas Hubert, Julian Schrittwieser, et al.
+A general reinforcement learning algorithm that mas-
+ters chess, shogi, and Go through self-play. Science,
+362(6419):1140–1144, 2018.
+Samuel Sokota, Gabriele Farina, David J Wu, Hengyuan Hu,
+Kevin A Wang, J. Zico Kolter, and Noam Brown. The
+update equivalence framework for decision-time planning.
+In Thirteenth International Conference on Learning Rep-
+resentation, 2024.
+D. J. Strouse, Kevin McKee, Matt Botvinick, Edward
+Hughes, and Richard Everett. Collaborating with humans
+without human data. In 35th Int’l Conf. on Neural Infor-
+mation Processing Systems, pages 14502–14515, 2021.
+Johannes Treutlein, Michael Dennis, Caspar Oesterheld, and
+Jakob Foerster. A new formalism, method and open issues
+for zero-shot coordination. In 38th Int’l Conf. on Machine
+Learning, pages 10413–10423, 2021.
+Karl Tuyls, Julien Perolat, Marc Lanctot, Edward Hughes,
+et al. Bounds and dynamics for empirical game-theoretic
+analysis. Autonomous Agents and Multi-Agent Systems,
+34(7), 2020.
+Oriol Vinyals, Igor Babuschkin, Wojciech M. Czarnecki,
+Micha¨el Mathieu, Andrew Dudzik, Junyoung Chung,
+David H. Choi, et al. Grandmaster level in StarCraft
+II using multi-agent reinforcement learning.
+Nature,
+575(7782):350–354, 2019.
+Michael P. Wellman. Putting the agent in agent-based
+modeling. Autonomous Agents and Multi-Agent Systems,
+30:1175–1189, 2016.
+Bryce Wiedenbeck, Ben-Alexander Cassell, and Michael P.
+Wellman. Bootstrap statistics for empirical games. In 13th
+Int’l Conf. on Autonomous Agents and Multi-Agent Sys-
+tems, pages 597–604, 2014.
+Peter R. Wurman, Samuel Barrett, Kenta Kawamoto, James
+MacGlashan, Kaushik Subramanian, et al. Outracing
+champion Gran Turismo drivers with deep reinforcement
+learning. Nature, 602(7896):223–228, 2022.
+Chao Yu, Akash Velu, Eugene Vinitsky, Jiaxuan Gao,
+Yu Wang, Alexandre Bayen, and Yi Wu. The surprising
+effectiveness of PPO in cooperative multi-agent games. In
+36th Int’l Conf. on Neural Information Processing Systems,
+pages 24611–24624, 2022.
+
+A Max-Entropy Nash
+In practice, it might be expensive to directly optimize the objective, due to the nonlinearity of the entropy function. We instead
+optimize a piecewise linear approximation of the objective. We have the following result.
+Theorem 1. Given ϵ > 0, an ϵ-maximum-entropy symmetric Nash can be solved by a mixed-integer linear program based
+on (1) with an additional O(| ˆΠ|2/ϵ) linear constraints.
+A.1 Proof of Theorem 1
+Proof. The idea is to transform (1) into the following mixed-integer linear program:
+min
+σ∗
+X
+π∈ ˆΠ
+γπ
+s.t. ∀π ∈ ˆΠ,
+∀k ∈ [K], γπ ≥ lk(σ∗(π))
+uπ =
+X
+π′∈ ˆΠ
+u∗ ≥ uπ
+u∗ − uπ ≤ Ubπ
+σ(π) ≤ 1 − bπ
+σ∗(π) ≥ 0
+X
+π
+σ∗(π) = 1
+bπ ∈ {0, 1}
+Where lk(x) = f( k
+K) +
+f( k+1
+K )−f( k
+K )
+1
+K
+(x − f( k
+K)) is the k-th piecewise linear segment of the function f(x) = x log x,
+for a total of K segments. Denote the convex envelope of all these K segments as l(x). The additional constraints are
+γπ ≥ lk(σ∗(π)). When we solve (2) exactly, one of these K inequalities will be satisfied at equality.
+Let f(x∗) be the minimum of f and l(x′) be the minimum of the piecewise approximation. Then if |f −l|∞ < ϵ, we can see
+that f(x∗) ≥ l(x∗) − ϵ ≥ l(x′) − ϵ. Then x′ is an ϵ-optimal solution of f.
+Then to achieve an ϵ-optimal solution of (1) we need to choose some K, such that |f − l|∞ < ϵ
+| ˆΠ| .
+For the segment Ik = [ k
+m, k+1
+m ], by elementary calculus we can find g(k) = maxx∈Ik |x log x − lk(x)| = k+1
+eK (1 + 1
+k )k −
+k(k+1)
+K log(1 + 1
+k ). This happens when x = k+1 1 + 1 	k
+eK
+We will now prove
+e +
+g′(k) =
+	�
+1 + 1 	k
+k
+(1 + k) − e(1 + 2k)
+	
+eK
+To show this, by arranging the numerator, we need to show that
+ 
+k + (1 + k)
+First notice that
+1 −
+1
+e
+	
+1 +
+1
+k
+	k
+= 1 − ek log(1+ 1
+k )−1
+= 1 − e− 1
+≥ 1 − e− 1
+2k+ 1
+3k2 − 1
+4k3 + 1
+5k4 +...
+2k+ 1
+3k2
+≥ (−
+1
+=
+2k
+1
+2k
+−
++
+3k2 ) −
+1
+11
+24k2 +
+1
+6k3 −
+1
+2
+	
+1
+−
+2k
+1
++
+18k4
+1
+3k2
+	2
+ 
+1 −
+1
+e
+	
+1 +
+1
+k
+	k!!
+log
+	
+1 +
+1
+k
+	
+log 1 + 1
+�
+k
+	
+< 0
+�
+k
+.
+(2)
+σ∗(π)u(π, π′)
+> 1
+
+Then when k ≥ 7
+(1 + k)
+≥(1 + k)
+= +
+1
+2
+Therefore
+ 
+k + (1 + k)
+Let h(k) = k + 1
+�
+2
+	
+log 1 + 1
+ 
+1 −
+1
+e
+	
+1 +
+1
+k
+	k!!
+log
+�
+k . Then h′(k) = log 1 + 1
+	
+�
+	
+1 +
+1
+k
+	
+k
+	
+− 1
+2k −
+> k +
+	
+1
+2
+	
+log
+	
+1 +
+1
+k
+	
+2(k+1) h′′(k) = −k(k+1) + 1
+1
+1
+2k2 + 1
+2(k+1)2 > 0.
+Therefore h′(k) increases. And since limk→∞ h′(k) = 0 we can deduce h′(k) < 0. Therefore h(k) is decreasing. And since
+limk→∞ h(k) = 1 we can see that h(k) > 1. Therefore the we have proved g′(k) < 0 for k ≥ 7 is decreasing. It is easy to
+verify it also holds for k < 7. So g(k) achieves maximum 1
+eK when k = 0.
+K · (|Π|) = O
+Then we have when K =
+	
+| ˆΠ|2
+ϵ
+	
+j
+| ˆΠ|
+eϵ
+k
++ 1, we can obtain an ϵ-optimal maximum entropy Nash by solving (2) with additional
+linear constraints.
+A.2 Setup
+We use GUROBI [Gurobi Optimization, LLC, 2023] as the solver. In our experiments we always solve for a 0.05-optimal
+max-entropy Nash.
+B Details of Gumbel IS-MCTS
+B.1 Value Estimation
+When C(s, a) > 0, we simply let ˆq(s, a) = R(s,a)
+1
+−
+24k
+ 
+	
+1 −
+1
+−
+2k
+7
+1
+e
+	
+1 +
+11
+24k2 +
+1
+24k2 +
+1
+k
+	k!
+1
+6k3 −
+1
+9k3 −
+18k4 >
+1
+18k4
+	
+1
+2
+C(s,a) . When C(s, a) = 0, following [Danihelka et al., 2022], we let
+qˆ(s, a) =
+1
+1 +
+P
+b C(s, b)
+
+v(s, a) +
+P
+b C(s, b)
+P
+b:C(s,b)>0 p(s, b)
+X
+b:C(s,b)>0
+R(s, b)
+C(s, b)
+p(s, b)
+
+
+as an estimator. And we use G(ˆq(s, a)) = c2(c1 + maxb C(s, b))ˆq(s, a), for some c1, c2 > 0.
+B.2 Action Selection at Non-Root Nodes
+At a non-root node, an action is selected to minimize the discrepancy between Imp(p) and the produced visited frequency:
+argmin
+a
+C Algorithms Pseudocode
+C.1 Vanilla AlphaZero Search
+Pseudocode presented as Alg. 2.
+C.2 Sequential Halving
+Pseudocode presented as Alg. 3.
+C.3 Self-play based Training
+Pseudocode presented as Alg. 4.
+D Hyperparameters
+D.1 Input Representation
+We use the infostate tensor in OpenSpiel [Lanctot et al., 2019] as the representation of infostate. In Bargaining games, this
+includes information (1) which player the current agent is playing (2) pool configuration (3) the player’s own private valuation
+(4) the current round number.
+X
+b
+	
+Imp(p)(si, b) −
+C(si, b) + 1{a = b}
+1 +
+P
+c C(si, c)
+	2
+(3)
+
+Algorithm 2 Vanilla AlphaZero-styled IS-MCTS
+1: function VA-Search(s, v, p)
+2: ∀(s, a), R(s, a) = 0, C(s, a) = 0.
+3: ∀a ∈ A(s), sample d(a) ∼ Dirichlet(α)
+4:
+for iter = 1, . . . , num sim do
+5:
+6:
+7:
+8:
+9:
+10:
+11:
+12:
+13:
+14:
+15:
+16:
+17:
+18:
+19:
+20:
+21:
+22:
+23:
+Sample a world state: h ∼ Pr(h | s, p)
+while do
+if h is terminal then
+r ← payoffs of players. Break
+else if i ≜ τ(h) is chance then
+a ← sample according to chance
+else if si(h) not in search tree then
+Add si(h) to search tree.
+r ← v(si(h)). Break
+else if si(h) is root node s then
+a ← arg maxa
+else
+a ← arg maxa
+end if
+h ← ha
+end while
+for (si, a) in this trajectory do
+R(si, a) += ri, C(si, a) += 1
+end for
+24: end for
+25:
+return Action a = argmaxC(s, a), (During training) a policy target that is the normalized visited count of s.
+26: end function
+D.2 PPO Algorithms
+We use the same PPO hyperparameters for every place when it is used. See Table 3. For single-agent PPO and IDPPO, the PPO
+algorithm trains policy nets by minimizing the clipped loss Et
+h
+min
+	
+πold(at|st)Aˆt, clip
+πθ(at|st)
+	
+πold(at|st) , 1 + ϵ, 1 − ϵ Aˆt
+πθ(at|st)
+	
+	i
+R(si,a)
+C(si,a) + cpuctp(s, a)
+√
+C(si,a)
+1+
+P
+b C(si,b)
+R(si,a)
+C(si,a) + cpuct((1 − ϵ)p(s, a) + ϵd(a))
+√
+C(si,a)
+1+
+P
+b C(si,b) .
+, where
+At is estimated by generalized advantage estimation (GAE) [Schulman et al., 2016]. Value nets are updated by minimizing L2
+loss from the value targets produced by GAE. For MAPPO, the loss is simply the summation of individual PPO losses of every
+player.
+D.3 R-NaD
+We fine-tuned the learning rate to be 1e-3, the total number of game trajectories to be around 1e6. Others are the same as the
+default hyperparameters in OpenSpiel [Lanctot et al., 2019].
+D.4 NFSP
+See Table 4.
+D.5 PSRO
+See Table 5.
+D.6 FCP
+See Table 6
+D.7 Gumbel Search
+See Table 7.
+D.8 VA Search
+See Table 8.
+
+Algorithm 3 Sequential Halving
+1: function Seq-Hal( ˆA,K)
+2:
+Maintain a static variable epoch across different calls of this function, initialized as 0
+3:
+4:
+5:
+if epoch == 0 then
+Aˆ ←K actions with largest g(a) + logit p(s, a)
+epoch += 1
+6: end if
+7: a ← an action that has not been visited ⌊ sim num
+2epoch−1 log2 K⌋ times at current epoch in Aˆ
+K
+8:
+9:
+10:
+if All actions in Aˆ have been visited ⌊ sim num
+2epoch−1 log2 K⌋ times in current epoch then
+K
+Aˆ ← Top ⌊ K
+2epoch ⌋ actions in Aˆ based on g(a) + logit p(s, a) +G(ˆq(s, a))
+epoch ← epoch + 1
+11: end if
+12:
+return a, ˆA.
+13: end function
+Hyperparameter Name
+Learning rate
+Optimizer
+Batch size
+Number of minibatch
+Number of updates per epoch
+Values
+2e − 4
+Adam
+16
+4
+10
+Number of steps per PPO trajectory 64
+Number of game trajectories in total 1e6
+Entropy weight
+0.01
+Clipped parameter ϵ
+GAE lambda
+RL discount factor
+Torso for policy nets
+Torso for value nets
+0.2
+0.95
+1
+[256, 256]
+[256, 256]
+Table 3: Hyper-parameters for PPO.
+E SUMREGRET Results
+All SUMREGRETs are estimated using PPO as a best response method. The results are reported across three random seeds.
+E.1 Barg(10, 0, 1)
+See Figures 3.
+E.2 Barg(30, 0.125, 0.935)
+See Figures 4.
+F Empirical Distribution of REGRET
+F.1 Barg(10, 0, 1)
+See Figures 5.
+F.2 Barg(30, 0.125, 0.935)
+See Figures 6
+G Approximate Size of Deal or No Deal
+To estimate the size of Deal or No Deal, we first verified that there are 142 unique preference vectors per player. Then, we
+generated 10,000 simulations of trajectories using uniform random policy, computing the average branching factor (number of
+legal actions per player at each state) as b ≈ 23.5.
+Since there are 142 different information states for player 1’s first decision, about 142bb player 1’s second decision, etc.
+leading to 142(1+b2 +b4 +b8) ≈ 13.2×1012 information states. Similarly, player 2 has roughly 142(1+b1 +b3 +b5 +b7) =
+5.63 × 1011 information states.
+
+Algorithm 4 Self-Play Training for Search Methods
+1: function Self-Play-Train(G)
+2:
+Initialize v, v′, p, p′
+3: Dv = {},Dp = {}
+4:
+for iter = 1, . . . , num epoch do
+5:
+6:
+7:
+8:
+9:
+10:
+11:
+12:
+13:
+14:
+15:
+16:
+17:
+18:
+19:
+20:
+21:
+h ← Initial state h0 of G
+while do
+if h is terminal then
+r ← payoffs of players Break
+else if i ≜ τ(h) is chance then
+a ← sample according to chance
+else
+a, π ← SEARCH(si(h), v′, p′)
+Dp ← Dp ∪ {(si(h), π)}, π is the visiting frequency during search
+end if
+h ← ha
+end while
+for si in this trajectory do
+Dv ← Dv ∪ {si, ri}
+end for
+v, p ← UPDATE(Dv,Dp)
+Replace parameters of v′, p′ with the latest parameters of v, p periodically.
+22: end for
+23:
+return v, p
+24: end function
+Hyperparameter Name
+RL network Learning rate
+DQN buffer size
+SL network learning rate
+Optimizer
+Batch size
+Values
+0.01
+217
+0.01
+Adam
+256
+Number of game trajectories in total 1e6
+Torso for RL net
+[256, 256]
+Torso for SL net
+[256, 256]
+Table 4: Hyper-parameters for NFSP.
+Hyperparameter Name
+Number of PSRO iterations
+best-response method
+Values
+32
+PPO
+Number of game trajectories to train each BR 1e6
+Meta-strategy solver
+Max-entropy Nash
+Table 5: Hyper-parameters for PSRO.
+Hyperparameter Name
+Number of self-play runs
+Values
+32
+Number of checkpoint strategies considered per run 100
+Strategies picked each run
+The first one, the last one, and the one that just achieves half of the social welfare of the last one
+Self-play method
+best-response method
+IDPPO
+PPO
+Table 6: Hyper-parameters for FCP.
+
+Hyperparameter Name
+Learning rate
+Optimizer
+Batch size
+Max buffer size
+c1
+c2
+sim num
+K
+Network delayed period
+Values
+2e − 4
+SGD
+256
+217
+50
+0.1
+200
+16
+1000
+Number of game trajectories in total 1e6
+Torso for PVN
+[256, 256]
+Table 7: Hyper-parameters for Gumbel Search.
+Hyperparameter Name
+Learning rate
+Optimizer
+Batch size
+Max buffer size
+cpuct
+sim num
+Dirichlet α
+ϵ
+Network delayed period
+Values
+1e − 3
+SGD
+256
+217
+20
+200
+1
+|A| · 1
+0.25
+1000
+Number of game trajectories in total 1e6
+Torso for PVN
+[256, 256]
+Table 8: Hyper-parameters for VA Search.
+
+FCP
+G-Search
+10
+10
+10
+IDPPO
+8
+8
+8
+6
+6
+6
+4
+4
+4
+2
+2
+2
+0
+0
+0.0
+0.2
+0.4
+0.6
+Number of Trajectories
+0.8
+1.0
+1e6
+0.0
+0.2
+0.4
+0.6
+Number of Trajectories
+0.8
+1.0
+1e6
+0
+0.0
+0.2
+0.4
+0.6
+Number of Trajectories
+0.8
+1.0
+1e6
+MAPPO
+NFSP
+10
+10
+8
+8
+6
+6
+4
+4
+2
+2
+6
+5
+4
+3
+2
+1
+0
+0
+0.0
+0.2
+0.4
+0.6
+Number of Trajectories
+0.8
+1.0
+1e6
+0
+0.0
+0.2
+0.4
+0.6
+Number of Trajectories
+0.8
+1.0
+1e6
+0
+5
+10
+15
+PSRO Iterations
+20
+25
+30
+PSRO
+PSRO-LAST
+R-NaD
+10
+6
+5
+4
+3
+2
+1
+0
+0
+5
+10
+15
+PSRO Iterations
+20
+25
+30
+10
+VA-Search
+8
+8
+6
+6
+4
+4
+2
+2
+0
+0
+0.0
+0.2
+0.4
+0.6
+Number of Trajectories
+0.8
+1.0
+1e6
+0.0
+0.2
+0.4
+0.6
+Number of Trajectories
+0.8
+1.0
+1e6
+Figure 3: SUMREGRET of Barg(10, 0, 1)
+Pe
+Lo
+NashConv
+NashConv
+NashConv
+NashConv
+NashConv
+NashConv
+NashConv
+NashConv
+NashConv
+
+FCP
+G-Search
+10
+10
+10
+IDPPO
+8
+8
+8
+6
+6
+6
+4
+4
+4
+2
+2
+2
+0
+0
+0.0
+0.2
+0.4
+0.6
+Number of Trajectories
+0.8
+1.0
+1e6
+0.0
+0.2
+0.4
+0.6
+Number of Trajectories
+0.8
+1.0
+1e6
+0
+0.0
+0.2
+0.4
+0.6
+Number of Trajectories
+0.8
+1.0
+1e6
+MAPPO
+NFSP
+10
+10
+8
+8
+6
+6
+4
+4
+2
+2
+4.0
+3.5
+3.0
+2.5
+2.0
+1.5
+1.0
+0.5
+0.0
+0
+0.0
+0.2
+0.4
+0.6
+Number of Trajectories
+0.8
+1.0
+1e6
+0
+0.0
+0.2
+0.4
+0.6
+Number of Trajectories
+0.8
+1.0
+1e6
+0
+5
+10
+15
+PSRO Iterations
+20
+25
+30
+PSRO
+PSRO-LAST
+R-NaD
+10
+4.0
+3.5
+3.0
+2.5
+2.0
+1.5
+1.0
+0.5
+0.0
+0
+5
+10
+15
+PSRO Iterations
+20
+25
+30
+10
+VA-Search
+8
+8
+6
+6
+4
+4
+2
+2
+0
+0
+0.0
+0.2
+0.4
+0.6
+Number of Trajectories
+0.8
+1.0
+1e6
+0.0
+0.2
+0.4
+0.6
+Number of Trajectories
+0.8
+1.0
+1e6
+Figure 4: SUMREGRET of Barg(30, 0.125, 0.935)
+PLL
+NashConv
+NashConv
+NashConv
+aa==-
+NashConv
+NashConv
+NashConv
+NashConv
+NashConv
+NashConv
+
+fcp
+g_search
+0.40
+0.80
+0.30
+0.60
+0.20
+0.40
+0.10
+0.20
+0.00
+0.0
+0.2
+0.4
+0.6
+0.8
+NE-regret
+g_search_r_nad
+1.00
+0.80
+0.60
+0.40
+0.20
+0.00
+0.0
+0.2
+0.4
+0.6
+NE-regret
+nfsp
+0.60
+0.50
+0.40
+0.30
+0.20
+0.10
+0.00
+0.2
+0.4
+0.6
+NE-regret
+soft
+0.40
+0.30
+0.20
+0.10
+0.00
+2.0
+2.2
+2.4
+2.6
+2.8
+NE-regret
+va_search_pn
+0.50
+3.0
+3.2
+3.4
+3.6
+0.70
+0.60
+0.50
+0.40
+0.30
+0.20
+0.10
+0.00
+1.5
+2.0
+2.5
+3.0
+NE-regret
+3.5
+4.0
+0.8
+1.0
+0.30
+0.25
+0.20
+0.15
+0.10
+0.05
+0.00
+0.0
+0.1
+0.2
+0.3
+0.4
+NE-regret
+tough
+0.40
+0.5
+0.6
+0.7
+0.40
+0.35
+0.30
+0.25
+0.20
+0.15
+0.10
+0.05
+0.00
+0.0
+0.1
+0.2
+0.3
+0.4
+NE-regret
+uniform
+0.30
+0.20
+0.10
+0.00
+3.6
+3.8
+4.0
+NE-regret
+4.2
+4.4
+4.6
+0.35
+0.30
+0.25
+0.20
+0.15
+0.10
+0.05
+0.00
+0.00
+0.05
+0.10
+0.15
+NE-regret
+0.20
+0.25
+0.5
+0.6
+0.7
+0.8
+0.80
+0.8
+1.0
+1.2
+0.40
+0.35
+0.30
+0.25
+0.20
+0.15
+0.10
+0.05
+0.00
+0.1
+0.2
+0.3
+0.4
+0.5
+NE-regret
+psro
+0.6
+0.7
+0.8
+1.0
+1.2
+1.4
+1.6
+0.00
+0.0
+0.2
+0.4
+0.6
+0.8
+NE-regret
+g_search_pn
+0.20
+0.50
+0.15
+0.40
+0.30
+0.10
+0.20
+0.05
+0.10
+0.00
+0.0
+0.2
+0.4
+0.6
+0.8
+NE-regret
+psro_last
+1.0
+1.2
+1.4
+0.00
+0.00
+0.25
+0.50
+0.75
+1.00
+NE-regret
+r_nad
+1.25
+1.50
+1.75
+1.0
+1.2
+1.4
+0.35
+0.30
+0.25
+0.20
+0.15
+0.10
+0.05
+0.00
+0.0
+0.2
+0.4
+NE-regret
+idppo
+0.6
+0.8
+g_search_idppo
+0.40
+0.35
+0.30
+0.25
+0.20
+0.15
+0.10
+0.05
+0.00
+0.0
+0.1
+0.2
+0.3
+0.4
+NE-regret
+mappo
+0.5
+0.6
+0.7
+0.8
+g_search_mappo
+0.60
+0.40
+0.20
+0.00
+0.00
+0.25
+0.50
+0.75
+NE-regret
+va_search
+1.00
+1.25
+1.50
+0.40
+0.30
+0.20
+0.10
+0.00
+0.4
+0.6
+0.8
+1.0
+NE-regret
+1.2
+1.4
+Figure 5: Empirical Distribution of NE-Regret of Barg(10, 0, 1)
+He
+ee
+Frequency
+Frequency
+Frequency
+Frequency
+Frequency
+Frequency
+Frequency
+Frequency
+Frequency
+Frequency
+Frequency
+Frequency
+Frequency
+eee
+ae
+Frequency
+Frequency
+Frequency
+Frequency
+
+fcp
+g_search
+0.50
+1.00
+0.40
+0.40
+0.80
+0.20
+0.30
+0.30
+0.60
+0.15
+0.20
+0.20
+0.40
+0.10
+0.10
+0.20
+0.10
+0.05
+0.00
+0.0
+0.1
+0.2
+0.3
+NE-regret
+g_search_r_nad
+1.00
+0.30
+0.25
+0.80
+0.20
+0.60
+0.15
+0.40
+0.10
+0.20
+0.05
+0.00
+0.000 0.025 0.050 0.075 0.100 0.125 0.150 0.175 0.200
+NE-regret
+nfsp
+0.35
+0.30
+0.25
+0.20
+0.15
+0.10
+0.05
+0.00
+0.30
+0.35
+0.40
+NE-regret
+soft
+0.30
+0.50
+0.25
+0.40
+0.20
+0.30
+0.15
+0.20
+0.10
+0.05
+0.00
+1.80
+1.85
+1.90
+1.95
+NE-regret
+va_search_pn
+0.40
+0.35
+0.30
+0.25
+0.20
+0.15
+0.10
+0.05
+0.00
+0.3
+0.4
+0.5
+NE-regret
+0.6
+0.7
+2.00
+2.05
+2.10
+0.10
+0.00
+2.0
+2.5
+3.0
+3.5
+NE-regret
+4.0
+4.5
+5.0
+0.30
+0.20
+0.10
+0.00
+3.4
+3.6
+3.8
+NE-regret
+4.0
+4.2
+0.40
+0.50
+0.50
+0.40
+0.30
+0.20
+0.10
+0.00
+0.00
+0.05
+0.10
+0.15
+0.20
+NE-regret
+0.25
+0.30
+0.35
+0.45
+0.50
+0.30
+0.25
+0.20
+0.15
+0.10
+0.05
+0.00
+0.0
+0.2
+0.4
+NE-regret
+tough
+0.60
+0.6
+0.8
+0.00
+0.20
+0.25
+0.30
+0.35
+NE-regret
+psro
+0.20
+0.17
+0.15
+0.12
+0.10
+0.07
+0.05
+0.03
+0.00
+0.0
+0.5
+1.0
+NE-regret
+uniform
+0.60
+1.5
+2.0
+0.40
+0.45
+0.35
+0.30
+0.25
+0.20
+0.15
+0.10
+0.05
+0.00
+0.2
+0.4
+0.6
+NE-regret
+psro_last
+0.35
+0.30
+0.25
+0.20
+0.15
+0.10
+0.05
+0.00
+0.00
+0.02
+0.04
+0.06
+0.08
+NE-regret
+va_search
+0.10
+0.12
+0.14
+0.16
+0.8
+1.0
+1.2
+0.25
+0.4
+0.5
+0.6
+0.00
+0.00
+0.05
+0.10
+0.15
+NE-regret
+g_search_pn
+0.20
+0.25
+0.30
+0.00
+0.0
+0.1
+0.2
+0.3
+0.4
+NE-regret
+idppo
+0.5
+0.6
+0.7
+0.8
+0.00
+0.0
+0.2
+0.4
+0.6
+NE-regret
+mappo
+0.8
+1.0
+1.2
+1.4
+0.25
+g_search_idppo
+g_search_mappo
+0.20
+0.15
+0.10
+0.05
+0.00
+0.00
+0.25
+0.50
+0.75
+1.00
+NE-regret
+r_nad
+1.25
+1.50
+1.75
+2.00
+Figure 6: Empirical Distribution of NE-Regret of Barg(30, 0.125, 0.935)
+TPLle
+Frequency
+Frequency
+Frequency
+Frequency
+Frequency
+Frequency
+Frequency
+Frequency
+Frequency
+i
+eee
+ee
+Frequency
+Frequency
+Frequency
+Frequency
+Frequency
+Frequency
+Frequency
+Frequency

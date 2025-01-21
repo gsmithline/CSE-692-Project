@@ -1,6 +1,11 @@
 from utils.offer import Offer
 import numpy as np
-def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: int, W2: int, w: int, R: int, g: float, r: int, history: dict, current_offer: Offer = None, player_num: int = 0, p1_outside_offer: list[int] = None, p2_outside_offer: list[int] = None) -> str:
+from prompts.prompt_texts.circle0 import make_prompt_circle_0
+from prompts.prompt_texts.circle1 import make_prompt_circle_1
+from prompts.prompt_texts.circle2 import make_prompt_circle_2
+from prompts.prompt_texts.circle3 import make_prompt_circle_3
+
+def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: int, W2: int, w: int, R: int, g: float, r: int, history: dict, current_offer: Offer = None, player_num: int = 0, p1_outside_offer: list[int] = None, p2_outside_offer: list[int] = None, circle: int = 0) -> str:
     
     my_player_num = player_num + 1  
     other_player_num = 2 if my_player_num == 1 else 1
@@ -25,7 +30,7 @@ def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: 
     
     if r == 1 and my_player_num == 1:
         action_prompt = f"""
-        What is your action? As the first player, you can:
+        What is your action? As the first player, your available actions are:
         - WALK to walk away
         - A list of numbers [n1, n2, ...] representing your initial offer (what you give to Player 2)"""
     elif current_offer is None:
@@ -39,16 +44,36 @@ def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: 
     - ACCEPT to accept the current offer
     - WALK to walk away
     - A list of numbers [n1, n2, ...] representing your counteroffer (what you give to Player {other_player_num})"""
+    
+    
 
+    #TODO: CONSTRUCT PROMPT BASED ON CIRCLE GAME SPECIFIED IN THE PAPER
+
+    
+    if circle == 0:
+        prompt = make_prompt_circle_0(T, quantities, V, values, W1, W2, w, R, g, r, history, current_offer, player_num, p1_outside_offer, p2_outside_offer, circle)
+    elif circle == 1:
+        prompt = make_prompt_circle_1(T, quantities, V, values, W1, W2, w, R, g, r, history, current_offer, player_num, p1_outside_offer, p2_outside_offer, circle)
+    elif circle == 2:
+        prompt = make_prompt_circle_2(T, quantities, V, values, W1, W2, w, R, g, r, history, current_offer, player_num, p1_outside_offer, p2_outside_offer, circle)
+    elif circle == 3:
+        prompt = make_prompt_circle_3(T, quantities, V, values, W1, W2, w, R, g, r, history, current_offer, player_num, p1_outside_offer, p2_outside_offer, circle)
+    #elif circle == 4:
+    else:
+        raise ValueError(f"Circle {circle} not supported")
+    
+    return f"{prompt}\n Negotiation history:{history_str}\n{current_offer_str}\n{action_prompt}"
+    
+    '''
     return f"""
     You and another agent have to negotiate a division of items between the two of you.
     You are Player {my_player_num} and the other agent is Player {other_player_num}.
     There are {T} types of items, called item 1 through item {T}.
     There are {', '.join([f'{q} units of item {i+1}' for i, q in enumerate(quantities)])} to divide.
     Both you and Player {other_player_num} have a private value per unit of each item type.
-    These values are drawn from a uniform random distribution, ranging from 0 to {V}.
+    These values are drawn from a uniform random distribution, ranging from 1 to {V}.
     Your private values are {', '.join([str(v) + ' for item ' + str(i+1) for i, v in enumerate(values)])}.
-    You have a private outside offer drawn from a uniform random distribution ranging from {p1_outside_offer[0] if my_player_num == 1 else p2_outside_offer[0]} to {p1_outside_offer[1] if my_player_num == 1 else p2_outside_offer[1]}. Player {other_player_num} has a private outside offer drawn from a uniform random distribution ranging from {p2_outside_offer[0] if my_player_num == 1 else p1_outside_offer[0]} to {p2_outside_offer[1] if my_player_num == 1 else p1_outside_offer[1]}.
+    You have a private outside offer drawn from a uniform random distribution ranging from {p1_outside_offer[0] if my_player_num == 1 else p2_outside_offer[0]} to {p1_outside_offer[1] if my_player_num == 1 else p2_outside_offer[1]}. Player {other_player_num} has a private outside offer drawn from a uniform random distribution ranging from 1 to the value they would get from the maximum offer (the offer that gives them all the items).
     Your outside offer value is {w}. Your objective is to maximize your value of the outcome of the negotiation game. Remember, you have a guaranteed alternative: your outside offer.
 
     Before making any counteroffer, you should calculate its total value to you and compare it to your outside offer value of {w}. For example, if you were considering offering the other player 2 units of each item (keeping 3 units of each for yourself), you would calculate:
@@ -76,8 +101,8 @@ def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: 
     - What are my item values?
     - What is the current offer (if any)?
     - What round are we in and what is the discount factor?
-    {f"- If I am considering making a counteroffer, what is the next round's discount factor (as that counteroffer will be realized in the next round, hence the discount factor will be gamma^(r+1-1) as opposed to gamma^(r-1) for the current round)?" if my_player_num == 2 else ""}
 
+    
     2) Then, let's calculate:
     - What is the current discount factor, gamma^(r-1)?
     - For the current offer (if any): What would be my total value if I accept?
@@ -105,3 +130,5 @@ def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: 
 """
 
 
+#{f"- If I am considering making a counteroffer, what is the next round's discount factor (as that counteroffer will be realized in the next round, hence the discount factor will be gamma^(r+1-1) as opposed to gamma^(r-1) for the current round)?" if my_player_num == 2 else ""}
+'''
