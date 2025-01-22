@@ -101,6 +101,7 @@ class NegotitaionGame:
             self.in_progress = False
             self.current_offer = None
             self.final_action_player = self.players[self.current_player]
+            
             offer = False
             
         '''
