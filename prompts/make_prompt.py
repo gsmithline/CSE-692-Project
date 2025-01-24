@@ -51,13 +51,13 @@ def make_prompt(T: int, quantities: list[int], V: int, values: list[float], W1: 
 
     
     if circle == 0:
-        prompt = make_prompt_circle_0(T, quantities, V, values, W1, W2, w, R, g, r, history, current_offer, player_num, p1_outside_offer, p2_outside_offer, circle)
+        prompt = make_prompt_circle_0(T, quantities, V, values, W1, W2, w, R, g, r, history, current_offer, player_num, p1_outside_offer, p2_outside_offer, circle, other_player_num, my_player_num)
     elif circle == 1:
-        prompt = make_prompt_circle_1(T, quantities, V, values, W1, W2, w, R, g, r, history, current_offer, player_num, p1_outside_offer, p2_outside_offer, circle)
+        prompt = make_prompt_circle_1(T, quantities, V, values, W1, W2, w, R, g, r, history, current_offer, player_num, p1_outside_offer, p2_outside_offer, circle, other_player_num, my_player_num)
     elif circle == 2:
-        prompt = make_prompt_circle_2(T, quantities, V, values, W1, W2, w, R, g, r, history, current_offer, player_num, p1_outside_offer, p2_outside_offer, circle)
+        prompt = make_prompt_circle_2(T, quantities, V, values, W1, W2, w, R, g, r, history, current_offer, player_num, p1_outside_offer, p2_outside_offer, circle, other_player_num, my_player_num)
     elif circle == 3:
-        prompt = make_prompt_circle_3(T, quantities, V, values, W1, W2, w, R, g, r, history, current_offer, player_num, p1_outside_offer, p2_outside_offer, circle)
+        prompt = make_prompt_circle_3(T, quantities, V, values, W1, W2, w, R, g, r, history, current_offer, player_num, p1_outside_offer, p2_outside_offer, circle, other_player_num, my_player_num)
     #elif circle == 4:
     else:
         raise ValueError(f"Circle {circle} not supported")

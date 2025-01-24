@@ -35,18 +35,29 @@ def make_prompt_circle_3(T: int, quantities: list[int], V: int, values: list[flo
     The value of an outcome is determined by each player's private values per unit of each item and the quantities they receive in the deal. This value is adjusted by the discount factor, which is used to compute the present value of the negotiation outcome.
     If a player chooses WALK, the negotiation ends without a deal, and each player receives the value of their private outside offer.
 
-    In the bargaining game, there are 5 actions that you can execute that would be inconsistent with your objective. These represent undesirable negotiation behaviors that can undermine your payoff or cause you to miss out on better deals. Avoiding these mistakes is crucial to achieving the most advantageous outcome.
-    These mistakes are:
-    - Mistake 1: Making an offer worse than your previous offer. This occurs when you reject an offer better for you than the one you subsequently propose. 
-    - Mistake 2: Making an offer worse for you than your outside offer. This happens if you propose giving away so much that what you keep is worth less than your guaranteed alternative, which is your outside offer.
-    - Mistake 3: Offering no items or all items. Offering nothing (or everything) to the opponent (in the early or middle rounds) can be a clear suboptimal move. 
-    - Mistake 4: Accepting an offer worse for you than your outside offer. This occurs if you accept a division that yields a payoff lower than your guaranteed fallback.
-    - Mistake 5: Walking away from an offer better than your outside offer. This occurs when you reject a division that actually yields a higher payoff than your fallback.
+    The following step-by-step questions are designed to guide you through a comprehensive analysis. By systematically addressing these questions, you can evaluate the current state of the negotiation, assess potential offers, and make informed decisions. You must use the information that you acquired through the step-by-step questioning above to decide what action you will make.
+    Let's walk through this step by step:
+
+    1) First, analyze the current situation:
+       - What is my outside offer value?
+       - What are the values of the items involved?
+       - What is the total pool of items?
+       - How does the discount factor influence the value of accepting the current offer versus waiting for future offers?
+
+    2) Assess the value of offers:
+       - For the current offer (if any): What is my total value if I accept it?
+       - For potential counteroffers: What would be my total value for different proposed divisions?
+       - How do these values compare to my outside offer value?
+
+    3) Make a decision based on the analysis:
+       - Should I accept the current offer?
+       - Should I walk away and take my outside offer?
+       - Or should I propose a specific counteroffer?
 
     Please show your reasoning step by step, then provide your action in one of these formats in your response (if you do not do this your response will be invalid):
     {{"action": "ACCEPT"}} - to accept the current offer
     {{"action": "WALK"}} - to walk away from negotiations  
-    {{"action": "COUNTEROFFER", "offer": [n1, n2, ...]}} - where n1, n2, ... are numbers representing your counteroffer
+    {{"action": "COUNTEROFFER", "offer": [n1, n2, ...]}} - where n1, n2, ... are numbers representing the number of units of each item being offered to the other player as part of the counteroffer.
 
     Any response not in these exact formats will be invalid and treated as a WALK. If you provide a counteroffer, it must be a valid offer, otherwise it will be treated as a WALK.
 

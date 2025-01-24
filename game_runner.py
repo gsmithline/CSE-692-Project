@@ -90,6 +90,7 @@ class NegotitaionGame:
                     self.in_progress = False
                     self.current_offer = None
                     self.final_action_player = self.players[self.current_player]
+                    self.final_action_player.action = "INVALID WALK"
                 else:  # New offer
                     self.current_offer = offer
                     if self.current_player == 0:
@@ -100,8 +101,8 @@ class NegotitaionGame:
             print(f"Game terminated due to invalid offer: {str(e)}")
             self.in_progress = False
             self.current_offer = None
-            self.final_action_player = self.players[self.current_player]
-            
+            self.final_action_player = self.players[1 -self.current_player]
+            self.final_action_player.action = "INVALID WALK"
             offer = False
             
         '''

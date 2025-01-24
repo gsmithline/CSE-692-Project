@@ -27,7 +27,7 @@ def make_prompt_circle_1(T: int, quantities: list[int], V: int, values: list[flo
     Please show your reasoning step by step, then provide your action in one of these formats in your response (if you do not do this your response will be invalid):
     {{"action": "ACCEPT"}} - to accept the current offer
     {{"action": "WALK"}} - to walk away from negotiations  
-    {{"action": "COUNTEROFFER", "offer": [n1, n2, ...]}} - where n1, n2, ... are numbers representing your counteroffer
+    {{"action": "COUNTEROFFER", "offer": [n1, n2, ...]}} - where n1, n2, ... are numbers representing the number of units of each item being offered to the other player as part of the counteroffer.
 
     Any response not in these exact formats will be invalid and treated as a WALK. If you provide a counteroffer, it must be a valid offer, otherwise it will be treated as a WALK.
 

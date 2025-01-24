@@ -18,7 +18,7 @@ def make_prompt_circle_2(T: int, quantities: list[int], V: int, values: list[flo
     Your outside offer value is {w}. Your objective is to maximize your value of the outcome of the negotiation game. Remember, you have a guaranteed alternative: your outside offer.
 
     Before making any counteroffer, you should calculate its total value to you and compare it to your outside offer value of {w}. 
-    For example, if you were considering offering the other player 2 units of each item (keeping 3 units of each for yourself), you would calculate:
+    For example, if you were considering offering the other player, player{other_player_num}, 2 units of each item (keeping {my_player_num} units of each for yourself), you would calculate:
     3 units of item 1 = 3 × {values[0]} = {3*values[0]} (multiplying units by your value per unit)
     3 units of item 2 = 3 × {values[1]} = {3*values[1]} (multiplying units by your value per unit)
     3 units of item 3 = 3 × {values[2]} = {3*values[2]} (multiplying units by your value per unit)
@@ -37,7 +37,7 @@ def make_prompt_circle_2(T: int, quantities: list[int], V: int, values: list[flo
     Please show your reasoning step by step, then provide your action in one of these formats in your response (if you do not do this your response will be invalid):
     {{"action": "ACCEPT"}} - to accept the current offer
     {{"action": "WALK"}} - to walk away from negotiations  
-    {{"action": "COUNTEROFFER", "offer": [n1, n2, ...]}} - where n1, n2, ... are numbers representing your counteroffer
+    {{"action": "COUNTEROFFER", "offer": [n1, n2, ...]}} - where n1, n2, ... are numbers representing the number of units of each item being offered to the other player as part of the counteroffer.
 
     Any response not in these exact formats will be invalid and treated as a WALK. If you provide a counteroffer, it must be a valid offer, otherwise it will be treated as a WALK.
 
