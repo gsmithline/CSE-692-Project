@@ -6,7 +6,7 @@ CIRCLE OF ERRORS
 - Addition add description of errors & explain that errors are obstructive to the objective
 '''
 
-def make_prompt_circle_5(T: int, quantities: list[int], V: int, values: list[float], W1: int, W2: int, w: int, R: int, g: float, r: int, history: dict, current_offer: Offer = None, player_num: int = 0, p1_outside_offer: list[int] = None, p2_outside_offer: list[int] = None, circle: int = 0, other_player_num: int = 0, my_player_num: int = 0) -> str:
+def make_prompt_circle_6(T: int, quantities: list[int], V: int, values: list[float], W1: int, W2: int, w: int, R: int, g: float, r: int, history: dict, current_offer: Offer = None, player_num: int = 0, p1_outside_offer: list[int] = None, p2_outside_offer: list[int] = None, circle: int = 0, other_player_num: int = 0, my_player_num: int = 0) -> str:
     return f"""
     You and another agent have to negotiate a division of items between the two of you.
     You are Player {my_player_num} and the other agent is Player {other_player_num}.
@@ -67,8 +67,11 @@ def make_prompt_circle_5(T: int, quantities: list[int], V: int, values: list[flo
     calculate its total value to you and compare it to your outside offer value. For instance, suppose you keep only [1, 1, 1, 1, 1] items and offer the rest to the other party. Your value would be:
     1×85+1×67+1×43+1×20+1×83=298,
 
-    which is less than your outside offer of 385. If your proposed offer results in a value lower than your outside offer, continue iterating until you develop a more advantageous offer. 
+    which is less than your outside offer of {w}. If your proposed offer results in a value lower than your outside offer, continue iterating until you develop a more advantageous offer. 
     This reasoning can be applied to each of the five highlighted mistakes to ensure that your offers align with your objectives and avoid undesirable negotiation behaviors.
+
+    Keep in mind the offers the opposing agent makes reflects its own values. If their offer includes most or all units of a particular item, it might indicate that the agent does not highly value that item, whereas offering none could suggest the opposite. 
+    You can use this kind of evidence to help inform your decision-making.
 
     Please show your reasoning step by step, then provide your action in one of these formats in your response (if you do not do this your response will be invalid):
     {{"action": "ACCEPT"}} - to accept the current offer
