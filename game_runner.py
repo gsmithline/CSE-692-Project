@@ -29,6 +29,8 @@ class NegotitaionGame:
         self.circle = circle
         self.valid_walk = None
 
+
+
     def reset(self):
         self.player_values[0] = np.random.randint(self.item_value_range[0], self.item_value_range[1], self.num_items) 
         self.player_values[1] = np.random.randint(self.item_value_range[0], self.item_value_range[1], self.num_items)
@@ -48,7 +50,7 @@ class NegotitaionGame:
         self.current_offer = None
         self.in_progress = True
         self.current_round = 0
-    def step(self):  
+    def step(self, example_offer_less_than_outside_offer_self: list[int] = None):  
         """Execute one step of the negotiation"""
         agent = self.players[self.current_player]
     
@@ -68,7 +70,8 @@ class NegotitaionGame:
             player_num=self.current_player,
             p1_outside_offer=[1, int(np.ceil(np.dot(self.items, self.player_values[0]) * 1))], #NOTE: CHANGE % FOR EXPERIMENTS 
             p2_outside_offer=[1, int(np.ceil(np.dot(self.items, self.player_values[1]) * 1))],
-            circle = self.circle
+            circle = self.circle,
+            example_offer_less_than_outside_offer_self=example_offer_less_than_outside_offer_self
         ) 
         print(prompt)
 
