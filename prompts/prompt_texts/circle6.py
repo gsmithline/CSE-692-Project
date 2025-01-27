@@ -1,12 +1,7 @@
 import numpy as np
 from utils.offer import Offer
 
-'''
-CIRCLE OF ERRORS
-- Addition add description of errors & explain that errors are obstructive to the objective
-'''
-
-def make_prompt_circle_3(T: int, quantities: list[int], V: int, values: list[float], W1: int, W2: int, w: int, R: int, g: float, r: int, history: dict, current_offer: Offer = None, player_num: int = 0, p1_outside_offer: list[int] = None, p2_outside_offer: list[int] = None, circle: int = 0, other_player_num: int = 0, my_player_num: int = 0) -> str:
+def make_prompt_circle_6(T: int, quantities: list[int], V: int, values: list[float], W1: int, W2: int, w: int, R: int, g: float, r: int, history: dict, current_offer: Offer = None, player_num: int = 0, p1_outside_offer: list[int] = None, p2_outside_offer: list[int] = None, circle: int = 0, other_player_num: int = 0, my_player_num: int = 0, example_offer_less_than_outside_offer_self: list[int] = None) -> str:
     return f"""
     You and another agent have to negotiate a division of items between the two of you.
     You are Player {my_player_num} and the other agent is Player {other_player_num}.
@@ -53,6 +48,26 @@ def make_prompt_circle_3(T: int, quantities: list[int], V: int, values: list[flo
        - Should I accept the current offer?
        - Should I walk away and take my outside offer?
        - Or should I propose a specific counteroffer?
+
+    In the bargaining game, there are five mistakes you can make that conflict with your objectives. 
+    While these aren't the only possible errors, they represent undesirable negotiation behaviors that can undermine your payoff or cause you to miss out on better deals. 
+    These mistakes are:
+    - Mistake 1: Making an offer worse than your previous offer. This occurs when you reject an offer better for you than the one you subsequently propose. 
+    - Mistake 2: Making an offer worse for you than your outside offer. This happens if you propose giving away so much that what you keep is worth less than your guaranteed alternative, which is your outside offer.
+    - Mistake 3: Offering no items or all items. Offering nothing (or everything) to the opponent (in the early or middle rounds) can be a clear suboptimal move. 
+    - Mistake 4: Accepting an offer worse for you than your outside offer. This occurs if you accept a division that yields a payoff lower than your guaranteed fallback.
+    - Mistake 5: Walking away from an offer better than your outside offer. This occurs when you reject a division that actually yields a higher payoff than your fallback.
+
+    To prevent these mistakes, adopt a strategy similar to the following example: Before making any counteroffer, 
+    calculate its total value to you and compare it to your outside offer value. For instance, suppose you keep only {example_offer_less_than_outside_offer_self} items and offer the rest to the other party. Your value would be:
+    {values[0]} x {example_offer_less_than_outside_offer_self[0]} + {values[1]} x {example_offer_less_than_outside_offer_self[1]} + {values[2]} x {example_offer_less_than_outside_offer_self[2]} + {values[3]} x {example_offer_less_than_outside_offer_self[3]} + {values[4]} x {example_offer_less_than_outside_offer_self[4]}
+    which is {np.dot(values, example_offer_less_than_outside_offer_self)} (sum of all item values)
+    
+    which is less than your outside offer of {w}. If your proposed offer results in a value lower than your outside offer, continue iterating until you develop a more advantageous offer. 
+    This reasoning can be applied to each of the five highlighted mistakes to ensure that your offers align with your objectives and avoid undesirable negotiation behaviors.
+
+    Keep in mind the offers the opposing agent makes reflects its own values. If their offer includes most or all units of a particular item, it might indicate that the agent does not highly value that item, whereas offering none could suggest the opposite. 
+    You can use this kind of evidence to help inform your decision-making.
 
     Please show your reasoning step by step, then provide your action in one of these formats in your response (if you do not do this your response will be invalid):
     {{"action": "ACCEPT"}} - to accept the current offer
