@@ -46,6 +46,21 @@ class GameHistory:
     def get_offers(self, agent_idx: int) -> List[Offer]:
         """Gets all offers made by specified agent"""
         return self.agent_1_offers if agent_idx == 0 else self.agent_2_offers
+    
+    def to_dict(self):
+        """Serializes GameHistory into a dictionary"""
+        return {
+            "agent_1_name": self.agent_1_name,
+            "agent_2_name": self.agent_2_name,
+            "num_items": self.num_items,
+            "items": self.items.tolist(),  # Convert torch.Tensor to list
+            "agent_1_values": self.agent_1_values.tolist(),
+            "agent_2_values": self.agent_2_values.tolist(),
+            "agent_1_outside_value": self.agent_1_outside_value,
+            "agent_2_outside_value": self.agent_2_outside_value,
+            "agent_1_offers": [offer.to_dict() for offer in self.agent_1_offers],
+            "agent_2_offers": [offer.to_dict() for offer in self.agent_2_offers]
+        }
 
 
 # In[2]:

@@ -1,6 +1,6 @@
 import json
 import pickle
-
+import numpy as np
 class GameData:
     def __init__(self, circle, date, agent1, agent2):
         """
@@ -21,18 +21,21 @@ class GameData:
         # Store the final outcome separately
         self.outcome = None
 
-    def add_round_data(self, prompt, response, action):
+    def add_round_data(self, prompt, response, action, game_metrics, envy_free_metrics):
         """
         Store data from a single round.
 
         prompt: The prompt text shown to the agent
         response: The raw text (or structured data) from the agent's response
         action: A string or structured data describing the action (ACCEPT, WALK, COUNTEROFFER, etc.)
+        metrics: A dictionary of metrics for the round
         """
         self.round_data.append({
             "prompt": prompt,
             "response": response,
-            "action": action
+            "action": action,
+            "game_metrics": game_metrics,
+            "envy_free_metrics": envy_free_metrics
         })
 
     def set_outcome(self, outcome):
@@ -41,19 +44,6 @@ class GameData:
         """
         self.outcome = outcome
 
-    def to_dict(self):
-        """
-        Convert all stored data into a dictionary.
-        This is useful for JSON serialization.
-        """
-        return {
-            "circle": self.circle,
-            "date": str(self.date),
-            "agent1": self.agent1,
-            "agent2": self.agent2,
-            "round_data": self.round_data,
-            "outcome": self.outcome
-        }
 
     @classmethod
     def from_dict(cls, data):
@@ -76,6 +66,45 @@ class GameData:
         """
         with open(filename, "w") as f:
             json.dump(self.to_dict(), f)
+
+    def to_dict(self):
+        """
+        Convert the GameData instance into a dictionary with all data
+        in JSON-serializable formats.
+        """
+        data = {
+            "circle": self.circle,
+            "date": self.date,
+            "agent1": self.agent1,
+            "agent2": self.agent2,
+            "round_data": self.round_data,  # Assuming round_data is a list of dicts
+            "outcome": self.outcome
+        }
+
+        def convert(obj):
+            """
+            Recursively convert NumPy data types to native Python types.
+            """
+            if isinstance(obj, dict):
+                return {k: convert(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert(item) for item in obj]
+            elif isinstance(obj, tuple):
+                return tuple(convert(item) for item in obj)
+            elif isinstance(obj, np.integer):
+                return int(obj)
+            elif isinstance(obj, np.floating):
+                return float(obj)
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist()
+            elif isinstance(obj, (np.bool_,)):
+                return bool(obj)
+            elif isinstance(obj, (np.str_,)):
+                return str(obj)
+            else:
+                return obj
+
+        return convert(data)
 
     @classmethod
     def load_from_json(cls, filename):

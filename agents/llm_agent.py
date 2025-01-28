@@ -17,6 +17,9 @@ class LLMAgent(Agent):
         self.llm_type = llm_type
         self.result = None
         self.action = None
+        self.current_prompt = None #PROMPT SENT TO LLM
+        self.current_response = None #RESPONSE FROM LLM (Text)
+        
         if llm_type == "llama":
             if api_key is None:
                 try:
@@ -116,7 +119,7 @@ class LLMAgent(Agent):
             try:
                 response = self.llm.run(api_request)
                 print("Raw API Response:", response.text)
-                
+                self.current_response = response.text
                 # Check if response is successful
                 if response.status_code != 200:
                     print(f"API request failed with status code: {response.status_code}")
@@ -136,6 +139,7 @@ class LLMAgent(Agent):
                     raise Exception("Invalid API response format")
                 
                 result_content = response_json['choices'][0]['message']['content']
+                self.current_response = result_content
                 print("Extracted content:", result_content)
                 
                 # Find the JSON string at the end of the text and clean it
@@ -207,6 +211,7 @@ class LLMAgent(Agent):
                     # Extract the action from the response text
                 result_content = response.choices[0].message.content
                     # Find the JSON string at the end of the text and clean it
+                self.current_response = result_content
                 json_start = result_content.rfind('{')
                 json_str = result_content[json_start:].strip()
                     # Remove any trailing text after the JSON
@@ -217,6 +222,7 @@ class LLMAgent(Agent):
                 print("Parsed result:", result)
                 self.result = result
                 self.action = result["action"]
+                self.current_response = result
             except Exception as e:
                 print(f"Error with OpenAI response: {e}")
                 print("Defaulting to WALK")
@@ -239,6 +245,7 @@ class LLMAgent(Agent):
                 print("Raw API Response:", response)
                 # Extract the action from the response text
                 result_content = response.content[0].text
+                self.current_response = result_content
                 # Find the JSON string at the end of the text and clean it
                 json_start = result_content.rfind('{')
                 json_str = result_content[json_start:].strip()

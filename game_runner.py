@@ -28,6 +28,7 @@ class NegotitaionGame:
         self.final_action_player = self.players[1] #default to player 2 as the final action player of final player in final round
         self.circle = circle
         self.valid_walk = None
+        self.current_prompt = None
 
 
 
@@ -72,8 +73,10 @@ class NegotitaionGame:
             p2_outside_offer=[1, int(np.ceil(np.dot(self.items, self.player_values[1]) * 1))],
             circle = self.circle,
             example_offer_less_than_outside_offer_self=example_offer_less_than_outside_offer_self
-        ) 
+        )
+        agent.current_prompt = prompt
         print(prompt)
+
 
         # Get agent's response
         offer = agent.give_offer(prompt)
