@@ -92,16 +92,6 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
             print(f"Sleeping for {sleep_duration} seconds to respect rate limits.")
             time.sleep(sleep_duration)
 
-        # Reset per-game trackers
-        p1_values = []
-        p2_values = []
-        p1_offers = []
-        p2_offers = []
-        p1_offers_utility = []
-        p2_offers_utility = []
-        p1_kept = None
-        p2_kept = None
-
         # --------------------------------------------------------------------
         # 2) Initialize a Single Negotiation Game
         # --------------------------------------------------------------------
@@ -240,9 +230,7 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
             if "WALK" in action_played or "ACCEPT" in action_played:
                 game.in_progress = False
 
-        # --------------------------------------------------------------------
-        # 12) After the Game Loop Ends, Save GameData
-        # --------------------------------------------------------------------
+        
         all_game_data.append(game_data)
         #UNCOMMENT THESE TO SAVE EACH GAME'S DATA SEPERATELY 
         # Optionally, save each game's data immediately
