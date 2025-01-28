@@ -21,7 +21,7 @@ class GameData:
         # Store the final outcome separately
         self.outcome = None
 
-    def add_round_data(self, prompt, response, action, game_metrics, envy_free_metrics):
+    def add_round_data(self, prompt, response, action):
         """
         Store data from a single round.
 
@@ -34,8 +34,6 @@ class GameData:
             "prompt": prompt,
             "response": response,
             "action": action,
-            "game_metrics": game_metrics,
-            "envy_free_metrics": envy_free_metrics
         })
 
     def set_outcome(self, outcome):
@@ -77,8 +75,7 @@ class GameData:
             "date": self.date,
             "agent1": self.agent1,
             "agent2": self.agent2,
-            "round_data": self.round_data,  # Assuming round_data is a list of dicts
-            "outcome": self.outcome
+            "round_data": self.round_data  # Assuming round_data is a list of dicts
         }
 
         def convert(obj):
