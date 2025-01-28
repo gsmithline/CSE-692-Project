@@ -78,30 +78,7 @@ class GameData:
             "round_data": self.round_data  # Assuming round_data is a list of dicts
         }
 
-        def convert(obj):
-            """
-            Recursively convert NumPy data types to native Python types.
-            """
-            if isinstance(obj, dict):
-                return {k: convert(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [convert(item) for item in obj]
-            elif isinstance(obj, tuple):
-                return tuple(convert(item) for item in obj)
-            elif isinstance(obj, np.integer):
-                return int(obj)
-            elif isinstance(obj, np.floating):
-                return float(obj)
-            elif isinstance(obj, np.ndarray):
-                return obj.tolist()
-            elif isinstance(obj, (np.bool_,)):
-                return bool(obj)
-            elif isinstance(obj, (np.str_,)):
-                return str(obj)
-            else:
-                return obj
-
-        return convert(data)
+        return data
 
     @classmethod
     def load_from_json(cls, filename):
