@@ -160,7 +160,6 @@ class LLMAgent(Agent):
                 except json.JSONDecodeError as e:
                     print(f"Failed to parse extracted JSON: {e}")
                     print(f"Extracted JSON string: {json_str}")
-
                     raise
                 
                 print("Parsed result:", result)
@@ -170,9 +169,11 @@ class LLMAgent(Agent):
             except Exception as e:
                 print(f"Error with LLM response: {e}")
                 print("Response details:")
+                self.current_response = "Error with LLM response, did not receive a response."
                 if 'response' in locals():
                     print(f"Status code: {response.status_code}")
                     print(f"Response text: {response.text}")
+                    self.current_response = response.text
                 print("Defaulting to WALK")
                 result = {}
                 result["action"] = "INVALID WALK"
@@ -180,7 +181,7 @@ class LLMAgent(Agent):
                 self.action = "INVALID WALK"
                 return False
                 
-        elif self.llm_type == "openai": #OTHER LLM MODELS
+        elif self.llm_type == "openai": 
             model = "gpt-4o" #gpt-4o #TODO: check OpenAI API type 
             try:
                 response = {}
@@ -204,17 +205,15 @@ class LLMAgent(Agent):
                         ],
                         max_tokens=1024,
                         #response_format=js
-
                     )
-
                 print("Raw API Response:", response)
-                    # Extract the action from the response text
+                # Extract the action from the response text
                 result_content = response.choices[0].message.content
-                    # Find the JSON string at the end of the text and clean it
+                # Find the JSON string at the end of the text and clean it
                 self.current_response = result_content
                 json_start = result_content.rfind('{')
                 json_str = result_content[json_start:].strip()
-                    # Remove any trailing text after the JSON
+                # Remove any trailing text after the JSON
                 json_end = json_str.rfind('}') 
                 if json_end >= 0:
                     json_str = json_str[:json_end+1]
@@ -225,6 +224,10 @@ class LLMAgent(Agent):
                 self.current_response = result
             except Exception as e:
                 print(f"Error with OpenAI response: {e}")
+                if response.choices[0].message.content:
+                    self.current_response = response.choices[0].message.content
+                else:
+                    self.current_response = response
                 print("Defaulting to WALK")
                 result = {}
                 result["action"] = "INVALID WALK"
@@ -260,6 +263,10 @@ class LLMAgent(Agent):
             except Exception as e:
                 print(f"Error with OpenAI response: {e}")
                 print("Defaulting to WALK")
+                if response.content[0].text:
+                    self.current_response = response.choices[0].message.content
+                else:
+                    self.current_response = response
                 result = {}
                 result["action"] = "INVALID WALK"
                 self.result = False
@@ -270,6 +277,7 @@ class LLMAgent(Agent):
                 response = self.llm.generate_content(prompt)
                 print("Raw API Response:", response)
                 result_content = response.candidates[0].content.parts[0].text
+                self.current_response = result_content
                 # Find the JSON string at the end of the text and clean it
                 json_start = result_content.rfind('{')
                 json_str = result_content[json_start:].strip()
@@ -284,6 +292,10 @@ class LLMAgent(Agent):
             except Exception as e:
                 print(f"Error with Gemini response: {e}")
                 print("Defaulting to WALK")
+                if response.candidates[0].content.parts[0].text:
+                    self.current_response = response.candidates[0].content.parts[0].text
+                else:
+                    self.current_response = response
                 result = {}
                 result["action"] = "INVALID WALK"
                 self.result = False
