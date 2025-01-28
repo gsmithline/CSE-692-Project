@@ -19,13 +19,10 @@ from IPython import get_ipython
 import runpy
 import os
 
-# Execute the notebook - place this before any code that needs GameHistory
 ipython = get_ipython()
 if ipython is not None:
-    # If in IPython/Jupyter, we can safely run the .ipynb directly
     ipython.run_line_magic('run', '../test_game_eval.ipynb')
 else:
-    # Fallback if not in IPython/Jupyter environment: run the converted .py file
     py_file = os.path.join('..', 'test_game_eval.py')
     if os.path.isfile(py_file):
         runpy.run_path(py_file)
@@ -48,9 +45,6 @@ from metrics.visualizations import (
     plot_negotiation_gap,
     plot_fairness
 )
-import concurrent.futures
-
-
 
 pathology_results = pd.DataFrame()  
 import itertools
@@ -62,25 +56,43 @@ import torch
 import numpy as np
 from math import sqrt, prod
 from utils.helpers import *
-
-
+import time
+import numpy as np
+import pandas as pd
+import torch
+from math import sqrt, prod
+from eval.game_data import GameData  # Importing GameData from game_data.py
+import pickle
+import json
 
 
 def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: str, llm_type: str):
-    rounds = []
-    p1_values = []
-    p2_values = []
-    pathology_results = pd.DataFrame()
-    envy_results_history = {}
+    """
+    Runs a series of negotiation games for a specific circle, tracking comprehensive metrics.
+
+    Args:
+        circle (int): The circle parameter influencing allocation strategies.
+        games (int): Number of games to simulate.
+        max_rounds (int): Maximum number of rounds per game.
+        date (str): Date identifier for result files.
+        game_title (str): Title identifier for the game series.
+        llm_type (str): Type of LLM agent being used (e.g., "openai").
+    """
+    # Initialize a list to store all GameData instances
+    all_game_data = []
 
     for i in range(games):
-        # Print progress / rate-limit
+        # --------------------------------------------------------------------
+        # 1) Per-Game Setup
+        # --------------------------------------------------------------------
+        # Rate-limit every 10 games to avoid API overuse
         if (i + 1) % 10 == 0:
             print(f"Game {i + 1} of {games}")
-            time.sleep(2 * np.random.randint(55, 60))  # Sleep for 2 minutes
-        
+            sleep_duration = 2 * np.random.randint(55, 60)  # Sleep for ~2 minutes
+            print(f"Sleeping for {sleep_duration} seconds to respect rate limits.")
+            time.sleep(sleep_duration)
+
         # Reset per-game trackers
-        rounds = []
         p1_values = []
         p2_values = []
         p1_offers = []
@@ -90,7 +102,9 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
         p1_kept = None
         p2_kept = None
 
-        # Initialize game & game history
+        # --------------------------------------------------------------------
+        # 2) Initialize a Single Negotiation Game
+        # --------------------------------------------------------------------
         game = NegotitaionGame(
             player1_agent=llm_agent.LLMAgent(llm_type=llm_type, player_num=0),
             player2_agent=llm_agent.LLMAgent(llm_type=llm_type, player_num=1),
@@ -101,6 +115,7 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
             circle=circle
         )
 
+        # Compute Pareto frontier for reference
         pareto_front = compute_pareto_frontier(
             game.player_values[0],
             game.player_values[1],
@@ -109,10 +124,13 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
             game.outside_offer_values
         )
 
+        # --------------------------------------------------------------------
+        # 3) Optional: Find Allocations with Utility < Outside Offer (Circles 5 & 6)
+        # --------------------------------------------------------------------
         allocations_less_than_outside_offer = None
         if circle in (5, 6):
             allocations_less_than_outside_offer = []
-            
+
             # Find allocations where Player 1's utility is less than their outside offer
             allocation_p1 = find_allocation_less_than_outside_offer_dp(
                 items=game.items,
@@ -123,18 +141,16 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
             if allocation_p1:
                 allocations_less_than_outside_offer.append({
                     'player': 1,
-                    'allocation': [value for value in allocation_p1.values()]
+                    'allocation': list(allocation_p1.values())
                 })
             else:
                 allocations_less_than_outside_offer.append({
                     'player': 1,
-                    'allocation': [0, 0, 0, 0, 0]
+                    'allocation': [0] * game.num_items
                 })
-                print(f"No feasible allocation found for Player 1 in Game {i + 1} where utility < outside offer.")
+                print(f"[INFO] No feasible < outside_offer allocation for Player 1 in Game {i + 1}.")
 
             # Find allocations where Player 2's utility is less than their outside offer
-            print(f"game.items: {game.items}")
-            
             allocation_p2 = find_allocation_less_than_outside_offer_dp(
                 items=game.items,
                 player_valuations=game.player_values[1],
@@ -144,18 +160,23 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
             if allocation_p2:
                 allocations_less_than_outside_offer.append({
                     'player': 2,
-                    'allocation': [value for value in allocation_p2.values()]
+                    'allocation': list(allocation_p2.values())
                 })
             else:
-                print(f"No feasible allocation found for Player 2 in Game {i + 1} where utility < outside offer.")
                 allocations_less_than_outside_offer.append({
                     'player': 2,
-                    'allocation': [0, 0, 0, 0, 0]
+                    'allocation': [0] * game.num_items
                 })
+                print(f"[INFO] No feasible < outside_offer allocation for Player 2 in Game {i + 1}.")
 
-        print(f"game.items: {game.items}")
-        print(f"allocations_less_than_outside_offer: {allocations_less_than_outside_offer}")
+            print(f"[DEBUG] Game {i + 1} allocations_less_than_outside_offer: {allocations_less_than_outside_offer}")
 
+        print(f"[DEBUG] game.items: {game.items}")
+        print(f"[DEBUG] allocations_less_than_outside_offer: {allocations_less_than_outside_offer}")
+
+        # --------------------------------------------------------------------
+        # 4) Initialize Game History
+        # --------------------------------------------------------------------
         game_history = GameHistory(
             agent_1_name="Agent1",
             agent_2_name="Agent2",
@@ -169,48 +190,41 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
         game_history.agent_1_offers = []
         game_history.agent_2_offers = []
 
-        # Prepare a DataFrame to record step-by-step results
-        game.game_results = pd.DataFrame(columns=[
-            "game_num", "round_num", "player", "discount_rate", "offer", "value",
-            "undiscounted_value", "items", "your_side_of_current_offer",
-            "outside_offer", "outside_offer_undiscounted",
-            "accepting_an_offer_worse_than_outside_offer",
-            "making_an_offer_worse_for_you_than_your_outside_offer",
-            "walking_away_from_an_offer_better_than_your_outside_offer",
-            "offer_no_items_or_all_items", "making_offer_worse_than_previous",
-            "nash_welfare", "proposal_proportion_player_1",
-            "proposal_proportion_player_2", "concession_size",
-            "security_level_player_1", "security_level_player_2",
-            "average_concession_size", "rawlsian_welfare", "gini_coefficient",
-            "utilitarian_welfare", "jain_fairness_index",
-            "on_pareto_frontier", "mean_absolute_difference",  # <-- fixed column name
-            "walk_type"
-        ])
+        # --------------------------------------------------------------------
+        # 5) Initialize GameData Instance
+        # --------------------------------------------------------------------
+        game_data = GameData(
+            circle=circle,
+            date=date,
+            agent1="Agent1",
+            agent2="Agent2"
+        )
 
-        print(f"PLAYING GAME_NUM: {i}")
-
-        # (Optional) check whether previous game results exist
-        # Commenting out or adjusting this logic if it causes breaks
-        if i > 0:
-            print("Unique games in pathology_results:", pathology_results['game_num'].unique())
-            if i - 1 in pathology_results['game_num'].unique():
-                print(f"Game {i - 1} exists in pathology_results")
-            else:
-                print(f"Game {i - 1} does not exist in pathology_results")
-                # If you do NOT want to break, just comment this out:
-                # break
+        print(f"[INFO] Starting Game {i + 1} of {games} for Circle {circle}.")
 
         # --------------------------------------------------------------------
-        # Main negotiation loop
-        # -------------------------------------------------------------------- 
+        # 6) (Optional) Verify Previous Game Results
+        # --------------------------------------------------------------------
+        if i > 0:
+            # Not necessary when using GameData, but kept for consistency
+            print(f"[DEBUG] Processing Game {i} completed.")
+
+        # --------------------------------------------------------------------
+        # 7) Main Negotiation Loop
+        # --------------------------------------------------------------------
         while game.in_progress:
-            time.sleep(circle + 0.5)  # Sleep 5s to simulate thinking or rate-limit
+            # Sleep to simulate thinking time and rate-limit API calls
+            sleep_duration = 5  # Adjust based on desired rate-limiting
+            print(f"[DEBUG] Sleeping for {sleep_duration} seconds before next step.")
+            time.sleep(sleep_duration)
+
+            # Determine current step, round, and player
             current_step = len(game.history[0]) + len(game.history[1]) + 1
             current_round = (current_step - 1) // 2 + 1
             current_player = 1 if current_step % 2 == 1 else 2
             game.current_round = current_round
 
-            # Pathology flags
+            # Initialize pathology flags for this step
             making_offer_worse_than_previous = False
             making_offer_worse_than_outside_offer = False
             offer_no_items_or_all_items = False
@@ -223,18 +237,25 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
             print(f"Game {i + 1}, Round {current_round}, Player {current_player}'s turn (Step {current_step})")
             print("=" * 80)
 
-            # Remember the previous offer, let the current player move
+            # Capture the previous offer before the player acts
             prev_offer = game.current_offer
-            current_allocation_example = None
 
-            if circle in (5, 6):
+            # Provide example allocation if circle is 5 or 6
+            current_allocation_example = None
+            if circle in (5, 6) and allocations_less_than_outside_offer is not None:
                 if current_player == 1:
                     current_allocation_example = allocations_less_than_outside_offer[0]['allocation']
                 elif current_player == 2:
                     current_allocation_example = allocations_less_than_outside_offer[1]['allocation']
 
-            print(f"type of current_allocation_example: {type(current_allocation_example)}")
-            game.step(example_offer_less_than_outside_offer_self=current_allocation_example)
+            print(f"[DEBUG] Current allocation example type: {type(current_allocation_example)}")
+
+            # Let the current player make a move (ACCEPT, WALK, COUNTEROFFER)
+            # Capture the prompt and response
+            response = game.step(example_offer_less_than_outside_offer_self=current_allocation_example)
+
+            # Capture the action played by the current player
+            action_played = game.players[current_player - 1].action.upper()
 
             # Check pathologies #4 (accepting worse) and #5 (walking away from better)
             walking_away_from_an_offer_better_than_outside_offer = check_walking_away_from_better(
@@ -244,33 +265,46 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
                 current_player, p1_kept, p2_kept, game
             )
 
-            # Check for walk away type (valid/invalid/no walk)
+            # Determine walk away type (valid/invalid/no walk)
             walk_away_type = determine_walk_away_type(current_player, game)
 
-            # If there's a current offer, compute new values and pathologies
+            # ------------------------------------------------------------
+            # Check if the current allocation is on the Pareto Frontier
+            # ------------------------------------------------------------
+            on_pareto_frontier = False
+            for vals in pareto_front:
+                if vals["type"] == "outside_offer" and action_played == "WALK":
+                    on_pareto_frontier = True
+                    break
+                elif vals["type"] == "allocation":
+                    if (np.array_equal(vals["agent1"], p1_kept) and 
+                        np.array_equal(vals["agent2"], p2_kept)):
+                        on_pareto_frontier = True
+                        break
+
+            # ------------------------------------------------------------
+            # 8) Compute Metrics if an Offer Exists
+            # ------------------------------------------------------------
+            metrics = {}
             if game.current_offer:
-                # Determine realization round for each player
-                action = game.players[current_player - 1].action
-                if action == "COUNTEROFFER":
-                    if current_player == 1:
-                        realization_round_p1 = current_round
-                        realization_round_p2 = current_round
-                    else:
-                        realization_round_p1 = current_round + 1
-                        realization_round_p2 = current_round + 1
+                # Determine realization round based on action
+                if action_played == "COUNTEROFFER":
+                    realization_round_p1 = current_round
+                    realization_round_p2 = current_round
                 else:
-                    # For ACCEPT or other actions, realization is the current round
                     realization_round_p1 = current_round
                     realization_round_p2 = current_round
 
-                # Update p1_kept, p2_kept if the current player made a counteroffer
+                # Update allocations based on the offer
                 p1_kept, p2_kept = update_kept_portions(current_player, game, p1_kept, p2_kept)
 
-                # Track undiscounted utilities
-                p1_offers_utility.append(np.dot(game.player_values[0], p1_kept))
-                p2_offers_utility.append(np.dot(game.player_values[1], p2_kept))
+                # Calculate undiscounted utilities
+                p1_undisc_val = float(np.dot(game.player_values[0], p1_kept))
+                p2_undisc_val = float(np.dot(game.player_values[1], p2_kept))
+                p1_offers_utility.append(p1_undisc_val)
+                p2_offers_utility.append(p2_undisc_val)
 
-                # Discounted values
+                # Calculate discounted utilities
                 p1_value = calculate_discounted_value(
                     p1_kept, game.player_values[0], game.gamma, realization_round_p1
                 )
@@ -278,44 +312,42 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
                     p2_kept, game.player_values[1], game.gamma, realization_round_p2
                 )
 
-                rounds.append(current_round)
+                # Track values across rounds
                 p1_values.append(p1_value)
                 p2_values.append(p2_value)
 
-                # Track which player's offer it is
+                # Log which player's offer it is
                 if current_player == 1:
-                    p1_offers.append(game.current_offer.offer)
+                    p1_offers.append(list(game.current_offer.offer))
                 else:
-                    p2_offers.append(game.current_offer.offer)
-                    print(f"\nRound {current_round} Values:")
+                    p2_offers.append(list(game.current_offer.offer))
+                    print(f"\n[INFO] Round {current_round} Values:")
                     print(f"Player 1: {p1_value:.2f}")
                     print(f"Player 2: {p2_value:.2f}")
 
                 # ------------------------------
                 # Pathology #1: Offer is worse than the immediate previous offer
                 # ------------------------------
-                if action == "COUNTEROFFER":
-                    # We can only compare if there's a previous offer for the same player
-                    if (current_round == 1 and current_player == 2) or (current_round > 1):
+                if action_played == "COUNTEROFFER":
+                    if (current_round > 1) or (current_round == 1 and current_player == 2):
                         if current_player == 1:
-                            your_side_of_previous_offer = p1_values[-2]
-                            your_side_of_current_offer = p1_values[-1]
+                            previous_offer_value = p1_values[-2]
+                            current_offer_value = p1_values[-1]
                         else:
-                            your_side_of_previous_offer = p2_values[-2]
-                            your_side_of_current_offer = p2_values[-1]
-
+                            previous_offer_value = p2_values[-2]
+                            current_offer_value = p2_values[-1]
                         making_offer_worse_than_previous = (
-                            your_side_of_previous_offer > your_side_of_current_offer
+                            previous_offer_value > current_offer_value
                         )
 
                     # ------------------------------
                     # Pathology #2: Offer is worse than your outside offer
                     # ------------------------------
                     if current_player == 1:
-                        outside_offer = game.outside_offer_values[0] * (game.gamma ** (current_round - 1))
+                        outside_offer = float(game.outside_offer_values[0]) * (game.gamma ** (current_round - 1))
                         making_offer_worse_than_outside_offer = (p1_value < outside_offer)
-                    else:  # current_player == 2
-                        outside_offer = game.outside_offer_values[1] * (game.gamma ** current_round)
+                    else:
+                        outside_offer = float(game.outside_offer_values[1]) * (game.gamma ** current_round)
                         making_offer_worse_than_outside_offer = (p2_value < outside_offer)
                 else:
                     making_offer_worse_than_outside_offer = False
@@ -323,15 +355,15 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
                 # ------------------------------
                 # Pathology #3: Offer has no items or all items
                 # ------------------------------
-                if action == "COUNTEROFFER":
+                if action_played == "COUNTEROFFER":
                     if (np.array_equal(game.current_offer.offer, [0] * game.num_items) or
                             np.array_equal(game.current_offer.offer, game.items)):
                         offer_no_items_or_all_items = True
 
                 # ------------------------------
-                # Compute Nash welfare
+                # Compute Nash Welfare
                 # ------------------------------
-                if action in ("ACCEPT", "COUNTEROFFER"):
+                if action_played in ("ACCEPT", "COUNTEROFFER"):
                     nash_welfare = sqrt(prod([
                         np.dot(game.player_values[0], p1_kept),
                         np.dot(game.player_values[1], p2_kept)
@@ -343,188 +375,153 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
                     ]))
 
                 # ------------------------------------------------------------
-                # Utility proportion for the round (x1_prop, x2_prop)
+                # Utility Proportion for the Round (x1_prop, x2_prop)
                 # ------------------------------------------------------------
-                if "WALK" in action:
-                    x1_prop = game.outside_offer_values[0]
-                    x2_prop = game.outside_offer_values[1]
+                if action_played == "WALK":
+                    x1_prop = float(game.outside_offer_values[0])
+                    x2_prop = float(game.outside_offer_values[1])
                 else:
-                    # Normalize by total utility for that player + item draws
-                    x1_prop = (
-                        np.dot(game.player_values[0], p1_kept)
-                        / sum([np.dot(game.player_values[0], p1_kept),
-                            np.dot(game.player_values[0], game.num_items)])
-                    )
-                    x2_prop = (
-                        np.dot(game.player_values[1], p2_kept)
-                        / sum([np.dot(game.player_values[1], p2_kept),
-                            np.dot(game.player_values[1], game.num_items)])
-                    )
+                    total_val_p1_kept = float(np.dot(game.player_values[0], p1_kept))
+                    total_val_p2_kept = float(np.dot(game.player_values[1], p2_kept))
+                    total_val = total_val_p1_kept + total_val_p2_kept
+                    if total_val > 0:
+                        x1_prop = total_val_p1_kept / total_val
+                        x2_prop = total_val_p2_kept / total_val
+                    else:
+                        x1_prop, x2_prop = 0.0, 0.0
 
                 # ------------------------------------------------------------
-                # Concession size
+                # Concession Size
                 # ------------------------------------------------------------
                 concession_size = None
-                if action == "COUNTEROFFER" and game.current_round > 1:
-                    if current_player == 1:
-                        old_value = p1_offers_utility[-1] if p1_offers_utility else np.dot(game.player_values[0], p1_kept)
+                if action_played == "COUNTEROFFER" and current_round > 1:
+                    if current_player == 1 and len(p1_offers_utility) >= 2:
+                        old_value = p1_offers_utility[-2]
                         new_value = p1_offers_utility[-1]
                         concession_size = max(0, old_value - new_value)
-                        p1_offers_utility.append(new_value)
-                    else:
-                        old_value = p2_offers_utility[-1] if p2_offers_utility else np.dot(game.player_values[1], p2_kept)
-                        new_value = np.dot(game.player_values[1], p2_kept)
+                    elif current_player == 2 and len(p2_offers_utility) >= 2:
+                        old_value = p2_offers_utility[-2]
+                        new_value = p2_offers_utility[-1]
                         concession_size = max(0, old_value - new_value)
-                        p2_offers_utility.append(new_value)
                 else:
-                    if action == "COUNTEROFFER":
+                    # Initialize utility if first COUNTEROFFER
+                    if action_played == "COUNTEROFFER":
                         if current_player == 1 and not p1_offers_utility:
-                            p1_offers_utility.append(np.dot(game.player_values[0], p1_kept))
+                            p1_offers_utility.append(p1_undisc_val)
                         elif current_player == 2 and not p2_offers_utility:
-                            p2_offers_utility.append(np.dot(game.player_values[1], p2_kept))
+                            p2_offers_utility.append(p2_undisc_val)
 
                 # ------------------------------------------------------------
-                # Proportion of collective value for each player
+                # Proportion of Collective Value for Each Player
                 # ------------------------------------------------------------
-                if "WALK" in action:
-                    proportion_of_value_p1 = None
-                    proportion_of_value_p2 = None
-                else:
-                    denom = (np.dot(game.player_values[0], p1_kept)
-                            + np.dot(game.player_values[1], p2_kept))
+                proportion_of_value_p1 = None
+                proportion_of_value_p2 = None
+
+                if action_played in ("ACCEPT", "COUNTEROFFER"):
+                    denom = float(np.dot(game.player_values[0], p1_kept) + np.dot(game.player_values[1], p2_kept))
                     if denom > 0:
-                        proportion_of_value_p1 = np.dot(game.player_values[0], p1_kept) / denom
-                        proportion_of_value_p2 = np.dot(game.player_values[1], p2_kept) / denom
+                        proportion_of_value_p1 = float(np.dot(game.player_values[0], p1_kept)) / denom
+                        proportion_of_value_p2 = float(np.dot(game.player_values[1], p2_kept)) / denom
                     else:
                         proportion_of_value_p1 = 0.0
                         proportion_of_value_p2 = 0.0
 
                 # ------------------------------------------------------------
-                # Proportional share of the maximum available utility
+                # Proportional Share of the Maximum Available Utility
                 # ------------------------------------------------------------
-                if "WALK" in action:
-                    proposal_proportion_player_1_available_items = None
-                    proposal_proportion_player_2_available_items = None
-                else:
-                    total_p1_available_items = np.dot(game.player_values[0], game.items)
-                    total_p2_available_items = np.dot(game.player_values[1], game.items)
+                proposal_proportion_player_1_available_items = None
+                proposal_proportion_player_2_available_items = None
+                if action_played in ("ACCEPT", "COUNTEROFFER"):
+                    total_p1_available_items = float(np.dot(game.player_values[0], game.items))
+                    total_p2_available_items = float(np.dot(game.player_values[1], game.items))
 
                     proposal_proportion_player_1_available_items = (
-                        np.dot(game.player_values[0], p1_kept) / total_p1_available_items
-                    ) if total_p1_available_items else 0.0
+                        float(np.dot(game.player_values[0], p1_kept)) / total_p1_available_items
+                    ) if total_p1_available_items > 0 else 0.0
 
                     proposal_proportion_player_2_available_items = (
-                        np.dot(game.player_values[1], p2_kept) / total_p2_available_items
-                    ) if total_p2_available_items else 0.0
+                        float(np.dot(game.player_values[1], p2_kept)) / total_p2_available_items
+                    ) if total_p2_available_items > 0 else 0.0
 
                 # ------------------------------------------------------------
-                # Utilitarian & Rawlsian welfare
+                # Utilitarian & Rawlsian Welfare
                 # ------------------------------------------------------------
-                if "WALK" in action:
-                    utilitarian_welfare = sum(game.outside_offer_values)
-                    rawlsian_welfare = min(game.outside_offer_values[0], game.outside_offer_values[1])
+                if action_played == "WALK":
+                    utilitarian_welfare = float(sum(game.outside_offer_values))
+                    rawlsian_welfare = float(min(game.outside_offer_values))
                 else:
-                    utilitarian_welfare = (
-                        np.dot(game.player_values[0], p1_kept)
-                        + np.dot(game.player_values[1], p2_kept)
-                    )
-                    rawlsian_welfare = min(
-                        np.dot(game.player_values[0], p1_kept),
-                        np.dot(game.player_values[1], p2_kept)
-                    )
+                    utilitarian_welfare = float(np.dot(game.player_values[0], p1_kept) + np.dot(game.player_values[1], p2_kept))
+                    rawlsian_welfare = float(min(np.dot(game.player_values[0], p1_kept),
+                                                 np.dot(game.player_values[1], p2_kept)))
 
                 # ------------------------------------------------------------
                 # Gini Coefficient (n=2)
                 # ------------------------------------------------------------
-                if "WALK" in action:
+                if action_played == "WALK":
                     wealth_distribution = np.array([
-                        game.outside_offer_values[0],
-                        game.outside_offer_values[1]
+                        float(game.outside_offer_values[0]),
+                        float(game.outside_offer_values[1])
                     ], dtype=float)
                 else:
                     wealth_distribution = np.array([
-                        np.dot(p1_kept, game.player_values[0]),
-                        np.dot(p2_kept, game.player_values[1])
+                        float(np.dot(game.player_values[0], p1_kept)),
+                        float(np.dot(game.player_values[1], p2_kept))
                     ], dtype=float)
 
                 total_wealth = wealth_distribution.sum()
-                jain_fairness_index = None 
                 if total_wealth > 0:
                     x1, x2 = wealth_distribution
-                    numerator = abs(x1 - x2)
-                    denominator = 4.0 * total_wealth
-                    gini_coefficient = numerator / denominator
+                    gini_coefficient = abs(x1 - x2) / (4.0 * total_wealth)
                 else:
                     gini_coefficient = 0.0
 
-                    # ------------------------------------------------------------
-                    # Jain's Fairness Index Calculation
-                    # ------------------------------------------------------------
+                # Jain's Fairness Index Calculation
+                if action_played == "WALK":
+                    x1 = float(game.outside_offer_values[0])
+                    x2 = float(game.outside_offer_values[1])
+                else:
+                    x1 = float(np.dot(game.player_values[0], p1_kept))
+                    x2 = float(np.dot(game.player_values[1], p2_kept))
 
-                    # Calculate x1 and x2
-                    if "WALK" in action:
-                        x1 = game.outside_offer_values[0]
-                        x2 = game.outside_offer_values[1]
-                    else:
-                        x1 = np.dot(p1_kept, game.player_values[0])
-                        x2 = np.dot(p2_kept, game.player_values[1])
+                # Mean Utility
+                mean_utility = (x1 + x2) / 2.0
 
-                    # Mean Utility
-                    mean_utility = (x1 + x2) / 2.0
+                # Variance
+                variance_value = (x1**2 + x2**2) / 2.0 - mean_utility**2
+                variance_value = max(variance_value, 0.0)  # Correct for negative variance due to precision
 
-                    # Variance
-                    variance_value = (x1**2 + x2**2) / 2.0 - mean_utility**2
-                    if variance_value < 0:
-                        variance_value = 0.0  # Correct for possible negative variance due to precision
+                # Coefficient of Variation
+                if mean_utility != 0:
+                    coefficient_of_variation = np.sqrt(variance_value) / mean_utility
+                else:
+                    coefficient_of_variation = 0.0  # Avoid division by zero
 
-                    # Coefficient of Variation
-                    if mean_utility != 0:
-                        coefficient_of_variation = np.sqrt(variance_value) / mean_utility
-                    else:
-                        coefficient_of_variation = 0.0  # Avoid division by zero
-
-                    # Jain's Fairness Index
-                    jain_fairness_index = 1 / (1 + coefficient_of_variation ** 2)
+                # Jain's Fairness Index
+                jain_fairness_index = 1 / (1 + coefficient_of_variation ** 2)
 
                 # ------------------------------------------------------------
                 # Security Level
                 # ------------------------------------------------------------
-                if "WALK" in action:
-                    security_level_player_1 = 0
-                    security_level_player_2 = 0
+                if action_played == "WALK":
+                    security_level_player_1 = 0.0
+                    security_level_player_2 = 0.0
                 else:
                     security_level_player_1 = max(
-                        0, game.outside_offer_values[0] - np.dot(game.player_values[0], p1_kept)
+                        0.0, float(game.outside_offer_values[0] - np.dot(game.player_values[0], p1_kept))
                     )
                     security_level_player_2 = max(
-                        0, game.outside_offer_values[1] - np.dot(game.player_values[1], p2_kept)
+                        0.0, float(game.outside_offer_values[1] - np.dot(game.player_values[1], p2_kept))
                     )
-
-                # ------------------------------------------------------------
-                # On Pareto Frontier?
-                # ------------------------------------------------------------
-                on_pareto_frontier = False
-                for vals in pareto_front:
-                    if vals["type"] == "outside_offer":
-                        # A WALK was played and the outside offers lie on the frontier
-                        if "WALK" in game.players[current_player - 1].action:
-                            on_pareto_frontier = True
-                            break
-                    elif vals["type"] == "allocation":
-                        if (np.array_equal(vals["agent1"], p1_kept)
-                            and np.array_equal(vals["agent2"], p2_kept)):
-                            on_pareto_frontier = True
-                            break
 
                 # ------------------------------------------------------------
                 # Mean Absolute Difference (MAD)
                 # ------------------------------------------------------------
-                if "WALK" in action:
-                    x1 = game.outside_offer_values[0]
-                    x2 = game.outside_offer_values[1]
+                if action_played == "WALK":
+                    x1 = float(game.outside_offer_values[0])
+                    x2 = float(game.outside_offer_values[1])
                 else:
-                    x1 = np.dot(game.player_values[0], p1_kept)
-                    x2 = np.dot(game.player_values[1], p2_kept)
+                    x1 = float(np.dot(game.player_values[0], p1_kept))
+                    x2 = float(np.dot(game.player_values[1], p2_kept))
 
                 if x1 == 0.0 and x2 == 0.0:
                     mean_absolute_difference = 0.0
@@ -532,32 +529,34 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
                     mean_absolute_difference = abs(x1 - x2) / 2.0
 
                 # ------------------------------------------------------------
-                # Record step in the DataFrame
+                # Compile Metrics
                 # ------------------------------------------------------------
-                new_row = pd.DataFrame([{
+                metrics = {
                     "game_num": i,
+                    "step_num": current_step,
                     "round_num": current_round,
                     "player": current_player,
+                    "action_played": action_played,
                     "discount_rate": game.gamma ** (current_round - 1),
-                    "offer": game.current_offer.offer,
-                    "value": (p1_value if current_player == 1 else p2_value),
+                    "offer": list(game.current_offer.offer) if game.current_offer else [],
+                    "value": p1_value if current_player == 1 else p2_value,
                     "undiscounted_value": (
-                        p1_value / (game.gamma ** (current_round - 1))
-                        if current_player == 1
-                        else p2_value / (game.gamma ** (current_round - 1))
+                        p1_value / (game.gamma ** (realization_round_p1 - 1)) if current_player == 1 else
+                        p2_value / (game.gamma ** (realization_round_p2 - 1))
                     ),
-                    "items": game.items,
+                    "p1_valuations": list(game.player_values[0]),
+                    "p2_valuations": list(game.player_values[1]),
+                    "p1_kept_allocation": list(p1_kept) if p1_kept is not None else None,
+                    "p2_kept_allocation": list(p2_kept) if p2_kept is not None else None,
+                    "p1_final_value": p1_value,
+                    "p2_final_value": p2_value,
+                    "items": list(game.items),
                     "your_side_of_current_offer": your_side_of_current_offer,
-                    "outside_offer": (
-                        outside_offer if action == "COUNTEROFFER" else None
-                    ),
-                    "outside_offer_undiscounted": game.outside_offer_values[current_player - 1],
-                    "accepting_an_offer_worse_than_outside_offer":
-                        accepting_an_offer_worse_than_outside_offer,
-                    "making_an_offer_worse_for_you_than_your_outside_offer":
-                        making_offer_worse_than_outside_offer,
-                    "walking_away_from_an_offer_better_than_your_outside_offer":
-                        walking_away_from_an_offer_better_than_outside_offer,
+                    "outside_offer": game.outside_offer_values[current_player - 1] * (game.gamma ** (current_round - 1)),  
+                    "outside_offer_undiscounted": game.outside_offer_values[current_player - 1], 
+                    "accepting_an_offer_worse_than_outside_offer": accepting_an_offer_worse_than_outside_offer,
+                    "making_an_offer_worse_for_you_than_your_outside_offer": making_offer_worse_than_outside_offer,
+                    "walking_away_from_an_offer_better_than_your_outside_offer": walking_away_from_an_offer_better_than_outside_offer,
                     "offer_no_items_or_all_items": offer_no_items_or_all_items,
                     "making_offer_worse_than_previous": making_offer_worse_than_previous,
                     "nash_welfare": nash_welfare,
@@ -566,7 +565,7 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
                     "concession_size": concession_size,
                     "security_level_player_1": security_level_player_1,
                     "security_level_player_2": security_level_player_2,
-                    "average_concession_size": None,  # TODO: compute post-game
+                    "average_concession_size": None,  # To be computed post-game if needed
                     "rawlsian_welfare": rawlsian_welfare,
                     "gini_coefficient": gini_coefficient,
                     "utilitarian_welfare": utilitarian_welfare,
@@ -574,108 +573,180 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
                     "on_pareto_frontier": on_pareto_frontier,
                     "mean_absolute_difference": mean_absolute_difference,
                     "walk_type": walk_away_type
-                }])
-                game.game_results = pd.concat([game.game_results, new_row], ignore_index=True)
+                }
+
+                # ------------------------------------------------------------
+                # Add Round Data to GameData
+                # ------------------------------------------------------------
+                game_data.add_round_data(
+                    prompt=game.players[current_player - 1].current_prompt,
+                    response=game.players[current_player - 1].current_response,  # Assuming response includes the agent's textual response
+                    action=action_played,
+                    game_metrics=metrics,
+                    envy_free_metrics=game_history.to_dict()
+                )
+
+                if "WALK" or "ACCEPT" in action_played:
+                    game_data.set_outcome(metrics)
 
             # ---------------------------------------------------------
-            # Add the current offer to the game history if complete
+            # 9) Add the Current Offer to Game History if Complete
             # ---------------------------------------------------------
             if game.current_offer is not None and len(game.current_offer.offer) == game.num_items:
+                offer_items = list(game.current_offer.offer) if isinstance(game.current_offer.offer, torch.Tensor) else game.current_offer.offer
                 game_history.add_offer(
                     game.current_player,
-                    Offer(game.current_player, offer=torch.tensor(game.current_offer.offer))
+                    Offer(game.current_player, offer=offer_items)
                 )
 
             # ---------------------------------------------------------
-            # Check final-round logic (Player 2's turn on last round)
+            # 10) Check Final-Round Logic (Player 2's Turn on Last Round)
             # ---------------------------------------------------------
             if current_round == game.max_rounds and current_player == 2:
                 # Handle acceptance/walk/counter in final round
-                p1_kept, p2_kept, p1_values, p2_values, accepting_an_offer_worse_than_outside_offer = (
-                    handle_final_round(
-                        i,
-                        current_round,
-                        current_player,
-                        game,
-                        prev_offer,
-                        p1_kept,
-                        p2_kept,
-                        p1_values,
-                        p2_values,
-                        p1_offers,
-                        accepting_an_offer_worse_than_outside_offer
-                    )
+                final_metrics = handle_final_round(
+                    game_num=i,
+                    current_round=current_round,
+                    current_player=current_player,
+                    game=game,
+                    prev_offer=prev_offer,
+                    p1_kept=p1_kept,
+                    p2_kept=p2_kept,
+                    p1_values=p1_values,
+                    p2_values=p2_values,
+                    p1_offers=p1_offers,
+                    accepting_an_offer_worse_than_outside_offer=accepting_an_offer_worse_than_outside_offer,
+                    pareto_front=pareto_front
                 )
+
+                # Add the final round data to GameData
+                game_data.add_round_data(
+                    prompt=game.players[current_player - 1].current_prompt,
+                    response=game.players[current_player - 1].current_response,  # Assuming response attribute exists
+                    action=final_metrics["action_played"],
+                    game_metrics=final_metrics,
+                    envy_free_metrics=game_history.to_dict()
+                )
+
+                # Set the final outcome in GameData
+                game_data.set_outcome(final_metrics)
+
+                # End the game loop
                 break
 
             # ---------------------------------------------------------
-            # Check if Player 1 walked away (offer is None + "WALK")
+            # 11) Handle Walk Away Scenarios
             # ---------------------------------------------------------
             elif (game.current_offer is None
-                and current_player == 1
-                and "WALK" in game.players[current_player - 1].action):
-                print("Player 1 walked")
-                # Record a final row for the walk
-                new_row = pd.DataFrame([{
+                  and "WALK" in action_played):
+                print(f"[INFO] Player {current_player} walked away.")
+
+                # Compile walk-away metrics
+                walk_metrics = {
                     "game_num": i,
+                    "step_num": current_step,
                     "round_num": current_round,
                     "player": current_player,
+                    "action_played": action_played,
                     "discount_rate": game.gamma ** (current_round - 1),
                     "offer": [],
-                    "value": None,
-                    "items": game.items,
+                    "value": None,  # No value since walk occurred
+                    "undiscounted_value": game.outside_offer_values[current_player - 1],
+                    "p1_valuations": list(game.player_values[0]),
+                    "p2_valuations": list(game.player_values[1]),
+                    "p1_kept_allocation": None,  # No allocation
+                    "p2_kept_allocation": None,  # No allocation
+                    "p1_final_value": float(game.outside_offer_values[0]),
+                    "p2_final_value": float(game.outside_offer_values[1]),
+                    "items": list(game.items),
                     "your_side_of_current_offer": None,
-                    "outside_offer": None,
-                    "accepting_an_offer_worse_than_outside_offer":
-                        accepting_an_offer_worse_than_outside_offer,
-                    "making_an_offer_worse_for_you_than_your_outside_offer":
-                        making_offer_worse_than_outside_offer,
-                    "walking_away_from_an_offer_better_than_your_outside_offer":
-                        walking_away_from_an_offer_better_than_outside_offer,
+                    "outside_offer": game.outside_offer_values[current_player - 1] * (game.gamma ** (current_round - 1)),
+                    "outside_offer_undiscounted": game.outside_offer_values[current_player - 1],
+                    "accepting_an_offer_worse_than_outside_offer": accepting_an_offer_worse_than_outside_offer,
+                    "making_an_offer_worse_for_you_than_your_outside_offer": making_offer_worse_than_outside_offer,
+                    "walking_away_from_an_offer_better_than_your_outside_offer": walking_away_from_an_offer_better_than_outside_offer,
                     "offer_no_items_or_all_items": offer_no_items_or_all_items,
                     "making_offer_worse_than_previous": making_offer_worse_than_previous,
-                    "security_level_player_1": 0,
-                    "security_level_player_2": 0,
-                    "average_concession_size": None,
                     "nash_welfare": sqrt(prod([
                         game.outside_offer_values[0],
                         game.outside_offer_values[1]
                     ])),
-                    "utilitarian_welfare":
-                        game.outside_offer_values[0] + game.outside_offer_values[1],
-                    "rawlsian_welfare":
-                        min(game.outside_offer_values[0], game.outside_offer_values[1]),
-                    "gini_coefficient": (
-                        abs(game.outside_offer_values[0] - game.outside_offer_values[1]) /
-                        (4.0 * sum([game.outside_offer_values[0], game.outside_offer_values[1]]))
-                    ) if sum(game.outside_offer_values) > 0 else 0.0,
-                    "security_level_player_1": 0,
-                    "security_level_player_2": 0,
-                    "jain_fairness_index": None,
                     "proposal_proportion_player_1": None,
                     "proposal_proportion_player_2": None,
                     "concession_size": None,
-                    "on_pareto_frontier": False,
-                    "mean_absolute_difference":
-                        abs(game.outside_offer_values[0] - game.outside_offer_values[1]) / 2.0,
+                    "security_level_player_1": 0.0,
+                    "security_level_player_2": 0.0,
+                    "average_concession_size": None,  # To be computed post-game
+                    "rawlsian_welfare": float(min(game.outside_offer_values[0], game.outside_offer_values[1])),
+                    "gini_coefficient": (
+                        abs(game.outside_offer_values[0] - game.outside_offer_values[1]) /
+                        (4.0 * sum(game.outside_offer_values))
+                    ) if sum(game.outside_offer_values) > 0 else 0.0,
+                    "utilitarian_welfare": float(sum(game.outside_offer_values)),
+                    "jain_fairness_index": (
+                        1 / (1 + (abs(game.outside_offer_values[0] - game.outside_offer_values[1]) / sum(game.outside_offer_values))**2)
+                        if sum(game.outside_offer_values) > 0 else 0.0
+                    ),
+                    "on_pareto_frontier": on_pareto_frontier, 
+                    "mean_absolute_difference": abs(
+                        game.outside_offer_values[0] - game.outside_offer_values[1]
+                    ) / 2.0,
                     "walk_type": walk_away_type
-                }])
-                game.game_results = pd.concat([game.game_results, new_row], ignore_index=True)
+                }
+
+                # Add the walk-away data to GameData
+                game_data.add_round_data(
+                    prompt=game.players[current_player - 1].current_prompt,
+                    response=game.players[current_player - 1].current_response,
+                    action=game.players[current_player - 1].action,
+                    game_metrics=walk_metrics,
+                    envy_free_metrics=game_history.to_dict()
+                )
+
+                # Set the final outcome in GameData
+                game_data.set_outcome(walk_metrics)
+
+                # End the game loop
                 game.in_progress = False
 
-        pathology_results = pd.concat([pathology_results, game.game_results], ignore_index=True)
-        envy_results_history[i] = game_history
+        # --------------------------------------------------------------------
+        # 12) After the Game Loop Ends, Save GameData
+        # --------------------------------------------------------------------
+        all_game_data.append(game_data)
+        #UNCOMMENT THESE TO SAVE EACH GAME'S DATA SEPERATELY 
+        # Optionally, save each game's data immediately
+        # Filename can include game number, circle, date, etc.
+        #filename = f'game_data_{date}_game_{i + 1}_circle_{circle}.json'
+        #game_data.save_to_json(filename)
+        #print(f"[INFO] Saved GameData to {filename}.")
+        #save to pickle
+        #filename_pkl = f'game_data_{date}_game_{i + 1}_circle_{circle}.pkl'
+        #with open(filename_pkl, "wb") as pf:
+        #    pickle.dump(game_data, pf)
+        #print(f"[INFO] Saved GameData to {filename_pkl}.")
 
     # ------------------------------------------------------------------------
-    # Save results
+    # 13) Save All Games' Data (Optional)
     # ------------------------------------------------------------------------
-    pathology_results.to_csv(
-        f'pathology_results_{date}_{games}_{game_title}_circle_{circle}.csv',
-        index=False
-    )
+    # If you prefer to save all games' data collectively, you can serialize the list
+    # For example, save as a list of dictionaries
+    print("HERE IS THE DATA")
+    all_data = {
+        "date": date,
+        "circle": circle,
+        "games": games,
+        "game_title": game_title,
+        "all_game_data": [gd.to_dict() for gd in all_game_data]
+    }
+    all_games_filename = f'all_game_data_{date}_{games}_{game_title}_circle_{circle}.json'
+    with open(all_games_filename, "w") as f:
+        json.dump(all_data, f, indent=4)
+        #json.pickle(all_data, f)
+    print(f"[INFO] Saved all GameData to JSON file: {all_games_filename}.")
 
-    # If you want to save envy_results_history as well:
-    # pd.DataFrame.from_dict(envy_results_history, orient='index').to_csv(
-    #     f'envy_results_{date}_{games}_{prompt_style}.csv', 
-    #     index=False
-    # )
+    #save to pickle optinally
+    all_games_filename_pkl = f'all_game_data_{date}_{games}_{game_title}_circle_{circle}.pkl'
+    with open(all_games_filename_pkl, "wb") as pf:
+        pickle.dump(all_data, pf)
+    print(f"[INFO] Saved all GameData as a pickle to {all_games_filename_pkl}.")
+
