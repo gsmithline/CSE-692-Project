@@ -139,7 +139,7 @@ class LLMAgent(Agent):
                     raise Exception("Invalid API response format")
                 
                 result_content = response_json['choices'][0]['message']['content']
-                self.current_response = result_content
+                self.current_response = response_json['choices'][0]['message']['content']
                 print("Extracted content:", result_content)
                 
                 # Find the JSON string at the end of the text and clean it
@@ -210,7 +210,7 @@ class LLMAgent(Agent):
                 # Extract the action from the response text
                 result_content = response.choices[0].message.content
                 # Find the JSON string at the end of the text and clean it
-                self.current_response = result_content
+                self.current_response = response.choices[0].message.content
                 json_start = result_content.rfind('{')
                 json_str = result_content[json_start:].strip()
                 # Remove any trailing text after the JSON
@@ -221,11 +221,12 @@ class LLMAgent(Agent):
                 print("Parsed result:", result)
                 self.result = result
                 self.action = result["action"]
-                self.current_response = result
             except Exception as e:
                 print(f"Error with OpenAI response: {e}")
-                if response.choices[0].message.content:
+                if response.choices[0].message.content is not None:
                     self.current_response = response.choices[0].message.content
+                elif response is None:
+                    self.current_response = "Error with OpenAI response, did not receive a response."
                 else:
                     self.current_response = response
                 print("Defaulting to WALK")
@@ -238,7 +239,7 @@ class LLMAgent(Agent):
         elif self.llm_type == "anthropic":
             try:
                 response = self.llm.messages.create(
-                    model="claude-3-opus-20240229", #claude-3-opus-20240229 , claude-3-5-sonnet-20241022
+                    model="claude-3-5-sonnet-20241022", #claude-3-opus-20240229 , claude-3-5-sonnet-20241022
                     system=system_prompt,
                     messages=[
                         {"role": "user", "content": prompt}
@@ -248,7 +249,7 @@ class LLMAgent(Agent):
                 print("Raw API Response:", response)
                 # Extract the action from the response text
                 result_content = response.content[0].text
-                self.current_response = result_content
+                self.current_response = response.content[0].text
                 # Find the JSON string at the end of the text and clean it
                 json_start = result_content.rfind('{')
                 json_str = result_content[json_start:].strip()
@@ -261,12 +262,12 @@ class LLMAgent(Agent):
                 self.result = result
                 self.action = result["action"]
             except Exception as e:
-                print(f"Error with OpenAI response: {e}")
+                print(f"Error with ANTHROPIC response: {e}")
                 print("Defaulting to WALK")
-                if response.content[0].text:
-                    self.current_response = response.choices[0].message.content
+                if response.content[0].text is not None:
+                    self.current_response = response.content[0].text
                 else:
-                    self.current_response = response
+                    self.current_response = "Error with ANTHROPIC response, did not receive a response."
                 result = {}
                 result["action"] = "INVALID WALK"
                 self.result = False
@@ -277,7 +278,7 @@ class LLMAgent(Agent):
                 response = self.llm.generate_content(prompt)
                 print("Raw API Response:", response)
                 result_content = response.candidates[0].content.parts[0].text
-                self.current_response = result_content
+                self.current_response = response.candidates[0].content.parts[0].text
                 # Find the JSON string at the end of the text and clean it
                 json_start = result_content.rfind('{')
                 json_str = result_content[json_start:].strip()
@@ -295,7 +296,7 @@ class LLMAgent(Agent):
                 if response.candidates[0].content.parts[0].text:
                     self.current_response = response.candidates[0].content.parts[0].text
                 else:
-                    self.current_response = response
+                    self.current_response = "Error with Gemini response, did not receive a response."
                 result = {}
                 result["action"] = "INVALID WALK"
                 self.result = False
