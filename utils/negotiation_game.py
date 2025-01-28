@@ -65,7 +65,6 @@ from eval.game_data import GameData  # Importing GameData from game_data.py
 import pickle
 import json
 
-
 def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: str, llm_type: str):
     """
     Runs a series of negotiation games for a specific circle, tracking comprehensive metrics.
@@ -92,6 +91,7 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
             print(f"Sleeping for {sleep_duration} seconds to respect rate limits.")
             time.sleep(sleep_duration)
 
+    
         # --------------------------------------------------------------------
         # 2) Initialize a Single Negotiation Game
         # --------------------------------------------------------------------
@@ -181,8 +181,8 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
         game_data = GameData(
             circle=circle,
             date=date,
-            agent1="Agent1",
-            agent2="Agent2"
+            agent1=f"Agent1_{llm_type}",
+            agent2=f"Agent2_{llm_type}"
         )
 
         print(f"[INFO] Starting Game {i + 1} of {games} for Circle {circle}.")
@@ -194,7 +194,7 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
 
         while game.in_progress:
             # Sleep to simulate thinking time and rate-limit API calls
-            sleep_duration = 5  # Adjust based on desired rate-limiting
+            sleep_duration = circle + .5  # Adjust based on desired rate-limiting
             print(f"[DEBUG] Sleeping for {sleep_duration} seconds before next step.")
             time.sleep(sleep_duration)
 
@@ -230,7 +230,9 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
             if "WALK" in action_played or "ACCEPT" in action_played:
                 game.in_progress = False
 
-        
+        # --------------------------------------------------------------------
+        # 12) After the Game Loop Ends, Save GameData
+        # --------------------------------------------------------------------
         all_game_data.append(game_data)
         #UNCOMMENT THESE TO SAVE EACH GAME'S DATA SEPERATELY 
         # Optionally, save each game's data immediately
@@ -244,13 +246,10 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
         #pickle.dump(game_data, pf)
         #print(f"[INFO] Saved GameData to {filename_pkl}.")
 
-  
     print("HERE IS THE DATA")
     all_data = {
         "date": date,
         "circle": circle,
-        "games": games,
-        "game_title": game_title,
         "all_game_data": [gd.to_dict() for gd in all_game_data]
     }
     all_games_filename = f'all_game_data_{date}_{games}_{game_title}_circle_{circle}.json'
