@@ -68,7 +68,7 @@ def make_prompt_circle_5(T: int, quantities: list[int], V: int, values: list[flo
     {values[0]} x {example_offer_less_than_outside_offer_self[0]} + {values[1]} x {example_offer_less_than_outside_offer_self[1]} + {values[2]} x {example_offer_less_than_outside_offer_self[2]} + {values[3]} x {example_offer_less_than_outside_offer_self[3]} + {values[4]} x {example_offer_less_than_outside_offer_self[4]}
     which is {np.dot(values, example_offer_less_than_outside_offer_self)} (sum of all item values) 
     
-    which is less than your outside offer of {w}. If your proposed offer results in a value lower than your outside offer, continue iterating until you develop a more advantageous offer. 
+    which is less than your outside offer of {w}. If your proposed offer results in a value lower than your outside offer, continue iterating until you develop a more advantageous offer that is better than your outside offer. 
     This reasoning can be applied to each of the five highlighted mistakes to ensure that your offers align with your objectives and avoid undesirable negotiation behaviors.
 
     Please show your reasoning step by step, then provide your action in one of these formats in your response (if you do not do this your response will be invalid):
