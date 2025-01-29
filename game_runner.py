@@ -178,5 +178,7 @@ class GameEvaluator:
         # Check if quantities exceed available items
         if any(q > max_q for q, max_q in zip(offer.offer, self.game.items)):
             raise ValueError("Invalid offer: Quantities exceed available items")
-            
+        #check if all quantities are integers
+        if any(not isinstance(q, int) for q in offer.offer):
+            raise ValueError("Invalid offer: Quantities must be integers")
         return True
