@@ -181,4 +181,8 @@ class GameEvaluator:
         #check if all quantities are integers
         if any(not isinstance(q, int) for q in offer.offer):
             raise ValueError("Invalid offer: Quantities must be integers")
+        #check length is 5
+        if len(offer.offer) != 5:
+            raise ValueError("Invalid offer: Quantities must of items must be 5")
+
         return True

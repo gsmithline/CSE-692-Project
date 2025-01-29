@@ -223,9 +223,7 @@ class LLMAgent(Agent):
                 self.action = result["action"]
             except Exception as e:
                 print(f"Error with OpenAI response: {e}")
-                if response.choices[0].message.content is not None:
-                    self.current_response = response.choices[0].message.content
-                elif response is None:
+                if response is None:
                     self.current_response = "Error with OpenAI response, did not receive a response."
                 else:
                     self.current_response = response
@@ -244,7 +242,7 @@ class LLMAgent(Agent):
                     messages=[
                         {"role": "user", "content": prompt}
                     ],
-                    max_tokens=2000
+                    max_tokens=1024
                 )
                 print("Raw API Response:", response)
                 # Extract the action from the response text
@@ -293,10 +291,7 @@ class LLMAgent(Agent):
             except Exception as e:
                 print(f"Error with Gemini response: {e}")
                 print("Defaulting to WALK")
-                if response.candidates[0].content.parts[0].text:
-                    self.current_response = response.candidates[0].content.parts[0].text
-                else:
-                    self.current_response = "Error with Gemini response, did not receive a response."
+                self.current_response = "Error with Gemini response, did not receive a response."
                 result = {}
                 result["action"] = "INVALID WALK"
                 self.result = False
