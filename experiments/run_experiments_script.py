@@ -16,21 +16,21 @@ from utils.negotiation_game import run_game
 
 def main():
     parser = argparse.ArgumentParser(description="Script to run negotiation experiments with concurrency.")
-    parser.add_argument("--prompt_style", type=str, required=True, default="o3_mini_vs_4o",
+    parser.add_argument("--prompt_style", type=str, required=False, default="o3_mini_vs_4o",
                         help="Prompt style identifier, e.g., 'o3_mini_vs_4o'")
-    parser.add_argument("--llm_model_p1", type=str, required=True, default="openai_4o",
+    parser.add_argument("--llm_model_p1", type=str, required=False, default="openai_4o",
                         help="LLM model identifier, e.g., 'openai_4o'")
-    parser.add_argument("--llm_model_p2", type=str, required=True, default="openai_o3_mini",
+    parser.add_argument("--llm_model_p2", type=str, required=False, default="openai_o3_mini",
                         help="LLM model identifier, e.g., 'openai_o3_mini'")
-    parser.add_argument("--date", type=str, required=True, default="2_10_2025",
+    parser.add_argument("--date", type=str, required=False, default="2_10_2025",
                         help="Date string for output naming, e.g., '2_10_2025'")
-    parser.add_argument("--max_rounds", type=int, default=3,
+    parser.add_argument("--max_rounds", type=int, required=False, default=3,
                         help="Maximum number of negotiation rounds.")
-    parser.add_argument("--games", type=int, default=100,
+    parser.add_argument("--games", type=int, required=False, default=10,
                         help="Number of games (simulations) to run per circle.")
     parser.add_argument("--circles", type=int, nargs='+', default=[0, 1, 2, 3, 4, 5, 6],
                         help="List of integer circle values to iterate over.")
-    parser.add_argument("--parallel", type=bool, default=True,
+    parser.add_argument("--parallel", type=bool, required=False, default=False,
                         help="Whether to run the experiments in parallel.")
     args = parser.parse_args()
 
