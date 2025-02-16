@@ -6,7 +6,7 @@ import json
 import pandas as pd
 
 class NegotitaionGame:
-    def __init__(self, player1_agent, player2_agent, num_items=4, item_value_range=[0, 101], gamma=0.9, max_rounds=10, game_results=pd.DataFrame(), envy_results=pd.DataFrame(), circle: int = 0):
+    def __init__(self, player1_agent, player2_agent, num_items=4, item_value_range=[1, 101], gamma=0.9, max_rounds=10, game_results=pd.DataFrame(), envy_results=pd.DataFrame(), circle: int = 0):
         if type(num_items) == int:
             self.items = np.random.poisson(4, num_items)
             self.num_items = num_items

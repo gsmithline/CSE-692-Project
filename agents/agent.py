@@ -1,7 +1,5 @@
 from abc import ABC, abstractmethod
 from utils.offer import Offer
-import openai
-from llamaapi import LlamaAPI
 import os
 class Agent(ABC):
     def __init__(self, llm_type="llama", api_key=None):

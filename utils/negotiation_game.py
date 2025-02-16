@@ -1,71 +1,23 @@
-import sys
-sys.path.append('../')
 
 from game_runner import NegotitaionGame
-from eval.game_evaluator import GameEvaluator
-import agents.simple_agent as simple_agent
 import agents.llm_agent as llm_agent
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 import pandas as pd
-from dataclasses import dataclass, field
-from math import prod, sqrt
+import sys
 sys.path.append('../caif_negotiation/')
-
-
-import import_ipynb
-from IPython import get_ipython
-import runpy
-import os
-
-ipython = get_ipython()
-if ipython is not None:
-    ipython.run_line_magic('run', '../test_game_eval.ipynb')
-else:
-    py_file = os.path.join('..', 'test_game_eval.py')
-    if os.path.isfile(py_file):
-        runpy.run_path(py_file)
-    else:
-        print(
-            "ERROR: Not in an IPython environment, and ../test_game_eval.ipynb "
-            "hasn’t been converted to ../test_game_eval.py. Please convert it:\n"
-            "  jupyter nbconvert --to python ../test_game_eval.ipynb\n"
-            "…and then try again."
-        )
 from test_game_eval import *
-import torch
-from utils.offer import Offer
-
-from prompts.make_prompt import make_prompt
-from prompts.make_prompt_bargain import make_prompt_bargain
-from metrics.visualizations import (
-    plot_discounted_values,
-    plot_offer_evolution,
-    plot_negotiation_gap,
-    plot_fairness
-)
-
-pathology_results = pd.DataFrame()  
-import itertools
-envy_results_history = {}
 from eval.metrics import *
 import time
 import pandas as pd
-import torch
 import numpy as np
-from math import sqrt, prod
 from utils.helpers import *
 import time
 import numpy as np
-import pandas as pd
-import torch
-from math import sqrt, prod
-from eval.game_data import GameData  # Importing GameData from game_data.py
+from eval.game_data import GameData 
 import pickle
 import json
 
-def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: str, llm_type: str):
+def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: str, llm_model_p1: str, llm_model_p2: str):
     """
     Runs a series of negotiation games for a specific circle, tracking comprehensive metrics.
 
@@ -75,37 +27,26 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
         max_rounds (int): Maximum number of rounds per game.
         date (str): Date identifier for result files.
         game_title (str): Title identifier for the game series.
-        llm_type (str): Type of LLM agent being used (e.g., "openai").
+        llm_model_p1 (str): Type of LLM agent being used (e.g., "openai_4o").
+        llm_model_p2 (str): Type of LLM agent being used (e.g., "openai_o3_mini").
     """
-    # Initialize a list to store all GameData instances
     all_game_data = []
-
-    for i in range(games):
-        # --------------------------------------------------------------------
-        # 1) Per-Game Setup
-        # --------------------------------------------------------------------
-        # Rate-limit every 10 games to avoid API overuse
+    for i in range(games+1):
         if (i + 1) % 10 == 0:
             print(f"Game {i + 1} of {games}")
             sleep_duration = 2 * np.random.randint(55, 60)  # Sleep for ~2 minutes
             print(f"Sleeping for {sleep_duration} seconds to respect rate limits.")
             time.sleep(sleep_duration)
-
-    
-        # --------------------------------------------------------------------
-        # 2) Initialize a Single Negotiation Game
-        # --------------------------------------------------------------------
         game = NegotitaionGame(
-            player1_agent=llm_agent.LLMAgent(llm_type=llm_type, player_num=0),
-            player2_agent=llm_agent.LLMAgent(llm_type=llm_type, player_num=1),
+            player1_agent=llm_agent.LLMAgent(llm_type=llm_model_p1, model=llm_model_p1, player_num=0),
+            player2_agent=llm_agent.LLMAgent(llm_type=llm_model_p2, model=llm_model_p2, player_num=1),
             num_items=5,
             item_value_range=[1, 101],
             gamma=0.9,
             max_rounds=max_rounds,
             circle=circle
         )
-
-        # Compute Pareto frontier for reference
+       
         pareto_front = compute_pareto_frontier(
             game.player_values[0],
             game.player_values[1],
@@ -114,14 +55,10 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
             game.outside_offer_values
         )
 
-        # --------------------------------------------------------------------
-        # 3) Optional: Find Allocations with Utility < Outside Offer (Circles 5 & 6)
-        # --------------------------------------------------------------------
         allocations_less_than_outside_offer = None
         if circle in (5, 6):
             allocations_less_than_outside_offer = []
 
-            # Find allocations where Player 1's utility is less than their outside offer
             allocation_p1 = find_allocation_less_than_outside_offer_dp(
                 items=game.items,
                 player_valuations=game.player_values[0],
@@ -181,8 +118,8 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
         game_data = GameData(
             circle=circle,
             date=date,
-            agent1=f"Agent1_{llm_type}",
-            agent2=f"Agent2_{llm_type}"
+            agent1=f"Agent1_{llm_model_p1}",
+            agent2=f"Agent2_{llm_model_p2}"
         )
 
         print(f"[INFO] Starting Game {i + 1} of {games} for Circle {circle}.")
