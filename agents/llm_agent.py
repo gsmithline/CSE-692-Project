@@ -86,7 +86,7 @@ class LLMAgent(Agent):
 
         else:
             raise ValueError(f"Invalid LLM type: {llm_type}")
-
+   
     def give_offer(self, prompt: str) -> Offer | bool:
         """
         Given a prompt describing the negotiation context, request a proposal 
@@ -187,33 +187,22 @@ class LLMAgent(Agent):
 
         # OpenAI branch
         elif "openai" in self.llm_type:
-            model = self.llm_type
+            if "4o" in self.model:
+                self.model = "gpt-4o"
+            elif "o1" in self.model:
+                self.model = "o1-2024-12-17"
+            elif "o3" in self.model:
+                self.model = "o3-mini"
+            else:
+                raise ValueError(f"Invalid model: {self.model}")
             try:
                 response = {}
-                if "4o" in model:
-                    response = openai.ChatCompletion.create(
-                        model="gpt-4o",
+                response = openai.ChatCompletion.create(
+                        model=self.model,
                         messages=[
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": prompt}
                         ],
-                    )
-                elif model == "gpt-o1":
-                    response = openai.ChatCompletion.create(
-                        model="o1-2024-12-17",
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": prompt}
-                        ],
-                        max_tokens=1024
-                    )
-                elif "o3_mini" in model:
-                    response = openai.ChatCompletion.create(
-                        model="o3-mini",
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": prompt}
-                        ]
                     )
 
                 print("Raw API Response:", response)
@@ -248,8 +237,6 @@ class LLMAgent(Agent):
         elif self.llm_type == "anthropic":
             if "3.5" in self.model:
                 model = "claude-3-5-sonnet-20241022"
-            elif "3.0" in self.model:
-                model = "claude-3-opus-20240229"
             elif "3.0" in self.model:
                 model = "claude-3-opus-20240229"
             else:

@@ -24,11 +24,11 @@ def main():
                         help="Date string for output naming, e.g., '2_10_2025'")
     parser.add_argument("--max_rounds", type=int, required=False, default=3,
                         help="Maximum number of negotiation rounds.")
-    parser.add_argument("--games", type=int, required=False, default=10,
+    parser.add_argument("--games", type=int, required=False, default=3,
                         help="Number of games (simulations) to run per circle.")
     parser.add_argument("--circles", type=int, nargs='+', default=[0, 1, 2, 3, 4, 5, 6],
                         help="List of integer circle values to iterate over.")
-    parser.add_argument("--parallel", type=bool, required=False, default=False,
+    parser.add_argument("--parallel", type=bool, required=False, default=True,
                         help="Whether to run the experiments in parallel.")
     args = parser.parse_args()
 
@@ -41,7 +41,7 @@ def main():
     print(f"  games:        {args.games}")
     print(f"  circles:      {args.circles}")
     print("--------------------------------------------------")
-    #checking if the models are valid
+    
     valid_models = ["openai_4o", "openai_o3_mini", "anthropic_3.5_sonnet", "gemini_2.0_flash", "llama3.3-70b", "llama3.3-8b", "llama3.3-4050"]
     if args.llm_model_p1 not in valid_models:
         raise ValueError(f"Invalid model: {args.llm_model_p1}")
