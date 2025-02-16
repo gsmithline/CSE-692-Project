@@ -12,8 +12,6 @@ import concurrent.futures
 pathology_results = pd.DataFrame()  
 envy_results_history = {}
 from utils.negotiation_game import run_game
-
-
 def main():
     parser = argparse.ArgumentParser(description="Script to run negotiation experiments with concurrency.")
     parser.add_argument("--prompt_style", type=str, required=False, default="o3_mini_vs_4o",
