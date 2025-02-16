@@ -1,5 +1,3 @@
-import sys
-sys.path.append('../')
 
 from game_runner import NegotitaionGame
 from eval.game_evaluator import GameEvaluator
@@ -11,28 +9,9 @@ import seaborn as sns
 import pandas as pd
 from dataclasses import dataclass, field
 from math import prod, sqrt
+import sys
 sys.path.append('../caif_negotiation/')
 
-
-import import_ipynb
-from IPython import get_ipython
-import runpy
-import os
-
-ipython = get_ipython()
-if ipython is not None:
-    ipython.run_line_magic('run', '../test_game_eval.ipynb')
-else:
-    py_file = os.path.join('..', 'test_game_eval.py')
-    if os.path.isfile(py_file):
-        runpy.run_path(py_file)
-    else:
-        print(
-            "ERROR: Not in an IPython environment, and ../test_game_eval.ipynb "
-            "hasn’t been converted to ../test_game_eval.py. Please convert it:\n"
-            "  jupyter nbconvert --to python ../test_game_eval.ipynb\n"
-            "…and then try again."
-        )
 from test_game_eval import *
 import torch
 from utils.offer import Offer
@@ -52,7 +31,7 @@ envy_results_history = {}
 from eval.metrics import *
 import time
 import pandas as pd
-import torch
+
 import numpy as np
 from math import sqrt, prod
 from utils.helpers import *
@@ -65,7 +44,7 @@ from eval.game_data import GameData  # Importing GameData from game_data.py
 import pickle
 import json
 
-def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: str, llm_type: str):
+def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: str, llm_model_p1: str, llm_model_p2: str):
     """
     Runs a series of negotiation games for a specific circle, tracking comprehensive metrics.
 
@@ -75,12 +54,13 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
         max_rounds (int): Maximum number of rounds per game.
         date (str): Date identifier for result files.
         game_title (str): Title identifier for the game series.
-        llm_type (str): Type of LLM agent being used (e.g., "openai").
+        llm_model_p1 (str): Type of LLM agent being used (e.g., "openai_4o").
+        llm_model_p2 (str): Type of LLM agent being used (e.g., "openai_o3_mini").
     """
     # Initialize a list to store all GameData instances
     all_game_data = []
 
-    for i in range(games):
+    for i in range(games+1):
         # --------------------------------------------------------------------
         # 1) Per-Game Setup
         # --------------------------------------------------------------------
@@ -96,8 +76,8 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
         # 2) Initialize a Single Negotiation Game
         # --------------------------------------------------------------------
         game = NegotitaionGame(
-            player1_agent=llm_agent.LLMAgent(llm_type=llm_type, player_num=0),
-            player2_agent=llm_agent.LLMAgent(llm_type=llm_type, player_num=1),
+            player1_agent=llm_agent.LLMAgent(llm_type=llm_model_p1, model=llm_model_p1, player_num=0),
+            player2_agent=llm_agent.LLMAgent(llm_type=llm_model_p2, model=llm_model_p2, player_num=1),
             num_items=5,
             item_value_range=[1, 101],
             gamma=0.9,
