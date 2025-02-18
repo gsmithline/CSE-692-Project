@@ -21,13 +21,10 @@ from IPython import get_ipython
 import runpy
 import os
 
-# Execute the notebook - place this before any code that needs GameHistory
 ipython = get_ipython()
 if ipython is not None:
-    # If in IPython/Jupyter, we can safely run the .ipynb directly
     ipython.run_line_magic('run', '../test_game_eval.ipynb')
 else:
-    # Fallback if not in IPython/Jupyter environment: run the converted .py file
     py_file = os.path.join('..', 'test_game_eval.py')
     if os.path.isfile(py_file):
         runpy.run_path(py_file)
