@@ -17,7 +17,7 @@ from eval.game_data import GameData
 import pickle
 import json
 
-def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: str, llm_model_p1: str, llm_model_p2: str):
+def run_game(circle1: int, circle2: int, games: int, max_rounds: int, date: str, game_title: str, llm_model_p1: str, llm_model_p2: str):
     """
     Runs a series of negotiation games for a specific circle, tracking comprehensive metrics.
 
@@ -31,7 +31,7 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
         llm_model_p2 (str): Type of LLM agent being used (e.g., "openai_o3_mini").
     """
     all_game_data = []
-    for i in range(games+1):
+    for i in range(games):
         if (i + 1) % 10 == 0:
             print(f"Game {i + 1} of {games}")
             sleep_duration = 2 * np.random.randint(55, 60)  # Sleep for ~2 minutes
@@ -44,7 +44,8 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
             item_value_range=[1, 101],
             gamma=0.9,
             max_rounds=max_rounds,
-            circle=circle
+            circle1=circle1,
+            circle2=circle2 
         )
        
         pareto_front = compute_pareto_frontier(
@@ -56,7 +57,7 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
         )
 
         allocations_less_than_outside_offer = None
-        if circle in (5, 6):
+        if circle1 in (5, 6) or circle2 in (5, 6):
             allocations_less_than_outside_offer = []
 
             allocation_p1 = find_allocation_less_than_outside_offer_dp(
@@ -116,13 +117,13 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
 
      
         game_data = GameData(
-            circle=circle,
+            circle=(circle1, circle2),
             date=date,
             agent1=f"Agent1_{llm_model_p1}",
             agent2=f"Agent2_{llm_model_p2}"
         )
 
-        print(f"[INFO] Starting Game {i + 1} of {games} for Circle {circle}.")
+        print(f"[INFO] Starting Game {i + 1} of {games} for Circle {circle1 if game.current_player == 0 else circle2}.")
 
   
         if i > 0:
@@ -131,7 +132,7 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
 
         while game.in_progress:
             # Sleep to simulate thinking time and rate-limit API calls
-            sleep_duration = circle + .5  # Adjust based on desired rate-limiting
+            sleep_duration = circle1 if game.current_player == 0 else circle2 + .5  # Adjust based on desired rate-limiting
             print(f"[DEBUG] Sleeping for {sleep_duration} seconds before next step.")
             time.sleep(sleep_duration)
 
@@ -146,7 +147,7 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
             print("=" * 80)
 
             current_allocation_example = None
-            if circle in (5, 6) and allocations_less_than_outside_offer is not None:
+            if circle1 in (5, 6) or circle2 in (5, 6) and allocations_less_than_outside_offer is not None:
                 if current_player == 1:
                     current_allocation_example = allocations_less_than_outside_offer[0]['allocation']
                 elif current_player == 2:
@@ -186,17 +187,18 @@ def run_game(circle: int, games: int, max_rounds: int, date: str, game_title: st
     print("HERE IS THE DATA")
     all_data = {
         "date": date,
-        "circle": circle,
+        "circle_p1": circle1,
+        "circle_p2": circle2,
         "all_game_data": [gd.to_dict() for gd in all_game_data]
     }
-    all_games_filename = f'all_game_data_{date}_{games}_{game_title}_circle_{circle}.json'
+    all_games_filename = f'all_game_data_{date}_{games}_{game_title}_circle_p1_{circle1}_circle_p2_{circle2}.json'
     with open(all_games_filename, "w") as f:
         json.dump(all_data, f, indent=4)
         #json.pickle(all_data, f)
     print(f"[INFO] Saved all GameData to JSON file: {all_games_filename}.")
 
     #save to pickle optinally
-    all_games_filename_pkl = f'all_game_data_{date}_{games}_{game_title}_circle_{circle}.pkl'
+    all_games_filename_pkl = f'all_game_data_{date}_{games}_{game_title}_circle_p1_{circle1}_circle_p2_{circle2}.pkl'
     with open(all_games_filename_pkl, "wb") as pf:
         pickle.dump(all_data, pf)
     print(f"[INFO] Saved all GameData as a pickle to {all_games_filename_pkl}.")
