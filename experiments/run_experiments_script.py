@@ -3,7 +3,7 @@ import sys
 import argparse
 import json
 import time
-
+sys.path.append('../caif_negotiation/')
 import sys
 import pandas as pd
 import concurrent.futures
@@ -24,7 +24,9 @@ def main():
                         help="Maximum number of negotiation rounds.")
     parser.add_argument("--games", type=int, required=False, default=3,
                         help="Number of games (simulations) to run per circle.")
-    parser.add_argument("--circles", type=int, nargs='+', default=[0, 1, 2, 3, 4, 5, 6],
+    parser.add_argument("--p1_circles", type=int, nargs='+', default=[0, 1, 2, 3, 4, 5, 6],
+                        help="List of integer circle values to iterate over.")
+    parser.add_argument("--p2_circles", type=int, nargs='+', default=[0, 1, 2, 3, 4, 5, 6],
                         help="List of integer circle values to iterate over.")
     parser.add_argument("--parallel", type=bool, required=False, default=True,
                         help="Whether to run the experiments in parallel.")
@@ -37,7 +39,8 @@ def main():
     print(f"  date:         {args.date}")
     print(f"  max_rounds:   {args.max_rounds}")
     print(f"  games:        {args.games}")
-    print(f"  circles:      {args.circles}")
+    print(f"  p1 circles:      {args.p1_circles}")
+    print(f"  p2 circles:      {args.p2_circles}")
     print("--------------------------------------------------")
     
     valid_models = ["openai_4o", "openai_o3_mini", "anthropic_3.5_sonnet", "gemini_2.0_flash", "llama3.3-70b", "llama3.3-8b", "llama3.3-4050"]
@@ -51,15 +54,16 @@ def main():
             future_to_circle = {
                 executor.submit(
                     run_game, 
-                    circle, 
+                    circle1, 
+                    circle2, 
                     args.games, 
                     args.max_rounds, 
                     args.date, 
                     args.prompt_style, 
                     args.llm_model_p1,
                     args.llm_model_p2
-                ): circle
-                for circle in args.circles
+                ): (circle1, circle2)
+                for (circle1, circle2) in zip(args.p1_circles, args.p2_circles)
             }
             for future in concurrent.futures.as_completed(future_to_circle):
                 circle_val = future_to_circle[future]
@@ -71,8 +75,8 @@ def main():
 
         print("[INFO] All experiment runs completed.")
     else:
-        for circle in args.circles:
-            run_game(circle, args.games, args.max_rounds, args.date, args.prompt_style, args.llm_model_p1, args.llm_model_p2)
+        for circle1, circle2 in zip(args.p1_circles, args.p2_circles):
+            run_game(circle1, circle2, args.games, args.max_rounds, args.date, args.prompt_style, args.llm_model_p1, args.llm_model_p2)
 
 
 if __name__ == "__main__":
