@@ -6,7 +6,7 @@ import json
 import pandas as pd
 
 class NegotitaionGame:
-    def __init__(self, player1_agent, player2_agent, num_items=4, item_value_range=[1, 101], gamma=0.9, max_rounds=10, game_results=pd.DataFrame(), envy_results=pd.DataFrame(), circle: int = 0):
+    def __init__(self, player1_agent, player2_agent, num_items=4, item_value_range=[1, 101], gamma=0.9, max_rounds=10, game_results=pd.DataFrame(), envy_results=pd.DataFrame(), circle1: int = 0, circle2: int = 0):
         if type(num_items) == int:
             self.items = np.random.poisson(4, num_items)
             self.num_items = num_items
@@ -26,7 +26,8 @@ class NegotitaionGame:
         self.player_values = {0: None, 1: None}
         self.reset()
         self.final_action_player = self.players[1] #default to player 2 as the final action player of final player in final round
-        self.circle = circle
+        self.circle1 = circle1
+        self.circle2 = circle2
         self.valid_walk = None
         self.current_prompt = None
 
@@ -35,6 +36,9 @@ class NegotitaionGame:
     def reset(self):
         self.player_values[0] = np.random.randint(self.item_value_range[0], self.item_value_range[1], self.num_items) 
         self.player_values[1] = np.random.randint(self.item_value_range[0], self.item_value_range[1], self.num_items)
+        #self.player_values[0] = np.clip(np.round(np.random.normal(50, 10, self.num_items)), self.item_value_range[0], self.item_value_range[1]).astype(int)
+        #self.player_values[1] = np.clip(np.round(np.random.normal(50, 10, self.num_items)), self.item_value_range[0], self.item_value_range[1]).astype(int)
+
         
 
         total_value_player0 = int(np.ceil(np.dot(self.items, self.player_values[0]) * 1)) #NOTE: CHANGE % FOR EXPERIMENTS 
@@ -71,7 +75,7 @@ class NegotitaionGame:
             player_num=self.current_player,
             p1_outside_offer=[1, int(np.ceil(np.dot(self.items, self.player_values[0]) * 1))], #NOTE: CHANGE % FOR EXPERIMENTS 
             p2_outside_offer=[1, int(np.ceil(np.dot(self.items, self.player_values[1]) * 1))],
-            circle = self.circle,
+            circle = self.circle1 if self.current_player == 0 else self.circle2,
             example_offer_less_than_outside_offer_self=example_offer_less_than_outside_offer_self
         )
         agent.current_prompt = prompt
