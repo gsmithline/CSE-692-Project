@@ -277,7 +277,7 @@ class LLMAgent(Agent):
                 self.action = "INVALID WALK"
                 return False
 
-        elif self.llm_type == "gemini":
+        elif "gemini" in self.llm_type:
             try:
                 response = self.llm.generate_content(prompt)
                 print("Raw API Response:", response)

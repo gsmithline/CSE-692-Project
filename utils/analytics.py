@@ -3,6 +3,7 @@ import re
 import math
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.stats import ttest_ind
 
 DISCOUNT_RATE = 0.9
 
@@ -1747,6 +1748,7 @@ def compare_llm_across_circles_with_stats_confint_and_distributions(
                         p2_val_final = last_co_val_p2
                     if p1_val_final is not None:
                         circle_final_p1_values[c].append((p1_val_final / np.dot(p1_valuations, item_counts)))
+                        #circle_final_p1_values[c].append(p1_val_final)
                     if p2_val_final is not None:
                         circle_final_p2_values[c].append((p2_val_final / np.dot(p2_valuations, item_counts)))
 
@@ -2077,6 +2079,12 @@ def compare_llm_across_circles_with_stats_confint_and_distributions(
             print(f"     95% CI = [{p2_lo:.2f}, {p2_hi:.2f}]")
         print()
 
+       
+        print("T-Test for significance")
+        t_stat, p_value = ttest_ind(p1_vals, p2_vals)
+        print(f"T-statistic: {t_stat:.4f}")
+        print(f"P-value: {p_value:.4f}")
+
    
     fig, axes = plt.subplots(nrows=len(circle_list), ncols=2, figsize=(10, 3*len(circle_list)))
     if len(circle_list) == 1:
@@ -2086,6 +2094,7 @@ def compare_llm_across_circles_with_stats_confint_and_distributions(
         # Filter out None values to prevent TypeError in hist
         p1_vals_filtered = [val for val in circle_final_p1_values[c] if val is not None]
         p2_vals_filtered = [val for val in circle_final_p2_values[c] if val is not None]
+
 
         ax_left = axes[idx][0]
         ax_right = axes[idx][1]
