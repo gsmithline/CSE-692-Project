@@ -6,8 +6,6 @@ import time
 
 import sys
 import pandas as pd
-#sys.path.append('../')
-sys.path.append('../caif_negotiation/')
 import concurrent.futures
 pathology_results = pd.DataFrame()  
 envy_results_history = {}
