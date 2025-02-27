@@ -43,7 +43,9 @@ def main():
     print(f"  p2 circles:      {args.p2_circles}")
     print("--------------------------------------------------")
     
-    valid_models = ["openai_4o", "openai_o3_mini", "anthropic_3.5_sonnet", "gemini_2.0_flash", "llama3.3-70b", "llama3.3-8b", "llama3.3-4050"]
+    valid_models = ["openai_4o", "openai_o3_mini", "anthropic_3.5_sonnet", "anthropic_3.7_sonnet", 
+                    "gemini_2.0_flash", "llama3.3-70b", "llama3.3-8b", "llama3.3-4050", "openai_o1_mini", "openai_o1_preview", "openai_o1",
+                    "anthropic_sonnet_3.7_reasoning"]
     if args.llm_model_p1 not in valid_models:
         raise ValueError(f"Invalid model: {args.llm_model_p1}")
     if args.llm_model_p2 not in valid_models:

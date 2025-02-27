@@ -37,6 +37,7 @@ class LLMAgent(Agent):
         self.current_prompt = None  # Prompt sent to LLM
         self.current_response = None  # Response text from LLM
         self.model = model
+        print(f"Using LLM model: {self.model}")
         # Determine which LLM to use and load or configure accordingly.
         if "llama" in llm_type:
             if api_key is None:
@@ -189,8 +190,12 @@ class LLMAgent(Agent):
         elif "openai" in self.llm_type:
             if "4o" in self.model:
                 self.model = "gpt-4o"
+            elif "o1_preview" in self.model:
+                self.model = "o1-preview"
+            elif "o1_mini" in self.model:
+                self.model = "o1-mini"
             elif "o1" in self.model:
-                self.model = "o1-2024-12-17"
+                self.model = "o1"
             elif "o3" in self.model:
                 self.model = "o3-mini"
             else:
@@ -200,7 +205,7 @@ class LLMAgent(Agent):
                 response = openai.ChatCompletion.create(
                         model=self.model,
                         messages=[
-                            {"role": "system", "content": system_prompt},
+                            #{"role": "system", "content": system_prompt},
                             {"role": "user", "content": prompt}
                         ],
                     )
@@ -234,24 +239,61 @@ class LLMAgent(Agent):
                 return False
 
         # Anthropic branch
-        elif self.llm_type == "anthropic":
-            if "3.5" in self.model:
+        elif "anthropic" in self.llm_type:
+            response = None
+            if "3.5" in self.model or "3-5" in self.model:
                 model = "claude-3-5-sonnet-20241022"
-            elif "3.0" in self.model:
+                self.model = model
+            elif "3.7" in self.model or "3-7" in self.model:
+                model = "claude-3-7-sonnet-20250219"
+                self.model = model
+            elif "3.0" in self.model or "3-0" in self.model:
                 model = "claude-3-opus-20240229"
+                self.model = model
             else:
                 raise ValueError(f"Invalid model: {self.model}")
-            self.model = model
+            
+
             try:
+                thinking_config = {
+                    "type": "enabled",
+                    "budget_tokens": 16000
+                } if "reasoning" in self.model else {
+                    "type": "disabled",
+                    "budget_tokens": 0
+                }
+                
                 response = self.llm.messages.create(
-                    model=model, 
+                    model=self.model, 
                     system=system_prompt,
                     messages=[{"role": "user", "content": prompt}],
-                    max_tokens=1024
-                    )
+                    max_tokens=20000 if "reasoning" in self.model else 2048, #need to set max tokens to 20000 for reasoning
+                    thinking=thinking_config
+                )
                 print("Raw API Response:", response)
-
-                result_content = response.content[0].text
+                
+                if "reasoning" in self.model:
+                    result_content = None
+                    for content_block in response.content:
+                        if hasattr(content_block, 'text'):
+                            result_content = content_block.text
+                            break
+                        elif hasattr(content_block, 'type') and content_block.type == 'thinking':
+                            continue
+                    
+                    if result_content is None:
+                        result_content = str(response.content)
+                else:
+                    if hasattr(response.content[0], 'text'):
+                        result_content = response.content[0].text
+                    else:
+                        for content_block in response.content:
+                            if hasattr(content_block, 'text'):
+                                result_content = content_block.text
+                                break
+                        else:
+                            result_content = str(response.content)
+                
                 self.current_response = result_content
 
                 json_start = result_content.rfind('{')
@@ -268,8 +310,17 @@ class LLMAgent(Agent):
             except Exception as e:
                 print(f"Error with ANTHROPIC response: {e}")
                 print("Defaulting to WALK")
-                if response.content[0].text:
-                    self.current_response = response.content[0].text
+                if response is not None and hasattr(response, 'content'):
+                    # Safely extract text content if possible
+                    try:
+                        for content_block in response.content:
+                            if hasattr(content_block, 'text'):
+                                self.current_response = content_block.text
+                                break
+                        else:
+                            self.current_response = str(response.content)
+                    except:
+                        self.current_response = "Error with ANTHROPIC response, could not extract text."
                 else:
                     self.current_response = "Error with ANTHROPIC response, did not receive a response."
                 result = {"action": "INVALID WALK"}
@@ -278,6 +329,7 @@ class LLMAgent(Agent):
                 return False
 
         elif "gemini" in self.llm_type:
+            
             try:
                 response = self.llm.generate_content(prompt)
                 print("Raw API Response:", response)
