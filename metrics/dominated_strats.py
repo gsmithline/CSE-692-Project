@@ -54,20 +54,13 @@ def parse_offer_from_response(response_text):
     return list(map(int, match.groups())) if match else None
 
 def compute_allocation_value(valuations, allocation):
-    #check type in valuations & allocations
     if valuations is None or allocation is None:
-      
-        print("HERE")
-        print(f"valuations: {valuations}")
-        print(f"allocation: {allocation}")
+        return 0
     elif any(x is None for x in valuations) or any(x is None for x in allocation):
-        print("HERE2")
-        print(f"valuations: {valuations}")
-        print(f"allocation: {allocation}")
-
+        return 0
     return sum(v * a for v, a in zip(valuations, allocation))
 
-def detect_mistakes(current_move_info, previous_move_info_player):
+def detect_mistakes(current_move_info, previous_move_info_player, opponent_last_offer_info=None):
     mistakes_found = []
     action = current_move_info["action"]
     my_val_cur = current_move_info["my_value_current_offer"]
@@ -76,12 +69,19 @@ def detect_mistakes(current_move_info, previous_move_info_player):
     allocation_to_opp = current_move_info["allocation_offered_to_opponent"]
     allocation_i_keep = current_move_info["allocation_i_keep"]
     is_game_ending = current_move_info["is_game_ending"]
-
+    
     if action == "COUNTEROFFER" and not is_game_ending:
-        if my_val_prev is not None and my_val_prev > my_val_cur:
-            mistakes_found.append(1)
+        # Mistake 1: Making an offer worse than opponent's offer on the table
+        if opponent_last_offer_info is not None:
+            value_of_opponents_offer = opponent_last_offer_info
+            if my_val_cur < value_of_opponents_offer:
+                mistakes_found.append(1)
+        
+        # Mistake 2: Making an offer worse than outside offer
         if my_val_cur < out_offer:
             mistakes_found.append(2)
+            
+        # Mistake 3: Offering nothing or everything
         if allocation_to_opp is not None and allocation_i_keep is not None:
             sum_offered = sum(allocation_to_opp)
             sum_kept = sum(allocation_i_keep)
@@ -91,10 +91,12 @@ def detect_mistakes(current_move_info, previous_move_info_player):
                     mistakes_found.append(3)
 
     if action == "ACCEPT" and is_game_ending:
+        # Mistake 4: Accepting an offer worse than outside offer
         if my_val_cur < out_offer:
             mistakes_found.append(4)
 
     if action == "WALK" and is_game_ending:
+        # Mistake 5: Walking away from an offer better than outside offer
         if my_val_cur > out_offer:
             mistakes_found.append(5)
 
@@ -123,11 +125,11 @@ def analyze_circle6(json_file_path):
     for game in all_game_data:
         round_data = game["round_data"]
         last_move_info = {1: None, 2: None}
+        
+        opponent_offer_values = {1: None, 2: None}
         total_rounds = 3
         current_round = 1
         i = 0
-        
-        # We iterate through at most total_rounds, each round can have up to two moves
         while i < len(round_data) and current_round <= total_rounds:
             # ---------------------------------------
             # Process the first move of this round
@@ -140,7 +142,6 @@ def analyze_circle6(json_file_path):
                 response = first_move["response"]
                 action = first_move["action"]
             except KeyError:
-                # If something is off, skip this round
                 current_round += 1
                 continue
 
@@ -151,6 +152,7 @@ def analyze_circle6(json_file_path):
                 continue
 
             player_id = parsed_info["player_id"]
+            opponent_id = 2 if player_id == 1 else 1
             valuations = parsed_info["valuations"]
             items = parsed_info["items"]
             outside_offer = parsed_info["outside_offer"]
@@ -163,10 +165,6 @@ def analyze_circle6(json_file_path):
                 if offer_allocation is not None:
                     allocation_offered_to_opponent = offer_allocation
                     allocation_i_keep = [ti - oa for ti, oa in zip(items, offer_allocation)]
-
-                    print(F"here 1: {action}")
-                    print(current_round)
-                    
                     current_value_for_self = compute_allocation_value(valuations, allocation_i_keep) * discount_factor
                 else:
                     allocation_offered_to_opponent = None
@@ -177,8 +175,6 @@ def analyze_circle6(json_file_path):
                 opp_info = last_move_info[opp_id]
                 if opp_info and opp_info["action"] == "COUNTEROFFER":
                     our_alloc = opp_info["allocation_offered_to_opponent"]
-                    print(F"here 2: {action}")
-                    print(current_round)
                     current_value_for_self = compute_allocation_value(valuations, our_alloc) * discount_factor
                     allocation_offered_to_opponent = None
                     allocation_i_keep = our_alloc
@@ -191,8 +187,6 @@ def analyze_circle6(json_file_path):
                 opp_info = last_move_info[opp_id]
                 if opp_info and opp_info["action"] == "COUNTEROFFER":
                     our_alloc = opp_info["allocation_offered_to_opponent"]
-                    print(F"here 3: {action}")
-                    print(current_round)
                     current_value_for_self = compute_allocation_value(valuations, our_alloc) * discount_factor
                     allocation_offered_to_opponent = None
                     allocation_i_keep = our_alloc
@@ -201,12 +195,13 @@ def analyze_circle6(json_file_path):
                     allocation_offered_to_opponent = None
                     allocation_i_keep = None
             else:
-                # Action is something we don't track, do not increment round multiple times
                 continue
 
             my_value_previous_own_offer = None
             if last_move_info[player_id] and last_move_info[player_id]["action"] == "COUNTEROFFER":
                 my_value_previous_own_offer = last_move_info[player_id]["my_value_current_offer"]
+
+            opponent_value_for_me = opponent_offer_values.get(player_id)
 
             current_move_info_struct = {
                 "player_id": player_id,
@@ -221,8 +216,10 @@ def analyze_circle6(json_file_path):
 
             mistakes_triggered = detect_mistakes(
                 current_move_info_struct,
-                last_move_info.get(player_id)
+                last_move_info.get(player_id),
+                opponent_value_for_me
             )
+            
             for mk in mistakes_triggered:
                 mistake_counts[mk] += 1
                 mistake_counts_by_player[player_id][mk] += 1
@@ -234,12 +231,18 @@ def analyze_circle6(json_file_path):
                 moves_by_player[player_id] += 1
 
             if action == "COUNTEROFFER":
+                # Update the offer this player made for the opponent to track
                 last_move_info[player_id] = {
                     "action": action,
                     "my_value_current_offer": current_value_for_self,
                     "allocation_offered_to_opponent": allocation_offered_to_opponent,
                     "allocation_i_keep": allocation_i_keep
                 }
+                
+                # Store value of this offer for the opponent
+                opp_value = compute_allocation_value(valuations, allocation_offered_to_opponent) * discount_factor
+                opponent_offer_values[opponent_id] = opp_value
+                
             if is_game_ending:
                 current_round += 1
                 break
@@ -254,7 +257,6 @@ def analyze_circle6(json_file_path):
                 try:
                     prompt2 = second_move["prompt"]
                     response2 = second_move["response"]
-                    
                     action2 = second_move["action"]
                 except KeyError:
                     current_round += 1
@@ -267,6 +269,7 @@ def analyze_circle6(json_file_path):
                     continue
 
                 player_id2 = parsed_info2["player_id"]
+                opponent_id2 = 2 if player_id2 == 1 else 1
                 valuations2 = parsed_info2["valuations"]
                 items2 = parsed_info2["items"]
                 outside_offer2 = parsed_info2["outside_offer"]
@@ -276,14 +279,11 @@ def analyze_circle6(json_file_path):
                 is_game_ending2 = (action2 in ["ACCEPT", "WALK", "INVALID WALK"])
 
                 offer_allocation2 = parse_offer_from_response(response2) if action2 == "COUNTEROFFER" else None
-                print(F"offer_allocation2: {offer_allocation2}")
                 
                 if action2 == "COUNTEROFFER":
                     if offer_allocation2 is not None:
                         allocation_offered_to_opponent2 = offer_allocation2
                         allocation_i_keep2 = [ti - oa for ti, oa in zip(items2, offer_allocation2)]
-                        print(F"here 4: {action2}")
-                        print(current_round)
                         current_value_for_self2 = compute_allocation_value(valuations2, allocation_i_keep2) * discount_factor2
                     else:
                         allocation_offered_to_opponent2 = None
@@ -293,21 +293,11 @@ def analyze_circle6(json_file_path):
                     opp_id2 = 1 if player_id2 == 2 else 2
                     opp_info2 = last_move_info[opp_id2]
                     if opp_info2 and opp_info2["action"] == "COUNTEROFFER":
-                        print(F"opp_info2: {opp_info2}")
-
                         our_alloc2 = opp_info2["allocation_offered_to_opponent"]
-                        #our_alloc2 = allocation_i_keep2
-                        #our_alloc2 = offer_allocation2
-                        #our_alloc2 = None
-                        print(F"here 5: {action2}")
-                        print(current_round)
-                        print(F"our_alloc2: {our_alloc2}")
-                        print(F"valuations2: {valuations2}")
-                        print(F"discount_factor2: {discount_factor2}")
                         try:
                             current_value_for_self2 = compute_allocation_value(valuations2, our_alloc2) * discount_factor2
                         except:
-                            print("halt")
+                            current_value_for_self2 = 0.0
                         allocation_offered_to_opponent2 = None
                         allocation_i_keep2 = our_alloc2
                     else:
@@ -319,13 +309,10 @@ def analyze_circle6(json_file_path):
                     opp_info2 = last_move_info[opp_id2]
                     if opp_info2 and opp_info2["action"] == "COUNTEROFFER":
                         our_alloc2 = opp_info2["allocation_offered_to_opponent"]
-                        #if our_alloc2 is None or valuations2 is None:
-                           #print(prompt)
-                            #print(response)
-                            #print(action)
-                        print(F"here 6: {action2}")
-                        print(current_round)
-                        current_value_for_self2 = compute_allocation_value(valuations2, our_alloc2) * discount_factor2
+                        try:
+                            current_value_for_self2 = compute_allocation_value(valuations2, our_alloc2) * discount_factor2
+                        except:
+                            current_value_for_self2 = 0.0
                         allocation_offered_to_opponent2 = None
                         allocation_i_keep2 = our_alloc2
                     else:
@@ -333,13 +320,14 @@ def analyze_circle6(json_file_path):
                         allocation_offered_to_opponent2 = None
                         allocation_i_keep2 = None
                 else:
-                    # Unknown action, do not truncate the round count
                     current_round += 1
                     continue
 
                 my_value_previous_own_offer2 = None
                 if last_move_info[player_id2] and last_move_info[player_id2]["action"] == "COUNTEROFFER":
                     my_value_previous_own_offer2 = last_move_info[player_id2]["my_value_current_offer"]
+
+                opponent_value_for_me2 = opponent_offer_values.get(player_id2)
 
                 current_move_info_struct2 = {
                     "player_id": player_id2,
@@ -354,8 +342,10 @@ def analyze_circle6(json_file_path):
 
                 mistakes_triggered2 = detect_mistakes(
                     current_move_info_struct2,
-                    last_move_info.get(player_id2)
+                    last_move_info.get(player_id2),
+                    opponent_value_for_me2
                 )
+                
                 for mk2 in mistakes_triggered2:
                     mistake_counts[mk2] += 1
                     mistake_counts_by_player[player_id2][mk2] += 1
@@ -373,10 +363,13 @@ def analyze_circle6(json_file_path):
                         "allocation_offered_to_opponent": allocation_offered_to_opponent2,
                         "allocation_i_keep": allocation_i_keep2
                     }
+                    
+                    opp_value2 = compute_allocation_value(valuations2, allocation_offered_to_opponent2) * discount_factor2
+                    opponent_offer_values[opponent_id2] = opp_value2
+                    
                 if is_game_ending2:
                     current_round += 1
                     break
-
             else:
                 pass
 
@@ -424,8 +417,7 @@ def plot_mistakes_radar_multiple_circles(circles_mistake_counts, model_name):
        - value: dict of {mistake_id: count}, e.g., {1:10, 2:4, 3:5, 4:3, 5:2}
     """
 
-    # For simplicity, we'll assume mistakes are always 1..5
-    labels = [1, 2, 3, 4, 5]
+    labels = [0, 1, 2, 3, 4]
     n_labels = len(labels)
 
     angles = np.linspace(0, 2 * np.pi, n_labels, endpoint=False).tolist()
@@ -439,11 +431,9 @@ def plot_mistakes_radar_multiple_circles(circles_mistake_counts, model_name):
         values = [mistake_counts.get(mk, 0) for mk in labels]
         values += [values[0]]
 
-        # Plot the line for this circle
         ax.plot(angles, values, 'o-', linewidth=2, label=circle_name, color=color)
         ax.fill(angles, values, alpha=0.25, color=color)
 
-    # Set up the axis ticks and labels
     ax.set_thetagrids(np.degrees(angles[:-1]), [f"Dominated Strategy {k}" for k in labels])
     ax.set_title(f"Dominated Strategies Count for {model_name} by Circle", y=1.1)
     ax.grid(True)
@@ -453,7 +443,7 @@ def plot_mistakes_radar_multiple_circles(circles_mistake_counts, model_name):
     plt.show()
 
 '''
-- Mistake 1: Making an offer worse than your previous offer. This occurs when you reject an offer better for you than the one you subsequently propose. 
+- Mistake 1: Making an offer worse than your previous offer. This occurs when you make an offer that is worse than the offer that is currently on the table ie if you make an offer that is worse than the offer that is currently on the table for you to accept. 
 - Mistake 2: Making an offer worse for you than your outside offer. This happens if you propose giving away so much that what you keep is worth less than your guaranteed alternative, which is your outside offer.
 - Mistake 3: Offering no items or all items. Offering nothing (or everything) to the opponent (in the early or middle rounds) can be a clear suboptimal move. 
 - Mistake 4: Accepting an offer worse for you than your outside offer. This occurs if you accept a division that yields a payoff lower than your guaranteed fallback.
@@ -461,23 +451,20 @@ def plot_mistakes_radar_multiple_circles(circles_mistake_counts, model_name):
 '''
 circles = [0, 1, 2, 3, 4, 5, 6]
 
-
-
 ds_data_4o = {}
 ds_data_gemini = {}
 for circle in circles:
     print(f"Analyzing circle {circle}")
     print("="*100)
-    #json_FILE_PATH = f"/Users/gabesmithline/Desktop/caif_negotiation/experiments/4o_final/4o_1_28_2025_100_circle_{circle}.json"
-    #o3-mini
-    json_FILE_PATH = f"/Users/gabesmithline/Desktop/caif_negotiation/experiments/gemini_2.0_final/gemini_2.0_1_28_2025_circle_{circle}.json"
-    #o3-mini
+    json_FILE_PATH = f"/Users/gabesmithline/Desktop/caif_negotiation/experiments/4o_final/4o_1_28_2025_100_circle_{circle}.json"
+    #json_FILE_PATH = f"/Users/gabesmithline/Desktop/caif_negotiation/experiments/gemini_2.0_final/gemini_2.0_1_28_2025_circle_{circle}.json"
     #json_FILE_PATH = f"/Users/gabesmithline/Desktop/caif_negotiation/experiments/o3-mini/all_game_data_2_4_2025_100_o3-mini_circle_{circle}.json"
     #json_FILE_PATH = f"/Users/gabesmithline/Desktop/caif_negotiation/experiments/4o_300/4o_2_9_2025_300_circle_{circle}.json"
     #json_FILE_PATH = f"/Users/gabesmithline/Desktop/caif_negotiation/experiments/4o_small_final/4o_2_6_2025_100_circle_{circle}_small.json"
     #json_FILE_PATH = f"/Users/gabesmithline/Desktop/caif_negotiation/experiments/cross_play/4o_vs_o3/all_game_data_2_9_2025_100_4o_vs_o3_mini_circle_{circle}.json"
+    json_FILE_PATH = f"/Users/gabesmithline/Desktop/caif_negotiation/experiments/claude_3.7/all_game_data_2_24_2025_100_anthropic_3.7_sonnet_vs_anthropic_3.7_sonnet_circle_p1_{circle}_circle_p2_{circle}.json"
     mistake_counts = analyze_circle6(json_FILE_PATH)
     print(mistake_counts)
-    ds_data_gemini[f"o3-mini_circle_{circle}"] = mistake_counts
+    ds_data_gemini[f"sonnet 3.7_circle_{circle}"] = mistake_counts
 
-plot_mistakes_radar_multiple_circles(ds_data_gemini, "o3 mini")
+plot_mistakes_radar_multiple_circles(ds_data_gemini, "sonnet 3.7")
