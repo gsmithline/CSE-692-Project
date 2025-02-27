@@ -202,13 +202,15 @@ class LLMAgent(Agent):
                 raise ValueError(f"Invalid model: {self.model}")
             try:
                 response = {}
+                messages = []
+                if "o1" in self.model:
+                    messages.append({"role": "system", "content": system_prompt})
+                messages.append({"role": "user", "content": prompt})
+                
                 response = openai.ChatCompletion.create(
-                        model=self.model,
-                        messages=[
-                            #{"role": "system", "content": system_prompt},
-                            {"role": "user", "content": prompt}
-                        ],
-                    )
+                    model=self.model,
+                    messages=messages,
+                )
 
                 print("Raw API Response:", response)
                 result_content = response.choices[0].message.content
