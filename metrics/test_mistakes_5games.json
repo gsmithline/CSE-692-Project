@@ -1,0 +1,110 @@
+{
+  "date": "2025_01_01",
+  "circle": "testcircle",
+  "all_game_data": [
+    {
+      "circle": "testcircle",
+      "date": "2025_01_01",
+      "agent1": "Agent1",
+      "agent2": "Agent2",
+      "round_data": [ 
+        {
+          "prompt": "    You and another agent have to negotiate a division of items between the two of you.\n    You are Player 1 and the other agent is Player 2.\n    There are 2 units of item 1, 2 units of item 2, 2 units of item 3, 2 units of item 4, 2 units of item 5 to divide.\n    Both you and Player 2 have a private value per unit of each item type.\n    These values are drawn from a uniform random distribution, ranging from 1 to 101.\n    Your private values are 10 for item 1, 10 for item 2, 10 for item 3, 10 for item 4, 10 for item 5.\n    You have a private outside offer drawn from a uniform random distribution ranging from 1 to your total value of all items, which is 100. Player 2 has a private outside offer as well.\n    Your outside offer value is 0.\n\n    It is now round 1.\n\nCurrent offer on the table: None\n\nWhat is your action?",
+          "response": "I'll start by offering 1 unit of item 1 to P2 and keeping the rest. {\"action\": \"COUNTEROFFER\", \"offer\": [1,0,0,0,0]}",
+          "action": "COUNTEROFFER"
+        },
+        {
+          "prompt": "    You and another agent have to negotiate a division of items between the two of you.\n    You are Player 2 and the other agent is Player 1.\n    There are 2 units of item 1, 2 units of item 2, 2 units of item 3, 2 units of item 4, 2 units of item 5 to divide.\n    Both you and Player 1 have a private value per unit of each item type.\n    Your private values are 5 for item 1, 5 for item 2, 5 for item 3, 5 for item 4, 5 for item 5.\n    Your outside offer value is 0.\n\n    Round 1, second move.\n\nCurrent offer on the table: [1,0,0,0,0]\nWhat is your action?",
+          "response": "I'll counter by asking for 1 of item 1 and 1 of item 2. {\"action\": \"COUNTEROFFER\", \"offer\": [1,1,0,0,0]}",
+          "action": "COUNTEROFFER"
+        },
+        {
+          "prompt": "    You and another agent have to negotiate a division of items between the two of you.\n    You are Player 1 and the other agent is Player 2.\n    There are 2 units of item 1, 2 units of item 2, 2 units of item 3, 2 units of item 4, 2 units of item 5 to divide.\n    Your private values are 10 for item 1, 10 for item 2, 10 for item 3, 10 for item 4, 10 for item 5.\n    Your outside offer value is 0.\n\n    It is now round 2.\n\nNegotiation history: P1: [1,0,0,0,0], P2: [1,1,0,0,0].\nCurrent offer on the table: [1,1,0,0,0]\nWhat is your action?",
+          "response": "I'll make a counteroffer that's worse for me than P2's current offer (Mistake 1). {\"action\": \"COUNTEROFFER\", \"offer\": [2,2,1,0,0]}",
+          "action": "COUNTEROFFER"
+        }
+      ]
+    },
+    {
+      "circle": "testcircle",
+      "date": "2025_01_01",
+      "agent1": "Agent1",
+      "agent2": "Agent2",
+      "round_data": [ 
+        {
+          "prompt": "    You and another agent have to negotiate a division of items between the two of you.\n    You are Player 1 and the other agent is Player 2.\n    There are 2 units of item 1, 2 units of item 2, 2 units of item 3, 2 units of item 4, 2 units of item 5 to divide.\n    Both you and Player 2 have a private value per unit of each item type.\n    These values are drawn from a uniform random distribution, ranging from 1 to 101.\n    Your private values are 10 for item 1, 10 for item 2, 10 for item 3, 10 for item 4, 10 for item 5.\n    You have a private outside offer drawn from a uniform random distribution ranging from 1 to your total value of all items, which is 100. Player 2 has a private outside offer as well.\n    Your outside offer value is 0.\n\n    It is now round 1.\n\nCurrent offer on the table: None\n\nWhat is your action?",
+          "response": "I'll start with a fair offer. {\"action\": \"COUNTEROFFER\", \"offer\": [1,1,1,1,1]}",
+          "action": "COUNTEROFFER"
+        }, 
+        {
+          "prompt": "    You and another agent have to negotiate a division of items between the two of you.\n    You are Player 2 and the other agent is Player 1.\n    There are 2 units of item 1, 2 units of item 2, 2 units of item 3, 2 units of item 4, 2 units of item 5 to divide.\n    Both you and Player 1 have a private value per unit of each item type.\n    Your private values are 5 for item 1, 5 for item 2, 5 for item 3, 5 for item 4, 5 for item 5.\n    Your outside offer value is 30.\n\n    Round 1, second move.\n\nCurrent offer on the table: [1,1,1,1,1]\nWhat is your action?",
+          "response": "I'll make a counteroffer that's worse for me than my outside offer (Mistake 2). {\"action\": \"COUNTEROFFER\", \"offer\": [2,2,2,2,1]}",
+          "action": "COUNTEROFFER"
+        }
+      ]
+    },
+    {
+      "circle": "testcircle",
+      "date": "2025_01_01",
+      "agent1": "Agent1",
+      "agent2": "Agent2",
+      "round_data": [ 
+        {
+          "prompt": "    You and another agent have to negotiate a division of items between the two of you.\n    You are Player 1 and the other agent is Player 2.\n    There are 2 units of item 1, 2 units of item 2, 2 units of item 3, 2 units of item 4, 2 units of item 5 to divide.\n    Both you and Player 2 have a private value per unit of each item type.\n    These values are drawn from a uniform random distribution, ranging from 1 to 101.\n    Your private values are 10 for item 1, 10 for item 2, 10 for item 3, 10 for item 4, 10 for item 5.\n    You have a private outside offer drawn from a uniform random distribution ranging from 1 to your total value of all items, which is 100. Player 2 has a private outside offer as well.\n    Your outside offer value is 0.\n\n    It is now round 1.\n\nCurrent offer on the table: None\n\nWhat is your action?",
+          "response": "I'll make an offer giving all items to the opponent (Mistake 3). {\"action\": \"COUNTEROFFER\", \"offer\": [2,2,2,2,2]}",
+          "action": "COUNTEROFFER"
+        }
+      ]
+    },
+    {
+      "circle": "testcircle",
+      "date": "2025_01_01",
+      "agent1": "Agent1",
+      "agent2": "Agent2",
+      "round_data": [ 
+        {
+          "prompt": "    You and another agent have to negotiate a division of items between the two of you.\n    You are Player 1 and the other agent is Player 2.\n    There are 2 units of item 1, 2 units of item 2, 2 units of item 3, 2 units of item 4, 2 units of item 5 to divide.\n    Both you and Player 2 have a private value per unit of each item type.\n    These values are drawn from a uniform random distribution, ranging from 1 to 101.\n    Your private values are 10 for item 1, 10 for item 2, 10 for item 3, 10 for item 4, 10 for item 5.\n    You have a private outside offer drawn from a uniform random distribution ranging from 1 to your total value of all items, which is 100. Player 2 has a private outside offer as well.\n    Your outside offer value is 0.\n\n    It is now round 1.\n\nCurrent offer on the table: None\n\nWhat is your action?",
+          "response": "I'll make an offer giving all items to the opponent (Mistake 3). {\"action\": \"COUNTEROFFER\", \"offer\": [0,0,0,0,0]}",
+          "action": "COUNTEROFFER"
+        }
+      ]
+    }
+    ,
+    {
+      "circle": "testcircle",
+      "date": "2025_01_01",
+      "agent1": "Agent1",
+      "agent2": "Agent2", 
+      "round_data": [ 
+        {
+          "prompt": "    You and another agent have to negotiate a division of items between the two of you.\n    You are Player 1 and the other agent is Player 2.\n    There are 2 units of item 1, 2 units of item 2, 2 units of item 3, 2 units of item 4, 2 units of item 5 to divide.\n    Both you and Player 2 have a private value per unit of each item type.\n    These values are drawn from a uniform random distribution, ranging from 1 to 101.\n    Your private values are 10 for item 1, 10 for item 2, 10 for item 3, 10 for item 4, 10 for item 5.\n    You have a private outside offer drawn from a uniform random distribution ranging from 1 to your total value of all items, which is 100. Player 2 has a private outside offer as well.\n    Your outside offer value is 0.\n\n    It is now round 1.\n\nCurrent offer on the table: None\n\nWhat is your action?",
+          "response": "I'll start with a reasonable offer. {\"action\": \"COUNTEROFFER\", \"offer\": [1,1,1,1,1]}",
+          "action": "COUNTEROFFER"
+        }, 
+        {
+          "prompt": "    You and another agent have to negotiate a division of items between the two of you.\n    You are Player 2 and the other agent is Player 1.\n    There are 2 units of item 1, 2 units of item 2, 2 units of item 3, 2 units of item 4, 2 units of item 5 to divide.\n    Both you and Player 1 have a private value per unit of each item type.\n    Your private values are 5 for item 1, 5 for item 2, 5 for item 3, 5 for item 4, 5 for item 5.\n    Your outside offer value is 60.\n\n    Round 1, second move.\n\nCurrent offer on the table: [1,1,1,1,1]\nWhat is your action?",
+          "response": "I'll accept this offer even though it's worse than my outside offer (Mistake 4). {\"action\": \"ACCEPT\"}",
+          "action": "ACCEPT"
+        }
+      ]
+    },
+    {
+      "circle": "testcircle",
+      "date": "2025_01_01",
+      "agent1": "Agent1",
+      "agent2": "Agent2",
+      "round_data": [ 
+        {
+          "prompt": "    You and another agent have to negotiate a division of items between the two of you.\n    You are Player 1 and the other agent is Player 2.\n    There are 2 units of item 1, 2 units of item 2, 2 units of item 3, 2 units of item 4, 2 units of item 5 to divide.\n    Both you and Player 2 have a private value per unit of each item type.\n    These values are drawn from a uniform random distribution, ranging from 1 to 101.\n    Your private values are 10 for item 1, 10 for item 2, 10 for item 3, 10 for item 4, 10 for item 5.\n    You have a private outside offer drawn from a uniform random distribution ranging from 1 to your total value of all items, which is 100. Player 2 has a private outside offer as well.\n    Your outside offer value is 0.\n\n    It is now round 1.\n\nCurrent offer on the table: None\n\nWhat is your action?",
+          "response": "I'll start with a fair offer. {\"action\": \"COUNTEROFFER\", \"offer\": [1,1,1,1,1]}",
+          "action": "COUNTEROFFER"
+        }, 
+        {
+          "prompt": "    You and another agent have to negotiate a division of items between the two of you.\n    You are Player 2 and the other agent is Player 1.\n    There are 2 units of item 1, 2 units of item 2, 2 units of item 3, 2 units of item 4, 2 units of item 5 to divide.\n    Both you and Player 1 have a private value per unit of each item type.\n    Your private values are 5 for item 1, 5 for item 2, 5 for item 3, 5 for item 4, 5 for item 5.\n    Your outside offer value is 10.\n\n    Round 1, second move.\n\nCurrent offer on the table: [1,1,1,1,1]\nWhat is your action?",
+          "response": "I'll walk away even though this offer is better than my outside offer (Mistake 5). {\"action\": \"WALK\"}",
+          "action": "WALK"
+        }
+      ]
+    }
+  ]
+}

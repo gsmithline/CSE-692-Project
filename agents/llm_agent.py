@@ -261,8 +261,7 @@ class LLMAgent(Agent):
                     "type": "enabled",
                     "budget_tokens": 16000
                 } if "reasoning" in self.model else {
-                    "type": "disabled",
-                    "budget_tokens": 0
+                    "type": "disabled"
                 }
                 
                 response = self.llm.messages.create(
