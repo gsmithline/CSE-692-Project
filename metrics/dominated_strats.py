@@ -125,7 +125,7 @@ def analyze_circle6(json_file_path):
     for game in all_game_data:
         round_data = game["round_data"]
         last_move_info = {1: None, 2: None}
-        
+
         opponent_offer_values = {1: None, 2: None}
         total_rounds = 3
         current_round = 1
@@ -417,7 +417,7 @@ def plot_mistakes_radar_multiple_circles(circles_mistake_counts, model_name):
        - value: dict of {mistake_id: count}, e.g., {1:10, 2:4, 3:5, 4:3, 5:2}
     """
 
-    labels = [0, 1, 2, 3, 4]
+    labels = [1, 2, 3, 4, 5]
     n_labels = len(labels)
 
     angles = np.linspace(0, 2 * np.pi, n_labels, endpoint=False).tolist()
@@ -456,13 +456,14 @@ ds_data_gemini = {}
 for circle in circles:
     print(f"Analyzing circle {circle}")
     print("="*100)
-    json_FILE_PATH = f"/Users/gabesmithline/Desktop/caif_negotiation/experiments/4o_final/4o_1_28_2025_100_circle_{circle}.json"
+    #json_FILE_PATH = f"/Users/gabesmithline/Desktop/caif_negotiation/experiments/4o_final/4o_1_28_2025_100_circle_{circle}.json"
     #json_FILE_PATH = f"/Users/gabesmithline/Desktop/caif_negotiation/experiments/gemini_2.0_final/gemini_2.0_1_28_2025_circle_{circle}.json"
     #json_FILE_PATH = f"/Users/gabesmithline/Desktop/caif_negotiation/experiments/o3-mini/all_game_data_2_4_2025_100_o3-mini_circle_{circle}.json"
     #json_FILE_PATH = f"/Users/gabesmithline/Desktop/caif_negotiation/experiments/4o_300/4o_2_9_2025_300_circle_{circle}.json"
     #json_FILE_PATH = f"/Users/gabesmithline/Desktop/caif_negotiation/experiments/4o_small_final/4o_2_6_2025_100_circle_{circle}_small.json"
     #json_FILE_PATH = f"/Users/gabesmithline/Desktop/caif_negotiation/experiments/cross_play/4o_vs_o3/all_game_data_2_9_2025_100_4o_vs_o3_mini_circle_{circle}.json"
     json_FILE_PATH = f"/Users/gabesmithline/Desktop/caif_negotiation/experiments/claude_3.7/all_game_data_2_24_2025_100_anthropic_3.7_sonnet_vs_anthropic_3.7_sonnet_circle_p1_{circle}_circle_p2_{circle}.json"
+    #json_FILE_PATH = f"/Users/gabesmithline/Desktop/caif_negotiation/metrics/test_mistakes_5games.json"
     mistake_counts = analyze_circle6(json_FILE_PATH)
     print(mistake_counts)
     ds_data_gemini[f"sonnet 3.7_circle_{circle}"] = mistake_counts
