@@ -5,6 +5,7 @@ import time
 import anthropic 
 import google.generativeai as genai
 import openai
+from openai import OpenAI
 from llamaapi import LlamaAPI
 from pydantic import BaseModel
 
@@ -84,6 +85,15 @@ class LLMAgent(Agent):
                     raise ValueError("No API key provided and couldn't find GEMINI_API_KEY.txt")
             genai.configure(api_key=api_key)
             self.llm = genai.GenerativeModel('gemini-2.0-flash-exp')
+
+        elif "deepseek" in llm_type:
+            if api_key is None:
+                api_key = os.environ["DEEPSEEK_API_KEY"]
+            self.client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
+            # self.client = OpenAI(
+            #     base_url = 'http://localhost:11434/v1', api_key='ollama', # required, but unused
+            #     )
+
 
         else:
             raise ValueError(f"Invalid LLM type: {llm_type}")
@@ -353,6 +363,52 @@ class LLMAgent(Agent):
                 print(f"Error with Gemini response: {e}")
                 print("Defaulting to WALK")
                 self.current_response = "Error with Gemini response, did not receive a response."
+                result = {"action": "INVALID WALK"}
+                self.result = False
+                self.action = "INVALID WALK"
+                return False
+
+        elif "deepseek" in self.llm_type:
+            if "reasoner" in self.model:
+                self.model = "deepseek-reasoner"
+                # self.model = "deepseek-r1:32b"
+            else:
+                raise ValueError(f"Invalid model: {self.model}")
+            try:
+                response = {}
+                messages = []
+                messages.append({"role": "user", "content": prompt})
+
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages
+                )
+
+                print("Raw API Response:", response)
+                # reasoning_content = response.choices[0].message.reasoning_content
+                content = response.choices[0].message.content
+                print("Content:", content)
+                self.current_response = content
+
+                # Find the JSON string at the end of the text and clean it
+                json_start = result_content.rfind('{')
+                json_str = result_content[json_start:].strip()
+                json_end = json_str.rfind('}')
+                if json_end >= 0:
+                    json_str = json_str[:json_end+1]
+
+                result = json.loads(json_str)
+                print("Parsed result:", result)
+                self.result = result
+                self.action = result["action"]
+
+            except Exception as e:
+                print(f"Error with DeepSeek response: {e}")
+                if not response:
+                    self.current_response = "Error with DeepSeek response, did not receive a response."
+                else:
+                    self.current_response = response
+                print("Defaulting to WALK")
                 result = {"action": "INVALID WALK"}
                 self.result = False
                 self.action = "INVALID WALK"
