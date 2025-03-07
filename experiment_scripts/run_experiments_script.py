@@ -43,9 +43,9 @@ def main():
     print(f"  p2 circles:      {args.p2_circles}")
     print("--------------------------------------------------")
     
-    valid_models = ["openai_4o", "openai_o3_mini", "anthropic_3.5_sonnet", "anthropic_3.7_sonnet", 
-                    "gemini_2.0_flash", "llama3.3-70b", "llama3.3-8b", "llama3.3-4050", "openai_o1_mini", "openai_o1_preview", "openai_o1",
-                    "anthropic_sonnet_3.7_reasoning", "deepseek_reasoner"]
+    valid_models = ["openai_4o_2024-08-06", "openai_4o_2024-11-20", "openai_o3_mini_2025-01-31", "anthropic_3.5_sonnet_2024-10-22", "anthropic_3.7_sonnet_2025-02-19", 
+                    "gemini_2.0_flash", "llama3.3-70b", "llama3.3-8b", "llama3.3-4050", "openai_o1_mini_2024-09-12", "openai_o1_preview_2024-09-12", "openai_o1_2024-12-17",
+                    "anthropic_sonnet_3.7_reasoning_2025-02-19", "deepseek_reasoner"]
     if args.llm_model_p1 not in valid_models:
         raise ValueError(f"Invalid model: {args.llm_model_p1}")
     if args.llm_model_p2 not in valid_models:
