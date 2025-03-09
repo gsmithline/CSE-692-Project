@@ -17,7 +17,7 @@ from eval.game_data import GameData
 import pickle
 import json
 
-def run_game(circle1: int, circle2: int, games: int, max_rounds: int, date: str, game_title: str, llm_model_p1: str, llm_model_p2: str):
+def run_game(circle1: int, circle2: int, games: int, max_rounds: int, date: str, game_title: str, llm_model_p1: str, llm_model_p2: str, discount: float):
     """
     Runs a series of negotiation games for a specific circle, tracking comprehensive metrics.
 
@@ -42,7 +42,7 @@ def run_game(circle1: int, circle2: int, games: int, max_rounds: int, date: str,
             player2_agent=llm_agent.LLMAgent(llm_type=llm_model_p2, model=llm_model_p2, player_num=1),
             num_items=5,
             item_value_range=[1, 101],
-            gamma=0.98,
+            gamma=discount,
             max_rounds=max_rounds,
             circle1=circle1,
             circle2=circle2 
