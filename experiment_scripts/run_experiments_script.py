@@ -30,6 +30,7 @@ def main():
                         help="List of integer circle values to iterate over.")
     parser.add_argument("--parallel", type=bool, required=False, default=True,
                         help="Whether to run the experiments in parallel.")
+    parser.add_argument("--discount", type=float, required=False, default=.9, help="discount rate for game ranging between [0, 1].")
     args = parser.parse_args()
 
     print("[INFO] Starting experiment...")
@@ -41,15 +42,18 @@ def main():
     print(f"  games:        {args.games}")
     print(f"  p1 circles:      {args.p1_circles}")
     print(f"  p2 circles:      {args.p2_circles}")
+    print(f"  discount:         {args.discount}")
     print("--------------------------------------------------")
     
-    valid_models = ["openai_4o", "openai_o3_mini", "anthropic_3.5_sonnet", "anthropic_3.7_sonnet", 
-                    "gemini_2.0_flash", "llama3.3-70b", "llama3.3-8b", "llama3.3-4050", "openai_o1_mini", "openai_o1_preview", "openai_o1",
-                    "anthropic_sonnet_3.7_reasoning", "deepseek_reasoner"]
+    valid_models = ["openai_4o_2024-08-06", "openai_4o_2024-11-20", "openai_o3_mini_2025-01-31", "anthropic_3.5_sonnet_2024-10-22", "anthropic_3.7_sonnet_2025-02-19", 
+                    "gemini_2.0_flash", "llama3.3-70b", "llama3.3-8b", "llama3.3-4050", "openai_o1_mini_2024-09-12", "openai_o1_preview_2024-09-12", "openai_o1_2024-12-17",
+                    "anthropic_sonnet_3.7_reasoning_2025-02-19", "deepseek_reasoner"]
     if args.llm_model_p1 not in valid_models:
         raise ValueError(f"Invalid model: {args.llm_model_p1}")
     if args.llm_model_p2 not in valid_models:
         raise ValueError(f"Invalid model: {args.llm_model_p2}")
+    if args.discount > 1 or args.discount < 0:
+        raise ValueError(f"Invalid Discount: {args.llm_model_p2}")
 
     if args.parallel:
         with concurrent.futures.ProcessPoolExecutor() as executor:
@@ -63,7 +67,8 @@ def main():
                     args.date, 
                     args.prompt_style, 
                     args.llm_model_p1,
-                    args.llm_model_p2
+                    args.llm_model_p2,
+                    args.discount
                 ): (circle1, circle2)
                 for (circle1, circle2) in zip(args.p1_circles, args.p2_circles)
             }
@@ -78,7 +83,7 @@ def main():
         print("[INFO] All experiment runs completed.")
     else:
         for circle1, circle2 in zip(args.p1_circles, args.p2_circles):
-            run_game(circle1, circle2, args.games, args.max_rounds, args.date, args.prompt_style, args.llm_model_p1, args.llm_model_p2)
+            run_game(circle1, circle2, args.games, args.max_rounds, args.date, args.prompt_style, args.llm_model_p1, args.llm_model_p2, args.discount)
 
 
 if __name__ == "__main__":

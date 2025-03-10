@@ -4,8 +4,8 @@ import time
 
 import anthropic 
 import google.generativeai as genai
-import openai
-from openai import OpenAI
+import openai 
+
 from llamaapi import LlamaAPI
 from pydantic import BaseModel
 
@@ -84,8 +84,14 @@ class LLMAgent(Agent):
                 except FileNotFoundError:
                     raise ValueError("No API key provided and couldn't find GEMINI_API_KEY.txt")
             genai.configure(api_key=api_key)
-            self.llm = genai.GenerativeModel('gemini-2.0-flash-exp')
+            if "thinking" in llm_type:
+                self.llm = genai.GenerativeModel('gemini-2.0-flash-thinking-exp-01-21')
+            elif "pro" in llm_type:
+                self.llm = genai.GenerativeModel('gemini-2.0-pro-exp-02-05')
+            else:
+                self.llm = genai.GenerativeModel('gemini-2.0-flash') #february 2025
 
+        '''
         elif "deepseek" in llm_type:
             if api_key is None:
                 api_key = os.environ["DEEPSEEK_API_KEY"]
@@ -93,11 +99,11 @@ class LLMAgent(Agent):
             # self.client = OpenAI(
             #     base_url = 'http://localhost:11434/v1', api_key='ollama', # required, but unused
             #     )
-
-
+        
+        
         else:
             raise ValueError(f"Invalid LLM type: {llm_type}")
-   
+        '''
     def give_offer(self, prompt: str) -> Offer | bool:
         """
         Given a prompt describing the negotiation context, request a proposal 
@@ -198,16 +204,28 @@ class LLMAgent(Agent):
 
         # OpenAI branch
         elif "openai" in self.llm_type:
-            if "4o" in self.model:
-                self.model = "gpt-4o"
-            elif "o1_preview" in self.model:
-                self.model = "o1-preview"
-            elif "o1_mini" in self.model:
-                self.model = "o1-mini"
-            elif "o1" in self.model:
-                self.model = "o1"
+            if "_" in self.model:
+                model_parts = self.model.split("_")
+                if len(model_parts) >= 2:
+                    model_name = "-".join(model_parts[1:])
+                    if model_name.startswith("4o"):
+                        self.model = f"gpt-{model_name}"
+                    elif model_name.startswith("o1") or model_name.startswith("o3"):
+                        self.model = model_name
+                    else:
+                        self.model = f"gpt-{model_name}"
+            if "4o-2024-08-06" in self.model:
+                self.model = "gpt-4o-2024-08-06" #defaults to august-6th version 
+            elif "4o-2024-11-20" in self.llm_type:
+                self.model = "gpt-4o-2024-11-20"
+            elif "o1_preview-2024-09-12" in self.model:
+                self.model = "o1-preview-2024-09-12"
+            elif "o1_mini-2024-09-12" in self.model:
+                self.model = "o1-mini-2024-09-12"
+            elif "o1-2024-12-17" in self.model:
+                self.model = "o1-2024-12-17"
             elif "o3" in self.model:
-                self.model = "o3-mini"
+                self.model = "o3-mini-2025-01-31"
             else:
                 raise ValueError(f"Invalid model: {self.model}")
             try:
@@ -264,7 +282,7 @@ class LLMAgent(Agent):
                 self.model = model
             else:
                 raise ValueError(f"Invalid model: {self.model}")
-            
+
 
             try:
                 thinking_config = {
@@ -273,7 +291,7 @@ class LLMAgent(Agent):
                 } if "reasoning" in self.model else {
                     "type": "disabled"
                 }
-                
+
                 response = self.llm.messages.create(
                     model=self.model, 
                     system=system_prompt,
@@ -282,7 +300,7 @@ class LLMAgent(Agent):
                     thinking=thinking_config
                 )
                 print("Raw API Response:", response)
-                
+
                 if "reasoning" in self.model:
                     result_content = None
                     for content_block in response.content:
@@ -291,7 +309,7 @@ class LLMAgent(Agent):
                             break
                         elif hasattr(content_block, 'type') and content_block.type == 'thinking':
                             continue
-                    
+
                     if result_content is None:
                         result_content = str(response.content)
                 else:
@@ -304,7 +322,7 @@ class LLMAgent(Agent):
                                 break
                         else:
                             result_content = str(response.content)
-                
+
                 self.current_response = result_content
 
                 json_start = result_content.rfind('{')
@@ -316,7 +334,7 @@ class LLMAgent(Agent):
                 print("Parsed result:", result)
                 self.result = result
                 self.action = result["action"]
-                
+
 
             except Exception as e:
                 print(f"Error with ANTHROPIC response: {e}")
@@ -340,7 +358,7 @@ class LLMAgent(Agent):
                 return False
 
         elif "gemini" in self.llm_type:
-            
+
             try:
                 response = self.llm.generate_content(prompt)
                 print("Raw API Response:", response)
