@@ -38,6 +38,7 @@ class LLMAgent(Agent):
         self.current_prompt = None  # Prompt sent to LLM
         self.current_response = None  # Response text from LLM
         self.model = model
+        self.api_failure = False  # Flag to track API failures
         print(f"Using LLM model: {self.model}")
         # Determine which LLM to use and load or configure accordingly.
         if "llama" in llm_type:
@@ -50,7 +51,7 @@ class LLMAgent(Agent):
                 except FileNotFoundError:
                     raise ValueError("No API key provided and couldn't find LLAMA_API_KEY.txt")
             self.llm = LlamaAPI(api_key)
-
+        
         elif "openai" in llm_type:
             if api_key is None:
                 try:
@@ -127,6 +128,9 @@ class LLMAgent(Agent):
             "Ensure your response is valid JSON and matches one of these exact formats."
         )
 
+        # Reset API failure flag before each attempt
+        self.api_failure = False
+
         # LLAMA branch
         if self.llm_type == "llama":
             #default to llama3.3-70b
@@ -147,7 +151,8 @@ class LLMAgent(Agent):
                 if response.status_code != 200:
                     print(f"API request failed with status code: {response.status_code}")
                     print(f"Error message: {response.text}")
-                    raise Exception("API request failed")
+                    self.api_failure = True
+                    raise Exception(f"API request failed with status code: {response.status_code}")
 
                 try:
                     response_json = json.loads(response.text)
@@ -196,6 +201,13 @@ class LLMAgent(Agent):
                     print(f"Status code: {response.status_code}")
                     print(f"Response text: {response.text}")
                     self.current_response = response.text
+                    # Check if this is an API failure (status code, timeout, etc.)
+                    if hasattr(response, 'status_code') and response.status_code != 200:
+                        self.api_failure = True
+                else:
+                    # No response object means API connection failed completely
+                    self.api_failure = True
+                
                 print("Defaulting to WALK")
                 result = {"action": "INVALID WALK"}
                 self.result = False
@@ -256,8 +268,39 @@ class LLMAgent(Agent):
                 self.result = result
                 self.action = result["action"]
 
+            except openai.error.APIError as e:
+                print(f"OpenAI API error: {e}")
+                self.api_failure = True
+                self.current_response = f"OpenAI API error: {e}"
+                print("API failure - this game should be dropped")
+                result = {"action": "INVALID WALK"}
+                self.result = False
+                self.action = "INVALID WALK"
+                return False
+            except openai.error.RateLimitError as e:
+                print(f"OpenAI rate limit error: {e}")
+                self.api_failure = True
+                self.current_response = f"OpenAI rate limit error: {e}"
+                print("API failure - this game should be dropped")
+                result = {"action": "INVALID WALK"}
+                self.result = False
+                self.action = "INVALID WALK"
+                return False
+            except openai.error.ServiceUnavailableError as e:
+                print(f"OpenAI service unavailable: {e}")
+                self.api_failure = True
+                self.current_response = f"OpenAI service unavailable: {e}"
+                print("API failure - this game should be dropped")
+                result = {"action": "INVALID WALK"}
+                self.result = False
+                self.action = "INVALID WALK"
+                return False
             except Exception as e:
                 print(f"Error with OpenAI response: {e}")
+                # Check if this is likely an API failure vs a formatting error
+                if "API" in str(e) or "connection" in str(e).lower() or "timeout" in str(e).lower() or "rate" in str(e).lower():
+                    self.api_failure = True
+                    print("API failure - this game should be dropped")
                 if not response:
                     self.current_response = "Error with OpenAI response, did not receive a response."
                 else:
@@ -282,7 +325,6 @@ class LLMAgent(Agent):
                 self.model = model
             else:
                 raise ValueError(f"Invalid model: {self.model}")
-
 
             try:
                 thinking_config = {
@@ -335,9 +377,30 @@ class LLMAgent(Agent):
                 self.result = result
                 self.action = result["action"]
 
-
+            except anthropic.APIError as e:
+                print(f"Anthropic API error: {e}")
+                self.api_failure = True
+                self.current_response = f"Anthropic API error: {e}"
+                print("API failure - this game should be dropped")
+                result = {"action": "INVALID WALK"}
+                self.result = False
+                self.action = "INVALID WALK"
+                return False
+            except anthropic.RateLimitError as e:
+                print(f"Anthropic rate limit error: {e}")
+                self.api_failure = True
+                self.current_response = f"Anthropic rate limit error: {e}"
+                print("API failure - this game should be dropped")
+                result = {"action": "INVALID WALK"}
+                self.result = False
+                self.action = "INVALID WALK"
+                return False
             except Exception as e:
                 print(f"Error with ANTHROPIC response: {e}")
+                # Check if this is likely an API failure vs a formatting error
+                if "API" in str(e) or "connection" in str(e).lower() or "timeout" in str(e).lower() or "rate" in str(e).lower():
+                    self.api_failure = True
+                    print("API failure - this game should be dropped")
                 print("Defaulting to WALK")
                 if response is not None and hasattr(response, 'content'):
                     # Safely extract text content if possible
@@ -352,13 +415,14 @@ class LLMAgent(Agent):
                         self.current_response = "Error with ANTHROPIC response, could not extract text."
                 else:
                     self.current_response = "Error with ANTHROPIC response, did not receive a response."
+                    # No response at all likely means an API failure
+                    self.api_failure = True
                 result = {"action": "INVALID WALK"}
                 self.result = False
                 self.action = "INVALID WALK"
                 return False
 
         elif "gemini" in self.llm_type:
-
             try:
                 response = self.llm.generate_content(prompt)
                 print("Raw API Response:", response)
@@ -377,8 +441,21 @@ class LLMAgent(Agent):
                 self.result = result
                 self.action = result["action"]
 
+            except genai.types.BlockedPromptException as e:
+                print(f"Gemini blocked prompt: {e}")
+                self.api_failure = True
+                self.current_response = f"Gemini API error: {e}"
+                print("API failure - this game should be dropped")
+                result = {"action": "INVALID WALK"}
+                self.result = False
+                self.action = "INVALID WALK"
+                return False
             except Exception as e:
                 print(f"Error with Gemini response: {e}")
+                # Check if this is likely an API failure vs a formatting error
+                if "API" in str(e) or "connection" in str(e).lower() or "timeout" in str(e).lower() or "rate" in str(e).lower():
+                    self.api_failure = True
+                    print("API failure - this game should be dropped")
                 print("Defaulting to WALK")
                 self.current_response = "Error with Gemini response, did not receive a response."
                 result = {"action": "INVALID WALK"}
@@ -422,6 +499,10 @@ class LLMAgent(Agent):
 
             except Exception as e:
                 print(f"Error with DeepSeek response: {e}")
+                # Check if this is likely an API failure vs a formatting error
+                if "API" in str(e) or "connection" in str(e).lower() or "timeout" in str(e).lower() or "rate" in str(e).lower():
+                    self.api_failure = True
+                    print("API failure - this game should be dropped")
                 if not response:
                     self.current_response = "Error with DeepSeek response, did not receive a response."
                 else:

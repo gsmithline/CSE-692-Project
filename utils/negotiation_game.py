@@ -1,4 +1,3 @@
-
 from game_runner import NegotitaionGame
 import agents.llm_agent as llm_agent
 import numpy as np
@@ -31,12 +30,18 @@ def run_game(circle1: int, circle2: int, games: int, max_rounds: int, date: str,
         llm_model_p2 (str): Type of LLM agent being used (e.g., "openai_o3_mini").
     """
     all_game_data = []
-    for i in range(games):
-        if (i + 1) % 10 == 0:
-            print(f"Game {i + 1} of {games}")
+    completed_games = 0
+    attempts = 0
+    max_attempts = games + 50  # Set a reasonable upper limit to prevent infinite loops
+    
+    while completed_games < games and attempts < max_attempts:
+        attempts += 1
+        if (attempts) % 10 == 0:
+            print(f"Game attempt {attempts}, completed {completed_games} of {games}")
             sleep_duration = 2 * np.random.randint(55, 60)  # Sleep for ~2 minutes
             print(f"Sleeping for {sleep_duration} seconds to respect rate limits.")
             time.sleep(sleep_duration)
+            
         game = NegotitaionGame(
             player1_agent=llm_agent.LLMAgent(llm_type=llm_model_p1, model=llm_model_p1, player_num=0),
             player2_agent=llm_agent.LLMAgent(llm_type=llm_model_p2, model=llm_model_p2, player_num=1),
@@ -76,7 +81,7 @@ def run_game(circle1: int, circle2: int, games: int, max_rounds: int, date: str,
                     'player': 1,
                     'allocation': [0] * game.num_items
                 })
-                print(f"[INFO] No feasible < outside_offer allocation for Player 1 in Game {i + 1}.")
+                print(f"[INFO] No feasible < outside_offer allocation for Player 1 in Game attempt {attempts}.")
 
             # Find allocations where Player 2's utility is less than their outside offer
             allocation_p2 = find_allocation_less_than_outside_offer_dp(
@@ -95,9 +100,9 @@ def run_game(circle1: int, circle2: int, games: int, max_rounds: int, date: str,
                     'player': 2,
                     'allocation': [0] * game.num_items
                 })
-                print(f"[INFO] No feasible < outside_offer allocation for Player 2 in Game {i + 1}.")
+                print(f"[INFO] No feasible < outside_offer allocation for Player 2 in Game attempt {attempts}.")
 
-            print(f"[DEBUG] Game {i + 1} allocations_less_than_outside_offer: {allocations_less_than_outside_offer}")
+            print(f"[DEBUG] Game attempt {attempts} allocations_less_than_outside_offer: {allocations_less_than_outside_offer}")
 
         print(f"[DEBUG] game.items: {game.items}")
         print(f"[DEBUG] allocations_less_than_outside_offer: {allocations_less_than_outside_offer}")
@@ -123,17 +128,16 @@ def run_game(circle1: int, circle2: int, games: int, max_rounds: int, date: str,
             agent2=f"Agent2_{llm_model_p2}"
         )
 
-        print(f"[INFO] Starting Game {i + 1} of {games} for Circle {circle1 if game.current_player == 0 else circle2}.")
+        print(f"[INFO] Starting Game attempt {attempts} (completed {completed_games} of {games}) for Circle {circle1 if game.current_player == 0 else circle2}.")
 
-  
-        if i > 0:
-            # Not necessary when using GameData, but kept for consistency
-            print(f"[DEBUG] Processing Game {i} completed.")
+        # Flag to track if this game had an API failure
+        had_api_failure = False
 
-        while game.in_progress:
+        while game.in_progress and not had_api_failure:
             # Sleep to simulate thinking time and rate-limit API calls
             sleep_duration = circle1 if game.current_player == 0 else circle2 + .5  # Adjust based on desired rate-limiting
             print(f"[DEBUG] Sleeping for {sleep_duration} seconds before next step.")
+            sleep_duration = np.random.randint(sleep_duration, sleep_duration + 10)
             time.sleep(sleep_duration)
 
             # Determine current step, round, and player
@@ -143,7 +147,7 @@ def run_game(circle1: int, circle2: int, games: int, max_rounds: int, date: str,
             game.current_round = current_round
 
             print("\n" + "=" * 80)
-            print(f"Game {i + 1}, Round {current_round}, Player {current_player}'s turn (Step {current_step})")
+            print(f"Game attempt {attempts}, Round {current_round}, Player {current_player}'s turn (Step {current_step})")
             print("=" * 80)
 
             current_allocation_example = None
@@ -156,7 +160,14 @@ def run_game(circle1: int, circle2: int, games: int, max_rounds: int, date: str,
             print(f"[DEBUG] Current allocation example type: {type(current_allocation_example)}")
 
             game.step(example_offer_less_than_outside_offer_self=current_allocation_example)
-
+            
+            # Check if an API failure occurred during this step
+            current_agent = game.players[current_player - 1]
+            if hasattr(current_agent, 'api_failure') and current_agent.api_failure:
+                print(f"[WARNING] API failure detected in step {current_step}. Skipping this game.")
+                had_api_failure = True
+                break
+                
             action_played = game.players[current_player - 1].action.upper()
 
             game_data.add_round_data(
@@ -168,22 +179,17 @@ def run_game(circle1: int, circle2: int, games: int, max_rounds: int, date: str,
             if "WALK" in action_played or "ACCEPT" in action_played:
                 game.in_progress = False
 
-        # --------------------------------------------------------------------
-        # 12) After the Game Loop Ends, Save GameData
-        # --------------------------------------------------------------------
-        all_game_data.append(game_data)
-        #UNCOMMENT THESE TO SAVE EACH GAME'S DATA SEPERATELY 
-        # Optionally, save each game's data immediately
-        # Filename can include game number, circle, date, etc.
-        #filename = f'game_data_{date}_game_{i + 1}_circle_{circle}.json'
-        #game_data.save_to_json(filename)
-        #print(f"[INFO] Saved GameData to {filename}.")
-        #save to pickle
-        #filename_pkl = f'game_data_{date}_game_{i + 1}_circle_{circle}.pkl'
-        #with open(filename_pkl, "wb") as pf:
-        #pickle.dump(game_data, pf)
-        #print(f"[INFO] Saved GameData to {filename_pkl}.")
+        # Only add this game to results if there was no API failure
+        if not had_api_failure:
+            all_game_data.append(game_data)
+            completed_games += 1
+            print(f"[INFO] Game {completed_games} completed successfully.")
+        else:
+            print(f"[INFO] Game attempt {attempts} skipped due to API failure.")
 
+    if completed_games < games:
+        print(f"[WARNING] Only completed {completed_games} of {games} requested games after {attempts} attempts due to API failures.")
+    
     print("HERE IS THE DATA")
     all_data = {
         "date": date,
@@ -191,14 +197,14 @@ def run_game(circle1: int, circle2: int, games: int, max_rounds: int, date: str,
         "circle_p2": circle2,
         "all_game_data": [gd.to_dict() for gd in all_game_data]
     }
-    all_games_filename = f'all_game_data_{date}_{games}_{game_title}_circle_p1_{circle1}_circle_p2_{circle2}.json'
+    all_games_filename = f'all_game_data_{date}_{completed_games}_{game_title}_circle_p1_{circle1}_circle_p2_{circle2}.json'
     with open(all_games_filename, "w") as f:
         json.dump(all_data, f, indent=4)
         #json.pickle(all_data, f)
     print(f"[INFO] Saved all GameData to JSON file: {all_games_filename}.")
 
     #save to pickle optinally
-    all_games_filename_pkl = f'all_game_data_{date}_{games}_{game_title}_circle_p1_{circle1}_circle_p2_{circle2}.pkl'
+    all_games_filename_pkl = f'all_game_data_{date}_{completed_games}_{game_title}_circle_p1_{circle1}_circle_p2_{circle2}.pkl'
     with open(all_games_filename_pkl, "wb") as pf:
         pickle.dump(all_data, pf)
     print(f"[INFO] Saved all GameData as a pickle to {all_games_filename_pkl}.")
