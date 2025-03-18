@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.colors import LinearSegmentedColormap
 
-def create_matrix_heatmap_with_nash_regret(performance_matrix, nash_regrets, title="Performance Matrix with Nash Regret", 
+def create_matrix_heatmap_with_nash_regret(performance_matrix, nash_regrets, regret_type, title="Performance Matrix with Nash Regret", 
                                          cmap="coolwarm", figsize=(16, 12)):
     """
     Create a heatmap visualization of a performance matrix with Nash regret values.
@@ -52,9 +52,9 @@ def create_matrix_heatmap_with_nash_regret(performance_matrix, nash_regrets, tit
     
     # Process nash_regrets to get values
     if isinstance(nash_regrets, pd.DataFrame):
-        if 'Mean NE Regret' in nash_regrets.columns and 'Agent' in nash_regrets.columns:
+        if regret_type in nash_regrets.columns and 'Agent' in nash_regrets.columns:
             # Convert DataFrame to Series indexed by Agent
-            regrets_dict = dict(zip(nash_regrets['Agent'], nash_regrets['Mean NE Regret']))
+            regrets_dict = dict(zip(nash_regrets['Agent'], nash_regrets[regret_type]))
             for agent in numeric_matrix.index:
                 if agent in regrets_dict:
                     regrets[agent] = regrets_dict[agent]
@@ -104,8 +104,8 @@ def create_matrix_heatmap_with_nash_regret(performance_matrix, nash_regrets, tit
         ax_regret.set_yticklabels([])  # No need for labels, they're already on the heatmap
         
         # Set labels
-        ax_regret.set_xlabel('Nash Equilibrium Regret', fontweight='bold')
-        ax_regret.set_title('NE Regret', fontweight='bold')
+        ax_regret.set_xlabel(regret_type, fontweight='bold')
+        ax_regret.set_title(regret_type, fontweight='bold')
         
         # Set y-axis limits to match heatmap
         ax_regret.set_ylim(ax_heatmap.get_ylim())
