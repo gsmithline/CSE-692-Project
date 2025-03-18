@@ -1,8 +1,12 @@
+#!/usr/bin/env python
+# coding: utf-8
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.colors import LinearSegmentedColormap
+import os
 
 def create_matrix_heatmap_with_nash_regret(performance_matrix, nash_regrets, regret_type, title="Performance Matrix with Nash Regret", 
                                          cmap="coolwarm", figsize=(16, 12)):
@@ -121,3 +125,51 @@ def create_matrix_heatmap_with_nash_regret(performance_matrix, nash_regrets, reg
     
     plt.tight_layout()
     return fig 
+
+def visualize_regret_heatmaps(performance_matrix, bootstrap_stats, save_dir=None):
+    """
+    Create heatmap visualizations with Nash regret and traditional regret marginals.
+    
+    Args:
+        performance_matrix: Performance matrix DataFrame
+        bootstrap_stats: DataFrame with bootstrap statistics
+        save_dir: Directory to save the plots
+        
+    Returns:
+        dict: Dictionary of figure objects
+    """
+    figures = {}
+    
+    # Create output directory if needed
+    if save_dir:
+        os.makedirs(save_dir, exist_ok=True)
+    
+    # Create heatmap with Nash regret marginal
+    fig_nash = create_matrix_heatmap_with_nash_regret(
+        performance_matrix,
+        bootstrap_stats,
+        regret_type='Mean NE Regret',
+        title="Performance Matrix with Nash Regret"
+    )
+    figures['performance_with_nash_regret'] = fig_nash
+    
+    if save_dir:
+        filepath = os.path.join(save_dir, 'performance_with_nash_regret.png')
+        fig_nash.savefig(filepath, bbox_inches='tight', dpi=300)
+        plt.close(fig_nash)
+    
+    # Create heatmap with traditional regret marginal
+    fig_trad = create_matrix_heatmap_with_nash_regret(
+        performance_matrix,
+        bootstrap_stats,
+        regret_type='Mean Traditional Regret',
+        title="Performance Matrix with Traditional Regret"
+    )
+    figures['performance_with_traditional_regret'] = fig_trad
+    
+    if save_dir:
+        filepath = os.path.join(save_dir, 'performance_with_traditional_regret.png')
+        fig_trad.savefig(filepath, bbox_inches='tight', dpi=300)
+        plt.close(fig_trad)
+    
+    return figures 
