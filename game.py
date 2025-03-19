@@ -50,8 +50,8 @@ class GameHistory:
         # For item i, we can allocate from 0..items[i] units to agent 1
         all_allocations = itertools.product(
             *[range(int(self.items[i].item()) + 1) for i in range(self.num_items)]
-        )
-        # Compute agent values for each allocation
+        )         
+        #      test commuit
         allocations_with_values = []
         for allocation in all_allocations:
             agent1_value = 0.0

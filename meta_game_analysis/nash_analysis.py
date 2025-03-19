@@ -1,0 +1,642 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+import numpy as np
+import pandas as pd
+import sys
+import os
+import matplotlib.pyplot as plt
+
+# Add parent directory to path for imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from nash_equilibrium import (
+    bootstrap_performance_metrics,
+    analyze_bootstrap_results,
+    plot_regret_distributions,
+    compute_acceptance_ratio_matrix
+)
+
+def run_nash_analysis(performance_matrix, num_bootstrap_samples=100, confidence_level=0.95):
+    """
+    Run Nash equilibrium analysis on the performance matrix.
+    
+    Args:
+        performance_matrix: Performance matrix DataFrame
+        num_bootstrap_samples: Number of bootstrap samples to use
+        confidence_level: Confidence level for bootstrap intervals
+        
+    Returns:
+        tuple: (bootstrap_results, bootstrap_stats, acceptance_matrix, ne_strategy_df)
+    """
+    # Get list of agents from performance matrix
+    agents = performance_matrix.index.tolist()
+    
+    # Run bootstrapping
+    print(f"Running bootstrapping with {num_bootstrap_samples} samples...")
+    bootstrap_results = bootstrap_performance_metrics(
+        performance_matrix, 
+        num_bootstrap=num_bootstrap_samples, 
+        sample_with_replacement=True
+    )
+
+    # Compute confidence intervals
+    print(f"\nComputing {confidence_level*100:.0f}% confidence intervals...")
+    bootstrap_stats = analyze_bootstrap_results(
+        bootstrap_results, 
+        agents, 
+        confidence=confidence_level
+    )
+    
+    # Calculate acceptance ratio matrix
+    acceptance_matrix = None
+    
+    # Compute Nash equilibrium mixed strategy
+    avg_ne_strategy = np.mean([s for s in bootstrap_results['ne_strategy']], axis=0)
+    ne_strategy_df = pd.DataFrame({
+        'Agent': agents,
+        'Nash Probability': avg_ne_strategy
+    }).sort_values(by='Nash Probability', ascending=False)
+    
+    return bootstrap_results, bootstrap_stats, acceptance_matrix, ne_strategy_df
+
+def plot_nash_distributions(bootstrap_results, agents):
+    """
+    Plot the distributions of Nash equilibrium metrics.
+    
+    Args:
+        bootstrap_results: Bootstrap results dictionary
+        agents: List of agent names
+        
+    Returns:
+        tuple: (regret_fig, trad_regret_fig, rel_perf_fig, dual_regret_fig)
+    """
+    # Plot Nash equilibrium regret distribution
+    regret_fig = plot_regret_distributions(bootstrap_results, agents)
+    
+    # Plot traditional regret distribution
+    trad_regret_fig = plot_regret_distributions(
+        bootstrap_results, 
+        agents,
+        regret_type='traditional_regret'
+    )
+    
+    # Plot relative performance distribution
+    rel_perf_fig = plot_regret_distributions(
+        bootstrap_results, 
+        agents,
+        regret_type='ne_regret'
+    )
+    
+    # Plot dual regret visualization
+    from nash_equilibrium.bootstrap import visualize_dual_regret
+    dual_regret_fig = visualize_dual_regret(bootstrap_results, agents)
+    
+    return regret_fig, trad_regret_fig, rel_perf_fig, dual_regret_fig
+
+def save_nash_plots(figures, save_dir):
+    """
+    Save Nash equilibrium plot figures to files.
+    
+    Args:
+        figures: Dictionary of figure objects
+        save_dir: Directory to save the plots
+    """
+    os.makedirs(save_dir, exist_ok=True)
+    
+    for name, fig in figures.items():
+        filename = f"{name}.png"
+        filepath = os.path.join(save_dir, filename)
+        fig.savefig(filepath, bbox_inches='tight', dpi=300)
+        plt.close(fig)
+
+def print_nash_summary(bootstrap_stats, ne_strategy_df, bootstrap_results):
+    """
+    Print a summary of Nash equilibrium analysis results.
+    
+    Args:
+        bootstrap_stats: DataFrame with bootstrap statistics
+        ne_strategy_df: DataFrame with Nash equilibrium strategy probabilities
+        bootstrap_results: Bootstrap results dictionary
+    """
+    print("\nNash Equilibrium Mixed Strategy (Probability Distribution):")
+    print(ne_strategy_df)
+
+    try:
+        # Try to compute statistics from bootstrap results
+        if isinstance(bootstrap_results['ne_regret'], list) and len(bootstrap_results['ne_regret']) > 0:
+            # Check if we're dealing with raw bootstrap or standard bootstrap
+            if isinstance(bootstrap_results['ne_regret'][0], np.ndarray):
+                # Use pre-computed statistics from bootstrap_stats to avoid numpy errors
+                mean_regrets = bootstrap_stats['Mean NE Regret'].values
+                std_regrets = bootstrap_stats['Std NE Regret'].values
+            else:
+                # We already have computed statistics in bootstrap_stats
+                mean_regrets = bootstrap_stats['Mean NE Regret'].values
+                std_regrets = bootstrap_stats['Std NE Regret'].values
+            
+            print("\nStatistical Summary of Nash Equilibrium Analysis:")
+            print(f"Average NE regret across all agents: {np.mean(mean_regrets):.4f}")
+            print(f"Maximum average regret: {np.max(mean_regrets):.4f}")
+            print(f"Minimum average regret: {np.min(mean_regrets):.4f}")
+            print(f"Standard deviation of average regrets: {np.std(mean_regrets, ddof=1):.4f}")
+        else:
+            print("\nNo valid bootstrap regret data available.")
+            return
+    except Exception as e:
+        print(f"\nError computing bootstrap statistics: {e}")
+        print("Using pre-computed statistics from bootstrap_stats instead.")
+        mean_regrets = bootstrap_stats['Mean NE Regret'].values
+        std_regrets = bootstrap_stats['Std NE Regret'].values
+
+    top_agents = bootstrap_stats.head(5)
+    print("\nTop 5 agents by Nash Equilibrium analysis (lowest regret):")
+    print(top_agents[['Agent', 'Mean NE Regret', 'Std NE Regret']])
+    
+    print("\nTop 5 agents by Traditional Regret (lower is better):")
+    print(bootstrap_stats.sort_values('Mean Traditional Regret').head(5)[['Agent', 'Mean Traditional Regret', 'Std Traditional Regret']])
+
+    print("\nTop 5 agents by Relative Performance (higher is better):")
+    print(bootstrap_stats.sort_values('Mean NE Regret', ascending=False).head(5)[['Agent', 'Mean NE Regret', 'Std NE Regret']])
+
+def calculate_acceptance_ratio(all_results, agents):
+    """
+    Calculate the acceptance ratio matrix for all agents.
+    
+    Args:
+        all_results: List of all game results
+        agents: List of agent names
+        
+    Returns:
+        DataFrame: Acceptance ratio matrix
+    """
+    acceptance_matrix = compute_acceptance_ratio_matrix(all_results, agents)
+    return acceptance_matrix
+
+def run_raw_data_nash_analysis(all_results, num_bootstrap_samples=100, confidence_level=0.95):
+    """
+    Run Nash equilibrium analysis using non-parametric bootstrapping on raw game data.
+    This is the preferred method for direct bootstrapping from individual game outcomes.
+    
+    Args:
+        all_results: List of dictionaries containing raw game results
+        num_bootstrap_samples: Number of bootstrap samples to use
+        confidence_level: Confidence level for bootstrap intervals
+        
+    Returns:
+        tuple: (bootstrap_results, bootstrap_stats, agent_names)
+    """
+    from meta_game_analysis.bootstrap_nonparametric import nonparametric_bootstrap_from_raw_data
+    
+    print(f"Running non-parametric bootstrapping with {num_bootstrap_samples} samples...")
+    bootstrap_results, agent_names = nonparametric_bootstrap_from_raw_data(
+        all_results,
+        num_bootstrap=num_bootstrap_samples,
+        confidence=confidence_level
+    )
+    
+    bootstrap_stats = bootstrap_results['statistics']
+    
+    # Compute Nash equilibrium mixed strategy
+    avg_ne_strategy = np.mean([s for s in bootstrap_results['ne_strategy']], axis=0)
+    ne_strategy_df = pd.DataFrame({
+        'Agent': agent_names,
+        'Nash Probability': avg_ne_strategy
+    }).sort_values(by='Nash Probability', ascending=False)
+    
+    print("\nNash Equilibrium Analysis Complete")
+    print_nash_summary(bootstrap_stats, ne_strategy_df, bootstrap_results)
+    
+    return bootstrap_results, bootstrap_stats, ne_strategy_df, agent_names
+
+def find_pure_nash_equilibria(performance_matrix):
+    """
+    Find all pure Nash equilibria in the performance matrix.
+    
+    Args:
+        performance_matrix: DataFrame with performance data (rows=player 1 strategies, cols=player 2 strategies)
+        
+    Returns:
+        list: List of tuples (row_idx, col_idx) representing pure Nash equilibria
+    """
+    if not isinstance(performance_matrix, pd.DataFrame):
+        raise ValueError("Performance matrix must be a pandas DataFrame")
+    
+    pure_nash = []
+    
+    # Convert to numpy array for faster processing
+    matrix = performance_matrix.to_numpy()
+    agent_names = performance_matrix.index.tolist()
+    
+    # For each cell in the matrix
+    for i in range(matrix.shape[0]):
+        for j in range(matrix.shape[1]):
+            # Skip if any value is NaN
+            if np.isnan(matrix[i, j]) or np.isnan(matrix[j, i]):
+                continue
+                
+            # Check if cell (i,j) is a pure Nash:
+            # 1. Strategy i must be a best response to strategy j for player 1
+            # 2. Strategy j must be a best response to strategy i for player 2
+            
+            # Is i a best response to j for player 1?
+            best_response_to_j = np.nanargmax(matrix[:, j])
+            
+            # Is j a best response to i for player 2?
+            best_response_to_i = np.nanargmax(matrix[i, :])
+            
+            if best_response_to_j == i and best_response_to_i == j:
+                pure_nash.append((agent_names[i], agent_names[j]))
+    
+    return pure_nash
+
+def print_pure_nash_info(performance_matrix):
+    """
+    Check for pure Nash equilibria and print the results.
+    
+    Args:
+        performance_matrix: DataFrame with performance data
+    """
+    pure_nash = find_pure_nash_equilibria(performance_matrix)
+    
+    if pure_nash:
+        print("\nPure Nash Equilibria Found:")
+        for i, (row, col) in enumerate(pure_nash):
+            p1_value = performance_matrix.loc[row, col]
+            p2_value = performance_matrix.loc[col, row]
+            print(f"  {i+1}. ({row}, {col}) with values: ({p1_value:.2f}, {p2_value:.2f})")
+    else:
+        print("\nNo pure Nash equilibria found in the performance matrix.")
+        
+    # Also find strongest diagonal element (self-play)
+    diag_values = []
+    for agent in performance_matrix.index:
+        if agent in performance_matrix.columns:
+            value = performance_matrix.loc[agent, agent]
+            if not np.isnan(value):
+                diag_values.append((agent, value))
+    
+    if diag_values:
+        best_self_play = max(diag_values, key=lambda x: x[1])
+        print(f"\nBest self-play: {best_self_play[0]} with value {best_self_play[1]:.2f}")
+    else:
+        print("\nNo valid self-play values found.")
+
+def replicator_dynamics(payoff_matrix, num_iterations=1000, convergence_threshold=1e-8, verbose=False, initial_strategy=None):
+    """
+    Find Nash equilibrium using replicator dynamics.
+    
+    Args:
+        payoff_matrix: 2D numpy array representing payoff matrix
+        num_iterations: Maximum number of iterations
+        convergence_threshold: Convergence threshold for stopping condition
+        verbose: Whether to print progress
+        initial_strategy: Optional initial strategy (if None, use uniform)
+        
+    Returns:
+        tuple: (nash_strategy, is_converged, iterations)
+    """
+    n = payoff_matrix.shape[0]
+    
+    # Initialize strategy with uniform distribution if not provided
+    if initial_strategy is None:
+        strategy = np.ones(n) / n
+    else:
+        strategy = initial_strategy.copy()
+        strategy = strategy / np.sum(strategy)  # Normalize
+    
+    is_converged = False
+    iterations = 0
+    
+    for i in range(num_iterations):
+        iterations = i + 1
+        
+        # Calculate expected payoffs for each strategy
+        expected_payoffs = np.dot(payoff_matrix, strategy)
+        
+        # Calculate average payoff
+        average_payoff = np.dot(strategy, expected_payoffs)
+        
+        # Update strategy using replicator dynamics equation
+        new_strategy = strategy * expected_payoffs / average_payoff
+        
+        # Normalize to ensure valid probability distribution
+        new_strategy = new_strategy / np.sum(new_strategy)
+        
+        # Check convergence
+        strategy_change = np.max(np.abs(new_strategy - strategy))
+        if strategy_change < convergence_threshold:
+            is_converged = True
+            if verbose:
+                print(f"Converged after {iterations} iterations")
+            break
+        
+        strategy = new_strategy
+    
+    if not is_converged and verbose:
+        print(f"Did not converge after {iterations} iterations")
+    
+    return strategy, is_converged, iterations
+
+def find_nash_with_replicator_dynamics(performance_matrix, num_restarts=10, num_iterations=2000, 
+                                      convergence_threshold=1e-8, verbose=False, return_all=False):
+    """
+    Find Nash equilibrium using replicator dynamics with multiple random restarts.
+    
+    Args:
+        performance_matrix: DataFrame or 2D numpy array representing payoff matrix
+        num_restarts: Number of random initializations to try
+        num_iterations: Maximum number of iterations for each run
+        convergence_threshold: Convergence threshold for stopping condition
+        verbose: Whether to print progress
+        return_all: Whether to return all found equilibria or just the best one
+        
+    Returns:
+        tuple: (best_nash_strategy, all_strategies, all_convergence_info)
+    """
+    # Convert DataFrame to numpy array if needed
+    if isinstance(performance_matrix, pd.DataFrame):
+        agent_names = performance_matrix.index.tolist()
+        payoff_matrix = performance_matrix.to_numpy()
+    else:
+        payoff_matrix = performance_matrix
+        agent_names = [f"Strategy {i}" for i in range(payoff_matrix.shape[0])]
+    
+    n = payoff_matrix.shape[0]
+    
+    # Fill NaN values with column means
+    for j in range(n):
+        col_mean = np.nanmean(payoff_matrix[:, j])
+        for i in range(n):
+            if np.isnan(payoff_matrix[i, j]):
+                payoff_matrix[i, j] = col_mean if not np.isnan(col_mean) else 0
+    
+    # Start with uniform distribution
+    uniform_strategy = np.ones(n) / n
+    best_strategy, best_converged, best_iter = replicator_dynamics(
+        payoff_matrix, num_iterations, convergence_threshold, verbose, uniform_strategy
+    )
+    
+    # Record all results
+    all_strategies = [best_strategy]
+    all_convergence = [(best_converged, best_iter)]
+    
+    if verbose:
+        expected_payoffs = np.dot(payoff_matrix, best_strategy)
+        average_payoff = np.dot(best_strategy, expected_payoffs)
+        print(f"Initial uniform run - Avg payoff: {average_payoff:.4f}, Converged: {best_converged}")
+    
+    # Run with random restarts
+    for i in range(num_restarts):
+        # Initialize with random strategy (Dirichlet distribution)
+        random_strategy = np.random.dirichlet(np.ones(n))
+        
+        strategy, converged, iterations = replicator_dynamics(
+            payoff_matrix, num_iterations, convergence_threshold, verbose, random_strategy
+        )
+        
+        all_strategies.append(strategy)
+        all_convergence.append((converged, iterations))
+        
+        # Calculate expected payoff for current strategy
+        expected_payoffs = np.dot(payoff_matrix, strategy)
+        average_payoff = np.dot(strategy, expected_payoffs)
+        
+        # Calculate expected payoff for best strategy so far
+        best_expected_payoffs = np.dot(payoff_matrix, best_strategy)
+        best_average_payoff = np.dot(best_strategy, best_expected_payoffs)
+        
+        if verbose:
+            print(f"Restart {i+1}/{num_restarts} - Avg payoff: {average_payoff:.4f}, Converged: {converged}")
+        
+        # Update best strategy if this one has higher average payoff
+        if average_payoff > best_average_payoff:
+            best_strategy = strategy
+            best_converged = converged
+            best_iter = iterations
+    
+    # Create a DataFrame with all strategies if return_all is True
+    if return_all:
+        all_strategies_df = pd.DataFrame(all_strategies, columns=agent_names)
+        all_strategies_df['Converged'] = [conv for conv, _ in all_convergence]
+        all_strategies_df['Iterations'] = [iters for _, iters in all_convergence]
+        
+        # Calculate expected payoff for each strategy
+        payoffs = []
+        for strat in all_strategies:
+            expected_payoffs = np.dot(payoff_matrix, strat)
+            average_payoff = np.dot(strat, expected_payoffs)
+            payoffs.append(average_payoff)
+        
+        all_strategies_df['Average Payoff'] = payoffs
+        all_strategies_df = all_strategies_df.sort_values('Average Payoff', ascending=False)
+        
+        return best_strategy, all_strategies_df
+    
+    # Just return the best strategy
+    best_nash_df = pd.DataFrame({
+        'Agent': agent_names,
+        'Nash Probability': best_strategy
+    }).sort_values(by='Nash Probability', ascending=False)
+    
+    return best_nash_df 
+
+def calculate_regrets_against_replicator_nash(performance_matrix, rd_nash_strategy):
+    """
+    Calculate regrets against the replicator dynamics Nash equilibrium.
+    
+    Args:
+        performance_matrix: DataFrame with performance data
+        rd_nash_strategy: DataFrame with Nash probabilities from replicator dynamics
+        
+    Returns:
+        DataFrame with regret statistics
+    """
+    # Convert performance matrix to numpy array
+    if isinstance(performance_matrix, pd.DataFrame):
+        agent_names = performance_matrix.index.tolist()
+        payoff_matrix = performance_matrix.to_numpy()
+    else:
+        raise ValueError("Performance matrix must be a pandas DataFrame")
+    
+    # Extract Nash strategy as a vector
+    nash_strategy = np.zeros(len(agent_names))
+    for i, agent in enumerate(agent_names):
+        idx = rd_nash_strategy[rd_nash_strategy['Agent'] == agent].index
+        if len(idx) > 0:
+            nash_strategy[i] = rd_nash_strategy.loc[idx[0], 'Nash Probability']
+    
+    # Handle NaN values in the payoff matrix
+    for i in range(payoff_matrix.shape[0]):
+        for j in range(payoff_matrix.shape[1]):
+            if np.isnan(payoff_matrix[i, j]):
+                col_mean = np.nanmean(payoff_matrix[:, j])
+                payoff_matrix[i, j] = col_mean if not np.isnan(col_mean) else 0
+    
+    # Check if we have a pure Nash equilibrium (just for debugging info)
+    is_pure_nash = np.max(nash_strategy) > 0.99
+    if is_pure_nash:
+        pure_nash_idx = np.argmax(nash_strategy)
+        pure_nash_agent = agent_names[pure_nash_idx]
+        print(f"\nDetected pure Nash equilibrium: {pure_nash_agent}")
+    
+    # Calculate expected utilities against the Nash mixture
+    expected_utils = np.dot(payoff_matrix, nash_strategy)
+    
+    # Calculate expected utilities of Nash mixture against each agent
+    nash_vs_agents = np.zeros(len(agent_names))
+    for i in range(len(agent_names)):
+        # Calculate how the Nash mixture performs against agent i
+        nash_vs_agents[i] = np.dot(nash_strategy, payoff_matrix[:, i])
+    
+    # Calculate regrets as expected utils against Nash minus Nash's expected utils against agent
+    relative_regrets = expected_utils - nash_vs_agents
+    
+    # Calculate Nash equilibrium value (expected utility of Nash mixture against itself)
+    nash_value = nash_strategy.reshape((1, -1)) @ payoff_matrix @ nash_strategy.reshape((-1, 1))
+    nash_value = nash_value.item()  # Convert to scalar
+    print(f"Nash equilibrium value: {nash_value:.2f}")
+    
+    # Debug print for each agent
+    for i, agent in enumerate(agent_names):
+        print(f"Agent {agent}: Payoff vs Nash = {expected_utils[i]:.2f}, Nash vs Agent = {nash_vs_agents[i]:.2f}, Regret = {relative_regrets[i]:.2f}")
+    
+    # Calculate max possible utility for each agent
+    max_utils = np.max(payoff_matrix, axis=1)
+    
+    # Calculate average utility for each agent
+    avg_utils = np.mean(payoff_matrix, axis=1)
+    
+    # Calculate traditional regrets (max utility minus average utility)
+    traditional_regrets = max_utils - avg_utils
+    
+    # Create DataFrame with results
+    results = pd.DataFrame({
+        'Agent': agent_names,
+        'RD Nash Regret': relative_regrets,
+        'RD Traditional Regret': traditional_regrets,
+        'RD Expected Utility': expected_utils,
+        'RD Max Utility': max_utils,
+        'RD Nash Value': nash_value
+    })
+    
+    return results, nash_value
+
+def generate_all_nash_stats(performance_matrix, bootstrap_stats, ne_strategy_df, rd_nash_df):
+    """
+    Generate comprehensive statistics for both Nash equilibrium approaches.
+    
+    Args:
+        performance_matrix: DataFrame with performance data
+        bootstrap_stats: DataFrame with bootstrap statistics
+        ne_strategy_df: DataFrame with Nash probabilities from max entropy Nash
+        rd_nash_df: DataFrame with Nash probabilities from replicator dynamics
+        
+    Returns:
+        tuple: (comparison_df, rd_regret_df)
+    """
+    # Calculate regrets against replicator dynamics Nash
+    rd_regret_df, rd_nash_value = calculate_regrets_against_replicator_nash(performance_matrix, rd_nash_df)
+    
+    # Create a comparison DataFrame
+    comparison = []
+    for agent in performance_matrix.index:
+        # Find agent in bootstrap stats
+        bs_row = bootstrap_stats[bootstrap_stats['Agent'] == agent]
+        me_regret = bs_row['Mean NE Regret'].values[0] if len(bs_row) > 0 else np.nan
+        me_trad_regret = bs_row['Mean Traditional Regret'].values[0] if len(bs_row) > 0 else np.nan
+        
+        # Find agent in RD regret DataFrame
+        rd_row = rd_regret_df[rd_regret_df['Agent'] == agent]
+        rd_regret = rd_row['RD Nash Regret'].values[0] if len(rd_row) > 0 else np.nan
+        rd_trad_regret = rd_row['RD Traditional Regret'].values[0] if len(rd_row) > 0 else np.nan
+        
+        # Find Nash probabilities
+        me_prob_row = ne_strategy_df[ne_strategy_df['Agent'] == agent]
+        me_prob = me_prob_row['Nash Probability'].values[0] if len(me_prob_row) > 0 else 0
+        
+        rd_prob_row = rd_nash_df[rd_nash_df['Agent'] == agent]
+        rd_prob = rd_prob_row['Nash Probability'].values[0] if len(rd_prob_row) > 0 else 0
+        
+        comparison.append({
+            'Agent': agent,
+            'ME Nash Probability': me_prob,
+            'RD Nash Probability': rd_prob,
+            'ME Nash Regret': me_regret,
+            'RD Nash Regret': rd_regret,
+            'ME Traditional Regret': me_trad_regret,
+            'RD Traditional Regret': rd_trad_regret
+        })
+    
+    comparison_df = pd.DataFrame(comparison)
+    
+    return comparison_df, rd_regret_df, rd_nash_value
+
+def print_rd_nash_summary(rd_regret_df, rd_nash_df, rd_nash_value):
+    """
+    Print a summary of replicator dynamics Nash equilibrium results.
+    
+    Args:
+        rd_regret_df: DataFrame with regret statistics against RD Nash
+        rd_nash_df: DataFrame with Nash probabilities from replicator dynamics
+        rd_nash_value: Nash equilibrium value from replicator dynamics
+    """
+    print("\nReplicator Dynamics Nash Equilibrium Summary:")
+    print(f"Nash equilibrium value: {rd_nash_value:.4f}")
+    
+    # Sort by Nash regret
+    rd_top_agents = rd_regret_df.sort_values('RD Nash Regret', ascending=False).head(5)
+    
+    print("\nTop 5 agents by RD Nash Regret (higher is better):")
+    print(rd_top_agents[['Agent', 'RD Nash Regret']])
+    
+    print("\nTop 5 agents by RD Traditional Regret (lower is better):")
+    print(rd_regret_df.sort_values('RD Traditional Regret').head(5)[['Agent', 'RD Traditional Regret']])
+
+def print_nash_comparison(comparison_df):
+    """
+    Print a comparison of the two Nash equilibrium concepts.
+    
+    Args:
+        comparison_df: DataFrame with comparison of both Nash approaches
+    """
+    print("\nNash Equilibrium Comparison:")
+    
+    # Print agents in order of Max Entropy Nash probability
+    me_ordered = comparison_df.sort_values('ME Nash Probability', ascending=False)
+    print("\nAgents by Max Entropy Nash probability:")
+    for i, row in me_ordered.iterrows():
+        print(f"{row['Agent']}: {row['ME Nash Probability']:.4f}")
+    
+    # Print agents in order of Replicator Dynamics Nash probability
+    rd_ordered = comparison_df.sort_values('RD Nash Probability', ascending=False)
+    print("\nAgents by Replicator Dynamics Nash probability:")
+    for i, row in rd_ordered.iterrows():
+        print(f"{row['Agent']}: {row['RD Nash Probability']:.4f}")
+    
+    # Calculate discrepancy between the two Nash concepts
+    comparison_df['Probability Difference'] = np.abs(comparison_df['ME Nash Probability'] - comparison_df['RD Nash Probability'])
+    comparison_df['Regret Difference'] = np.abs(comparison_df['ME Nash Regret'] - comparison_df['RD Nash Regret'])
+    
+    print("\nAgents with largest discrepancy between Nash concepts:")
+    top_diff = comparison_df.sort_values('Probability Difference', ascending=False).head(3)
+    for i, row in top_diff.iterrows():
+        print(f"{row['Agent']}: ME prob={row['ME Nash Probability']:.4f}, RD prob={row['RD Nash Probability']:.4f}")
+    
+    # Correlation between the two concepts
+    me_probs = comparison_df['ME Nash Probability'].values
+    rd_probs = comparison_df['RD Nash Probability'].values
+    try:
+        from scipy.stats import pearsonr
+        corr, p = pearsonr(me_probs, rd_probs)
+        print(f"\nCorrelation between ME and RD Nash probabilities: {corr:.4f} (p={p:.4f})")
+    except:
+        print("\nCould not calculate correlation (scipy.stats not available)")
+    
+    print("\nCorrelation between ME and RD Nash regrets:")
+    me_regrets = comparison_df['ME Nash Regret'].values
+    rd_regrets = comparison_df['RD Nash Regret'].values
+    try:
+        corr, p = pearsonr(me_regrets, rd_regrets)
+        print(f"Correlation: {corr:.4f} (p={p:.4f})")
+    except:
+        print("Could not calculate correlation (scipy.stats not available)") 
