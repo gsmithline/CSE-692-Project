@@ -347,4 +347,229 @@ def save_results_to_csv(matrices, bootstrap_stats, ne_strategy_df, save_dir):
     bootstrap_stats.to_csv(os.path.join(save_dir, 'bootstrap_statistics.csv'))
     
     # Save Nash equilibrium strategy
-    ne_strategy_df.to_csv(os.path.join(save_dir, 'nash_equilibrium_strategy.csv'), index=False) 
+    ne_strategy_df.to_csv(os.path.join(save_dir, 'nash_equilibrium_strategy.csv'), index=False)
+
+def create_matrix_heatmap_with_rd_regret(performance_matrix, rd_regret_df, regret_type, title="Performance Matrix with RD Nash Regret", 
+                                      cmap="coolwarm", figsize=(16, 12)):
+    """
+    Create a heatmap visualization of a performance matrix with Replicator Dynamics Nash regret values.
+    
+    Parameters:
+    - performance_matrix: pandas DataFrame containing the performance data
+    - rd_regret_df: DataFrame containing regret values calculated against RD Nash
+    - regret_type: 'RD Nash Regret' or 'RD Traditional Regret'
+    - title: title for the plot
+    - cmap: colormap to use
+    - figsize: figure size (width, height)
+    
+    Returns:
+    - fig: the matplotlib figure
+    """
+    # Convert performance matrix to numeric values
+    numeric_matrix = performance_matrix.copy()
+    
+    # Convert all values to numeric, coercing errors to NaN
+    for col in numeric_matrix.columns:
+        numeric_matrix[col] = pd.to_numeric(numeric_matrix[col], errors='coerce')
+    
+    # Create mask for NaN values
+    mask = np.isnan(numeric_matrix)
+    
+    # Create a figure with grid layout
+    fig = plt.figure(figsize=figsize)
+    gs = plt.GridSpec(1, 5, figure=fig, width_ratios=[4, 1, 0.2, 0.2, 0.2])
+    
+    # Main heatmap
+    ax_heatmap = fig.add_subplot(gs[0, 0])
+    
+    # Nash regret subplot
+    ax_regret = fig.add_subplot(gs[0, 1])
+    
+    # Draw the main heatmap
+    sns.heatmap(numeric_matrix, ax=ax_heatmap, cmap=cmap, annot=True, fmt=".2f",
+                cbar=False, linewidths=0.5, mask=mask)
+    
+    ax_heatmap.set_title(title, fontsize=16, fontweight='bold')
+    ax_heatmap.set_xticklabels(ax_heatmap.get_xticklabels(), rotation=45, ha='right', fontweight='bold')
+    ax_heatmap.set_yticklabels(ax_heatmap.get_yticklabels(), fontweight='bold')
+    
+    # Create a Series of regrets aligned with performance matrix index
+    regrets = pd.Series(index=numeric_matrix.index)
+    
+    # Extract regret values from rd_regret_df
+    for agent in numeric_matrix.index:
+        idx = rd_regret_df[rd_regret_df['Agent'] == agent].index
+        if len(idx) > 0:
+            regrets[agent] = rd_regret_df.loc[idx[0], regret_type]
+        else:
+            regrets[agent] = np.nan
+    
+    # Drop NaN values but maintain original order from performance matrix
+    regrets = regrets.dropna()
+    
+    if len(regrets) > 0:
+        # Get colors based on regret values (for Nash regret, higher is better - use direct colormap)
+        # For traditional regret, lower is better - use reversed colormap
+        if regret_type == 'RD Nash Regret':
+            norm = plt.Normalize(regrets.min(), regrets.max())
+            colors = plt.cm.viridis(norm(regrets.values))
+        else:  # Traditional regret
+            norm = plt.Normalize(regrets.min(), regrets.max())
+            colors = plt.cm.viridis_r(norm(regrets.values))
+        
+        # Plot bars in the same order as the heatmap rows
+        for i, (agent, value) in enumerate(regrets.items()):
+            y_pos = list(numeric_matrix.index).index(agent)
+            ax_regret.barh(y_pos, value, color=colors[i], height=0.8)
+            ax_regret.text(value + (regrets.max() * 0.02), y_pos, f"{value:.2f}", 
+                          va='center', fontsize=9)
+        
+        # Set y-tick labels to agent names (same as heatmap)
+        ax_regret.set_yticks(range(len(numeric_matrix.index)))
+        ax_regret.set_yticklabels([])  # No need for labels, they're already on the heatmap
+        
+        # Set labels
+        ax_regret.set_xlabel(regret_type, fontweight='bold')
+        ax_regret.set_title(regret_type, fontweight='bold')
+        
+        # Set y-axis limits to match heatmap
+        ax_regret.set_ylim(ax_heatmap.get_ylim())
+        
+        # Remove unnecessary spines
+        ax_regret.spines['top'].set_visible(False)
+        ax_regret.spines['right'].set_visible(False)
+        ax_regret.spines['left'].set_visible(False)
+    else:
+        ax_regret.text(0.5, 0.5, "No valid regret data", 
+                      ha='center', va='center', fontsize=12)
+        ax_regret.axis('off')
+    
+    plt.tight_layout()
+    return fig
+
+def visualize_rd_regret_heatmaps(performance_matrix, rd_regret_df, save_dir=None):
+    """
+    Create heatmap visualizations with RD Nash regret and traditional regret marginals.
+    
+    Args:
+        performance_matrix: Performance matrix DataFrame
+        rd_regret_df: DataFrame with regret values calculated against RD Nash
+        save_dir: Directory to save the plots
+        
+    Returns:
+        dict: Dictionary of figure objects
+    """
+    figures = {}
+    
+    # Create output directory if needed
+    if save_dir:
+        os.makedirs(save_dir, exist_ok=True)
+    
+    # Create heatmap with RD Nash regret marginal
+    fig_nash = create_matrix_heatmap_with_rd_regret(
+        performance_matrix,
+        rd_regret_df,
+        regret_type='RD Nash Regret',
+        title="Performance Matrix with RD Nash Regret"
+    )
+    figures['performance_with_rd_nash_regret'] = fig_nash
+    
+    if save_dir:
+        filepath = os.path.join(save_dir, 'performance_with_rd_nash_regret.png')
+        fig_nash.savefig(filepath, bbox_inches='tight', dpi=300)
+        plt.close(fig_nash)
+    
+    # Create heatmap with traditional regret marginal
+    fig_trad = create_matrix_heatmap_with_rd_regret(
+        performance_matrix,
+        rd_regret_df,
+        regret_type='RD Traditional Regret',
+        title="Performance Matrix with RD Traditional Regret"
+    )
+    figures['performance_with_rd_traditional_regret'] = fig_trad
+    
+    if save_dir:
+        filepath = os.path.join(save_dir, 'performance_with_rd_traditional_regret.png')
+        fig_trad.savefig(filepath, bbox_inches='tight', dpi=300)
+        plt.close(fig_trad)
+    
+    return figures
+
+def visualize_nash_comparison(comparison_df, save_dir=None):
+    """
+    Create visualizations comparing the two Nash equilibrium concepts.
+    
+    Args:
+        comparison_df: DataFrame with comparison of both Nash approaches
+        save_dir: Directory to save the plots
+        
+    Returns:
+        dict: Dictionary of figure objects
+    """
+    figures = {}
+    
+    # Create output directory if needed
+    if save_dir:
+        os.makedirs(save_dir, exist_ok=True)
+    
+    # Bar chart comparing Nash probabilities
+    fig, ax = plt.subplots(figsize=(12, 8))
+    
+    # Sort by Max Entropy Nash probability
+    ordered_df = comparison_df.sort_values('ME Nash Probability', ascending=False)
+    agents = ordered_df['Agent']
+    
+    x = np.arange(len(agents))
+    width = 0.35
+    
+    ax.bar(x - width/2, ordered_df['ME Nash Probability'], width, label='Max Entropy Nash')
+    ax.bar(x + width/2, ordered_df['RD Nash Probability'], width, label='Replicator Dynamics Nash')
+    
+    ax.set_ylabel('Nash Probability')
+    ax.set_title('Comparison of Nash Equilibrium Probabilities')
+    ax.set_xticks(x)
+    ax.set_xticklabels(agents, rotation=45, ha='right')
+    ax.legend()
+    
+    plt.tight_layout()
+    
+    figures['nash_probability_comparison'] = fig
+    
+    if save_dir:
+        filepath = os.path.join(save_dir, 'nash_probability_comparison.png')
+        fig.savefig(filepath, bbox_inches='tight', dpi=300)
+        plt.close(fig)
+    
+    # Scatter plot of ME vs RD Nash Regret
+    fig, ax = plt.subplots(figsize=(10, 10))
+    
+    ax.scatter(comparison_df['ME Nash Regret'], comparison_df['RD Nash Regret'], s=80, alpha=0.7)
+    
+    # Add agent labels
+    for i, row in comparison_df.iterrows():
+        ax.annotate(row['Agent'], 
+                   (row['ME Nash Regret'], row['RD Nash Regret']),
+                   fontsize=9,
+                   xytext=(5, 5),
+                   textcoords='offset points')
+    
+    # Add diagonal line
+    min_val = min(comparison_df['ME Nash Regret'].min(), comparison_df['RD Nash Regret'].min())
+    max_val = max(comparison_df['ME Nash Regret'].max(), comparison_df['RD Nash Regret'].max())
+    ax.plot([min_val, max_val], [min_val, max_val], 'k--', alpha=0.3)
+    
+    ax.set_xlabel('Max Entropy Nash Regret')
+    ax.set_ylabel('Replicator Dynamics Nash Regret')
+    ax.set_title('Comparison of Nash Regret Metrics')
+    ax.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    
+    figures['nash_regret_comparison'] = fig
+    
+    if save_dir:
+        filepath = os.path.join(save_dir, 'nash_regret_comparison.png')
+        fig.savefig(filepath, bbox_inches='tight', dpi=300)
+        plt.close(fig)
+    
+    return figures 

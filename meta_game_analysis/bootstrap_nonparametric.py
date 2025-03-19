@@ -230,22 +230,52 @@ def analyze_bootstrap_results(bootstrap_results, agent_names, confidence=0.95):
         
         # Calculate statistics if we have samples
         if agent_ne_regrets:
-            mean_regrets[agent_idx] = np.mean(agent_ne_regrets)
-            std_regrets[agent_idx] = np.std(agent_ne_regrets)
-            lower_regrets[agent_idx] = np.percentile(agent_ne_regrets, lower_percentile)
-            upper_regrets[agent_idx] = np.percentile(agent_ne_regrets, upper_percentile)
+            # Convert to regular Python list of floats to avoid numpy type issues
+            agent_ne_regrets = [float(x) for x in agent_ne_regrets]
+            mean_regrets[agent_idx] = sum(agent_ne_regrets) / len(agent_ne_regrets)
+            # Manual std calculation to avoid numpy issues
+            if len(agent_ne_regrets) > 1:
+                variance = sum((x - mean_regrets[agent_idx])**2 for x in agent_ne_regrets) / (len(agent_ne_regrets) - 1)
+                std_regrets[agent_idx] = variance**0.5
+            else:
+                std_regrets[agent_idx] = 0.0
+            
+            # Use numpy for percentiles only
+            agent_ne_regrets_array = np.array(agent_ne_regrets)
+            lower_regrets[agent_idx] = np.percentile(agent_ne_regrets_array, lower_percentile)
+            upper_regrets[agent_idx] = np.percentile(agent_ne_regrets_array, upper_percentile)
         
         if agent_trad_regrets:
-            mean_trad_regrets[agent_idx] = np.mean(agent_trad_regrets)
-            std_trad_regrets[agent_idx] = np.std(agent_trad_regrets)
-            lower_trad_regrets[agent_idx] = np.percentile(agent_trad_regrets, lower_percentile)
-            upper_trad_regrets[agent_idx] = np.percentile(agent_trad_regrets, upper_percentile)
+            # Convert to regular Python list of floats
+            agent_trad_regrets = [float(x) for x in agent_trad_regrets]
+            mean_trad_regrets[agent_idx] = sum(agent_trad_regrets) / len(agent_trad_regrets)
+            # Manual std calculation
+            if len(agent_trad_regrets) > 1:
+                variance = sum((x - mean_trad_regrets[agent_idx])**2 for x in agent_trad_regrets) / (len(agent_trad_regrets) - 1)
+                std_trad_regrets[agent_idx] = variance**0.5
+            else:
+                std_trad_regrets[agent_idx] = 0.0
+                
+            # Use numpy for percentiles
+            agent_trad_regrets_array = np.array(agent_trad_regrets)
+            lower_trad_regrets[agent_idx] = np.percentile(agent_trad_regrets_array, lower_percentile)
+            upper_trad_regrets[agent_idx] = np.percentile(agent_trad_regrets_array, upper_percentile)
         
         if agent_expected_utils:
-            mean_expected_utils[agent_idx] = np.mean(agent_expected_utils)
-            std_expected_utils[agent_idx] = np.std(agent_expected_utils)
-            lower_utils[agent_idx] = np.percentile(agent_expected_utils, lower_percentile)
-            upper_utils[agent_idx] = np.percentile(agent_expected_utils, upper_percentile)
+            # Convert to regular Python list of floats
+            agent_expected_utils = [float(x) for x in agent_expected_utils]
+            mean_expected_utils[agent_idx] = sum(agent_expected_utils) / len(agent_expected_utils)
+            # Manual std calculation
+            if len(agent_expected_utils) > 1:
+                variance = sum((x - mean_expected_utils[agent_idx])**2 for x in agent_expected_utils) / (len(agent_expected_utils) - 1)
+                std_expected_utils[agent_idx] = variance**0.5
+            else:
+                std_expected_utils[agent_idx] = 0.0
+                
+            # Use numpy for percentiles
+            agent_expected_utils_array = np.array(agent_expected_utils)
+            lower_utils[agent_idx] = np.percentile(agent_expected_utils_array, lower_percentile)
+            upper_utils[agent_idx] = np.percentile(agent_expected_utils_array, upper_percentile)
     
     # Create a DataFrame with results
     results = pd.DataFrame({

@@ -26,10 +26,9 @@ from meta_game_analysis.visualization import (
     create_complete_best_response_graph,
     visualize_welfare_matrices,
     visualize_nash_equilibrium,
+    visualize_rd_regret_heatmaps,
+    visualize_nash_comparison,
     save_results_to_csv
-)
-from meta_game_analysis.nash_regret_viz import (
-    visualize_regret_heatmaps
 )
 from meta_game_analysis.nash_analysis import (
     run_nash_analysis,
@@ -37,7 +36,12 @@ from meta_game_analysis.nash_analysis import (
     plot_nash_distributions,
     save_nash_plots,
     print_nash_summary,
-    calculate_acceptance_ratio
+    calculate_acceptance_ratio,
+    print_pure_nash_info,
+    find_nash_with_replicator_dynamics,
+    generate_all_nash_stats,
+    print_rd_nash_summary,
+    print_nash_comparison
 )
 
 def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_analysis/results", 
@@ -73,7 +77,7 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
     print("\nStep 2: Computing global maximum values...")
     global_max_nash_welfare, global_standard_max = compute_global_max_values(num_samples=10000)
     print(f"Global max Nash welfare: {global_max_nash_welfare:.2f}")
-    print(f"Global standard max: {global_standard_max:.2f}")
+    print(f"Global max social welfare: {global_standard_max:.2f}")
     
     # Step 3: Create performance matrices
     print("\nStep 3: Creating performance matrices...")
@@ -109,9 +113,24 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
     print("\nStep 7: Running Nash equilibrium analysis...")
     performance_matrix = filtered_matrices['performance_matrix']
     
+    # Check for pure Nash equilibria
+    print("\nChecking for pure Nash equilibria in the performance matrix:")
+    print_pure_nash_info(performance_matrix)
+    
+    # Calculate Nash equilibrium using replicator dynamics
+    print("\nFinding Nash equilibrium using replicator dynamics with multiple restarts:")
+    rd_nash_df = find_nash_with_replicator_dynamics(
+        performance_matrix, 
+        num_restarts=10,
+        num_iterations=2000,
+        verbose=True
+    )
+    print("\nNash Equilibrium from Replicator Dynamics:")
+    print(rd_nash_df)
+    
     if use_raw_bootstrap:
         # Use non-parametric bootstrapping with raw game data
-        print("Using non-parametric bootstrapping with raw game data...")
+        print("\nUsing non-parametric bootstrapping with raw game data...")
         bootstrap_results, bootstrap_stats, ne_strategy_df, agent_names = run_raw_data_nash_analysis(
             all_results,
             num_bootstrap_samples=num_bootstrap,
@@ -119,11 +138,28 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
         )
     else:
         # Use traditional bootstrapping with the performance matrix
+        print("\nUsing traditional bootstrapping with performance matrix...")
         bootstrap_results, bootstrap_stats, acceptance_matrix, ne_strategy_df = run_nash_analysis(
             performance_matrix,
             num_bootstrap_samples=num_bootstrap,
             confidence_level=confidence
         )
+    
+    print("\nMax Entropy Nash Equilibrium from bootstrapping:")
+    print(ne_strategy_df)
+    
+    # Generate comprehensive Nash equilibrium statistics
+    print("\nGenerating comprehensive Nash equilibrium statistics...")
+    comparison_df, rd_regret_df, rd_nash_value = generate_all_nash_stats(
+        performance_matrix, 
+        bootstrap_stats, 
+        ne_strategy_df, 
+        rd_nash_df
+    )
+    
+    # Print statistics for both Nash concepts
+    print_rd_nash_summary(rd_regret_df, rd_nash_df, rd_nash_value)
+    print_nash_comparison(comparison_df)
     
     # Calculate acceptance ratio if needed
     if 'acceptance_matrix' not in filtered_matrices and len(all_results) > 0:
@@ -150,20 +186,36 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
         save_dir=os.path.join(output_dir, 'graphs')
     )
     
-    # Visualize Nash equilibrium results
-    print("Creating Nash equilibrium visualizations...")
+    # Visualize Nash equilibrium results for Max Entropy Nash
+    print("Creating Max Entropy Nash equilibrium visualizations...")
+    max_entropy_nash_dir = os.path.join(output_dir, 'max_entropy_nash')
+    os.makedirs(max_entropy_nash_dir, exist_ok=True)
+    
     nash_figures = visualize_nash_equilibrium(
         bootstrap_stats, 
         ne_strategy_df, 
-        save_dir=os.path.join(output_dir, 'nash')
+        save_dir=max_entropy_nash_dir
     )
     
-    # Create Nash regret visualizations
-    print("Creating Nash regret visualizations...")
-    regret_figures = visualize_regret_heatmaps(
+    # Create Nash regret visualizations for RD Nash
+    print("Creating Replicator Dynamics Nash equilibrium visualizations...")
+    rd_nash_dir = os.path.join(output_dir, 'rd_nash')
+    os.makedirs(rd_nash_dir, exist_ok=True)
+    
+    rd_regret_figures = visualize_rd_regret_heatmaps(
         performance_matrix,
-        bootstrap_stats,
-        save_dir=os.path.join(output_dir, 'nash')
+        rd_regret_df,
+        save_dir=rd_nash_dir
+    )
+    
+    # Create Nash comparison visualizations
+    print("Creating Nash comparison visualizations...")
+    comparison_dir = os.path.join(output_dir, 'nash_comparison')
+    os.makedirs(comparison_dir, exist_ok=True)
+    
+    comparison_figures = visualize_nash_comparison(
+        comparison_df,
+        save_dir=comparison_dir
     )
     
     # Plot Nash distributions
@@ -181,16 +233,24 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
         'relative_performance_distribution': rel_perf_fig,
         'dual_regret': dual_regret_fig
     }
-    save_nash_plots(nash_plot_figures, os.path.join(output_dir, 'nash'))
+    save_nash_plots(nash_plot_figures, max_entropy_nash_dir)
     
     # Step 9: Save results to CSV files
     print("\nStep 9: Saving results to CSV files...")
+    # Save regular matrices
     save_results_to_csv(
         filtered_matrices, 
         bootstrap_stats, 
         ne_strategy_df, 
         os.path.join(output_dir, 'csv')
     )
+    
+    # Save RD Nash results and comparison
+    csv_dir = os.path.join(output_dir, 'csv')
+    os.makedirs(csv_dir, exist_ok=True)
+    
+    rd_regret_df.to_csv(os.path.join(csv_dir, 'rd_nash_regret.csv'), index=False)
+    comparison_df.to_csv(os.path.join(csv_dir, 'nash_comparison.csv'), index=False)
     
     # Step 10: Print summary statistics
     print("\nStep 10: Summary of results:")
