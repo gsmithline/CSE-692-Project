@@ -128,6 +128,37 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
     print("\nNash Equilibrium from Replicator Dynamics:")
     print(rd_nash_df)
     
+    # Calculate and print Max Entropy Nash Equilibrium for the plain performance matrix
+    print("\nCalculating Max Entropy Nash Equilibrium for the plain performance matrix...")
+    from nash_equilibrium.nash_solver import milp_max_sym_ent_2p
+    
+    # Convert performance matrix to numpy array
+    performance_matrix_np = performance_matrix.to_numpy()
+    
+    # Handle missing values
+    for i in range(performance_matrix_np.shape[0]):
+        for j in range(performance_matrix_np.shape[1]):
+            if np.isnan(performance_matrix_np[i, j]):
+                col_mean = np.nanmean(performance_matrix_np[:, j])
+                if not np.isnan(col_mean):
+                    performance_matrix_np[i, j] = col_mean
+                else:
+                    row_mean = np.nanmean(performance_matrix_np[i, :])
+                    performance_matrix_np[i, j] = row_mean if not np.isnan(row_mean) else 0
+    
+    # Calculate ME Nash equilibrium
+    me_nash_strategy = milp_max_sym_ent_2p(performance_matrix_np)
+    
+    # Create DataFrame for display
+    agents = performance_matrix.index.tolist()
+    me_strategy_df = pd.DataFrame({
+        'Agent': agents,
+        'Nash Probability': me_nash_strategy
+    }).sort_values(by='Nash Probability', ascending=False)
+    
+    print("\nMax Entropy Nash Equilibrium for plain performance matrix:")
+    print(me_strategy_df)
+    
     if use_raw_bootstrap:
         # Use non-parametric bootstrapping with raw game data
         print("\nUsing non-parametric bootstrapping with raw game data...")
@@ -221,19 +252,35 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
     # Plot Nash distributions
     print("Creating Nash distribution plots...")
     agents_list = performance_matrix.index.tolist()
-    regret_fig, trad_regret_fig, rel_perf_fig, dual_regret_fig = plot_nash_distributions(
+    
+    # Check if bootstrap_results contains RD regret data from non-parametric bootstrapping
+    has_rd_regrets = False
+    if use_raw_bootstrap and 'rd_regret' in bootstrap_results and bootstrap_results['rd_regret']:
+        has_rd_regrets = True
+        print("Found RD regret data from non-parametric bootstrapping. Including in visualizations.")
+    
+    me_ne_regret_fig, rd_ne_regret_fig, dual_regret_fig, nash_mixture_fig = plot_nash_distributions(
         bootstrap_results, 
-        agents_list
+        agents_list,
+        include_rd_regrets=has_rd_regrets
     )
     
     # Save Nash plots
     nash_plot_figures = {
-        'regret_distribution': regret_fig,
-        'traditional_regret_distribution': trad_regret_fig,
-        'relative_performance_distribution': rel_perf_fig,
-        'dual_regret': dual_regret_fig
+        'me_nash_equilibrium_regret': me_ne_regret_fig,
+        'rd_nash_equilibrium_regret': rd_ne_regret_fig,
+        'nash_regret_comparison': dual_regret_fig,
+        'nash_mixture_with_ci': nash_mixture_fig
     }
     save_nash_plots(nash_plot_figures, max_entropy_nash_dir)
+    
+    # Also save RD plots to the RD Nash directory if available
+    if has_rd_regrets:
+        rd_plot_figures = {
+            'rd_nash_equilibrium_regret': rd_ne_regret_fig,
+            'nash_regret_comparison': dual_regret_fig
+        }
+        save_nash_plots(rd_plot_figures, rd_nash_dir)
     
     # Step 9: Save results to CSV files
     print("\nStep 9: Saving results to CSV files...")

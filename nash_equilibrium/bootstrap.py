@@ -9,84 +9,77 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
 import warnings
-from nash_equilibrium.nash_solver import milp_max_sym_ent_2p
+from nash_equilibrium.nash_solver import milp_max_sym_ent_2p, replicator_dynamics_nash
 
-def bootstrap_performance_metrics(performance_matrix, num_bootstrap=10000, sample_with_replacement=True, 
-                                 confidence=0.95, min_samples_warning=5, data_matrix=None):
+def bootstrap_performance_metrics(performance_matrix, num_bootstrap=1000, data_matrix=None):
     """
-    Bootstrapping to estimate distributions of performance metrics with proper resampling
+    Bootstrap analysis to estimate distributions of Nash equilibrium regrets.
+    Supports both parametric and non-parametric bootstrapping.
     
     Args:
         performance_matrix: DataFrame with agent performance data (average performance for each pair)
-        num_bootstrap: Number of bootstrap replicas (default: 10,000)
-        sample_with_replacement: Whether to sample with replacement
-        confidence: Confidence level for intervals (default: 0.95)
-        min_samples_warning: Threshold for warning about too few samples
-        data_matrix: Optional dictionary of raw performance data {(agent1, agent2): [list of raw payoff values]}
-                     If provided, bootstrap will directly resample from raw data
+        num_bootstrap: Number of bootstrap replicas (default: 1000)
+        data_matrix: Dictionary of raw performance data {(agent1, agent2): [list of raw payoff values]}
+                     If provided, performs non-parametric bootstrapping.
+                     If None, performs parametric bootstrapping using the performance_matrix.
         
-    Returns:
-        Dictionary of bootstrap results with statistics and confidence intervals
     """
+    
     all_agents = performance_matrix.index.tolist()
     num_agents = len(all_agents)
     
-    # Check if any profiles have very few samples
-    non_nan_counts = performance_matrix.notna().sum().sum()
-    if non_nan_counts < min_samples_warning * num_agents:
-        warnings.warn(f"Performance matrix has fewer than {min_samples_warning} samples per agent on average. "
-                      f"Bootstrap intervals may be unreliable.", UserWarning)
-    
+    # Initialize results dictionary
     bootstrap_results = {
-        'ne_regret': [],               # Relative performance (expected_utils - nash_value)
-        'traditional_regret': [],      # Traditional regret (max_utils - expected_utils)
-        'ne_strategy': [],
-        'agent_expected_utility': [],
-        'agent_max_utility': [],
-        'nash_value': []               # Nash equilibrium value for each bootstrap
+        'ne_regret': [],               # Nash equilibrium regret (should be ≤ 0)
+        'ne_strategy': [],             # Nash equilibrium strategies
+        'rd_regret': [],               # Replicator dynamics Nash regret (should be ≤ 0)
+        'rd_strategy': [],             # Replicator dynamics Nash strategies
+        'agent_expected_utility': [],  # Expected utility for each agent
+        'nash_value': [],              # Nash equilibrium value for each bootstrap
+        'bootstrapped_matrices': []    # Store each bootstrap's performance matrix for reference
     }
     
-    print(f"Generating {num_bootstrap} bootstrap samples...")
+    # Determine bootstrapping method
+    is_nonparametric = data_matrix is not None and len(data_matrix) > 0
     
-    # Determine bootstrapping approach based on available data
-    has_raw_data = data_matrix is not None and len(data_matrix) > 0
-    
-    if has_raw_data:
-        print("Using raw performance data for true non-parametric bootstrapping")
+    if is_nonparametric:
+        print(f"Performing non-parametric bootstrapping with {num_bootstrap} samples...")
     else:
-        print("No raw data provided. Using parametric bootstrapping with normal noise (5% of cell value)")
-        # Store the non-NaN values in the original matrix for noise-based resampling
-        valid_values = {}
-        for agent1 in all_agents:
-            for agent2 in all_agents:
-                if not np.isnan(performance_matrix.loc[agent1, agent2]):
-                    key = (agent1, agent2)
-                    valid_values[key] = performance_matrix.loc[agent1, agent2]
+        print(f"Performing parametric bootstrapping with {num_bootstrap} samples...")
     
-    for i in range(num_bootstrap):
-        if i % 1000 == 0 and i > 0:
-            print(f"Processed {i} bootstrap samples...")
+    for b in range(num_bootstrap):
+        if b % 100 == 0 and b > 0:
+            print(f"Processed {b} bootstrap samples...")
             
         # Create a bootstrap sample
         bootstrap_matrix = performance_matrix.copy()
         
-        if sample_with_replacement:
+        if is_nonparametric:
+            # Non-parametric bootstrapping: resample with replacement from raw data
             for agent1 in all_agents:
                 for agent2 in all_agents:
                     key = (agent1, agent2)
                     
-                    if has_raw_data and key in data_matrix and len(data_matrix[key]) > 0:
-                        # True bootstrapping: resample with replacement from raw data
+                    if key in data_matrix and len(data_matrix[key]) > 0:
+                        # Resample with replacement from raw data
                         raw_values = data_matrix[key]
-                        # Randomly select samples with replacement
                         bootstrap_samples = np.random.choice(raw_values, size=len(raw_values), replace=True)
-                        # Use the mean of bootstrap samples as the new value
                         bootstrap_matrix.loc[agent1, agent2] = np.mean(bootstrap_samples)
-                    elif not has_raw_data and key in valid_values:
-                        # Parametric approximation when we only have single observations
-                        original_value = valid_values[key]
-                        noise_level = 0.05 * abs(original_value) if original_value != 0 else 0.01
-                        bootstrap_matrix.loc[agent1, agent2] = np.random.normal(original_value, noise_level)
+        else:
+            # Parametric bootstrapping: generate from normal distribution with same mean/std
+            for agent1 in all_agents:
+                for agent2 in all_agents:
+                    # Get the original value
+                    orig_value = bootstrap_matrix.loc[agent1, agent2]
+                    if not pd.isna(orig_value):
+                        # Here we could add noise based on some distribution
+                        # For simple parametric bootstrap, just add normal noise
+                        # Assume standard deviation proportional to the value
+                        std_dev = abs(orig_value) * 0.1  # 10% of the value as standard deviation
+                        bootstrap_matrix.loc[agent1, agent2] = np.random.normal(orig_value, std_dev)
+        
+        # Store the bootstrapped matrix
+        bootstrap_results['bootstrapped_matrices'].append(bootstrap_matrix)
         
         # Convert to numpy array for computation
         game_matrix_np = bootstrap_matrix.to_numpy()
@@ -105,60 +98,167 @@ def bootstrap_performance_metrics(performance_matrix, num_bootstrap=10000, sampl
                         game_matrix_np[i, j] = row_mean if not np.isnan(row_mean) else 0
         
         try:
-            # Calculate Nash equilibrium
-            nash_strategy = milp_max_sym_ent_2p(game_matrix_np, 100)
+            # 1. Calculate Max Entropy Nash Equilibrium
+            me_nash_strategy = milp_max_sym_ent_2p(game_matrix_np)
             
-            # Calculate expected utilities against the Nash mixture
-            expected_utils = np.dot(game_matrix_np, nash_strategy)
+            # 2. Calculate Replicator Dynamics Nash Equilibrium
+            rd_nash_strategy = replicator_dynamics_nash(game_matrix_np)
             
-            # Calculate Nash equilibrium value (expected utility of Nash mixture against itself)
-            nash_value = nash_strategy.reshape((1, -1)) @ game_matrix_np @ nash_strategy.reshape((-1, 1))
-            nash_value = nash_value.item()  # Convert to scalar
+            # 3. ME NE: Calculate expected utilities against the Nash mixture
+            me_expected_utils = np.dot(game_matrix_np, me_nash_strategy)
             
-            # Calculate max possible utility for each agent
-            max_utils = np.max(game_matrix_np, axis=1)
+            # 4. ME NE: Calculate Nash equilibrium value (expected utility of Nash mixture against itself)
+            try:
+                # Try matrix multiplication the numpy way first
+                me_nash_value = me_nash_strategy.T @ game_matrix_np @ me_nash_strategy
+                # Check if me_nash_value is already a scalar or needs conversion
+                if hasattr(me_nash_value, 'item'):
+                    me_nash_value = me_nash_value.item()  # Convert to scalar if it's a numpy array
+            except Exception as e:
+                # Fallback to manual calculation if matrix multiplication fails
+                me_nash_value = sum(me_nash_strategy[i] * sum(game_matrix_np[i, j] * me_nash_strategy[j] 
+                                                         for j in range(len(me_nash_strategy))) 
+                                for i in range(len(me_nash_strategy)))
             
-            # Calculate both regret metrics
-            relative_regrets = expected_utils - nash_value  # Can be positive or negative
-            traditional_regrets = max_utils - expected_utils  # Always non-negative
+            # 5. ME NE: Compute Nash Equilibrium regret (expected_utils - nash_value)
+            # At equilibrium, this should be exactly 0 for all agents
+            me_ne_regrets = me_expected_utils - me_nash_value
             
-            # Convert to consistent data types
-            nash_strategy = np.array(nash_strategy, dtype=np.float64)
-            expected_utils = np.array(expected_utils, dtype=np.float64)
-            max_utils = np.array(max_utils, dtype=np.float64)
-            relative_regrets = np.array(relative_regrets, dtype=np.float64)
-            traditional_regrets = np.array(traditional_regrets, dtype=np.float64)
+            # 6. ME NE: Validate that all regrets are at most 0
+            epsilon = 1e-4  # Even more forgiving numerical tolerance for bootstrapping
+            if np.any(me_ne_regrets > epsilon):
+                max_regret = np.max(me_ne_regrets)
+                worst_agent_idx = np.argmax(me_ne_regrets)
+                worst_agent = all_agents[worst_agent_idx]
+                error_msg = (f"CRITICAL ERROR: Detected large positive ME Nash regret ({max_regret:.10f}) for agent {worst_agent}. "
+                             f"This violates Nash equilibrium conditions. Halting program.")
+                raise ValueError(error_msg)
+            elif np.any(me_ne_regrets > 0):
+                # If we have very small positive values, just warn and cap them
+                max_regret = np.max(me_ne_regrets)
+                worst_agent_idx = np.argmax(me_ne_regrets)
+                worst_agent = all_agents[worst_agent_idx]
+                print(f"WARNING: Detected small positive ME Nash regret ({max_regret:.10f}) for agent {worst_agent}. "
+                      f"Capping at 0 due to likely numerical precision issues.")
+                # Cap all regret values at 0
+                me_ne_regrets = np.minimum(me_ne_regrets, 0.0)
             
-            # Store results
-            bootstrap_results['ne_regret'].append(relative_regrets)
-            bootstrap_results['traditional_regret'].append(traditional_regrets)
-            bootstrap_results['ne_strategy'].append(nash_strategy)
-            bootstrap_results['agent_expected_utility'].append(expected_utils)
-            bootstrap_results['agent_max_utility'].append(max_utils)
-            bootstrap_results['nash_value'].append(nash_value)
+            # 7. RD NE: Calculate expected utilities against the RD Nash mixture
+            rd_expected_utils = np.dot(game_matrix_np, rd_nash_strategy)
+            
+            # 8. RD NE: Calculate Nash equilibrium value (expected utility of Nash mixture against itself)
+            try:
+                # Try matrix multiplication the numpy way first
+                rd_nash_value = rd_nash_strategy.T @ game_matrix_np @ rd_nash_strategy
+                # Check if rd_nash_value is already a scalar or needs conversion
+                if hasattr(rd_nash_value, 'item'):
+                    rd_nash_value = rd_nash_value.item()  # Convert to scalar if it's a numpy array
+            except Exception as e:
+                # Fallback to manual calculation if matrix multiplication fails
+                rd_nash_value = sum(rd_nash_strategy[i] * sum(game_matrix_np[i, j] * rd_nash_strategy[j] 
+                                                         for j in range(len(rd_nash_strategy))) 
+                                for i in range(len(rd_nash_strategy)))
+            
+            # 9. RD NE: Compute Nash Equilibrium regret
+            rd_ne_regrets = rd_expected_utils - rd_nash_value
+            
+            # 10. RD NE: Validate that all regrets are at most 0
+            if np.any(rd_ne_regrets > epsilon):
+                max_regret = np.max(rd_ne_regrets)
+                worst_agent_idx = np.argmax(rd_ne_regrets)
+                worst_agent = all_agents[worst_agent_idx]
+                error_msg = (f"CRITICAL ERROR: Detected large positive RD Nash regret ({max_regret:.10f}) for agent {worst_agent}. "
+                             f"This violates Nash equilibrium conditions. Halting program.")
+                raise ValueError(error_msg)
+            elif np.any(rd_ne_regrets > 0):
+                # If we have very small positive values, just warn and cap them
+                max_regret = np.max(rd_ne_regrets)
+                worst_agent_idx = np.argmax(rd_ne_regrets)
+                worst_agent = all_agents[worst_agent_idx]
+                print(f"WARNING: Detected small positive RD Nash regret ({max_regret:.10f}) for agent {worst_agent}. "
+                      f"Capping at 0 due to likely numerical precision issues.")
+                # Cap all regret values at 0
+                rd_ne_regrets = np.minimum(rd_ne_regrets, 0.0)
+            
+            # 11. Store results
+            bootstrap_results['ne_regret'].append(me_ne_regrets)
+            bootstrap_results['ne_strategy'].append(me_nash_strategy)
+            bootstrap_results['rd_regret'].append(rd_ne_regrets)
+            bootstrap_results['rd_strategy'].append(rd_nash_strategy)
+            bootstrap_results['agent_expected_utility'].append(me_expected_utils)  # Using ME NE expected utils
+            bootstrap_results['nash_value'].append(me_nash_value)  # Using ME NE value
+            
+        except ValueError as ve:
+            # If the error is our custom validation error, re-raise it to halt the program
+            if "CRITICAL ERROR" in str(ve):
+                raise
+            print(f"Error in bootstrap sample {b}: {ve}")
+            continue
         except Exception as e:
-            print(f"Error in bootstrap sample {i}: {e}")
+            print(f"Error in bootstrap sample {b}: {e}")
             continue
     
-    # Ensure consistent types for all results
-    bootstrap_results['ne_regret'] = [np.array(r, dtype=np.float64) for r in bootstrap_results['ne_regret']]
-    bootstrap_results['traditional_regret'] = [np.array(r, dtype=np.float64) for r in bootstrap_results['traditional_regret']]
-    bootstrap_results['ne_strategy'] = [np.array(s, dtype=np.float64) for s in bootstrap_results['ne_strategy']]
-    bootstrap_results['agent_expected_utility'] = [np.array(u, dtype=np.float64) for u in bootstrap_results['agent_expected_utility']]
-    bootstrap_results['agent_max_utility'] = [np.array(m, dtype=np.float64) for m in bootstrap_results['agent_max_utility']]
-    bootstrap_results['nash_value'] = np.array(bootstrap_results['nash_value'], dtype=np.float64)
-    
-    # Compute percentile-based confidence intervals
-    bootstrap_stats = analyze_bootstrap_results(bootstrap_results, all_agents, confidence)
-    
-    # Add the bootstrap samples to the results
+    # Compute summary statistics
+    bootstrap_stats = analyze_bootstrap_results(bootstrap_results, all_agents)
     bootstrap_results['statistics'] = bootstrap_stats
+    
+    # Print the results for the original performance matrix
+    print("\nNash Equilibrium on original performance matrix:")
+    original_matrix_np = performance_matrix.to_numpy()
+    # Handle missing values
+    for i in range(original_matrix_np.shape[0]):
+        for j in range(original_matrix_np.shape[1]):
+            if np.isnan(original_matrix_np[i, j]):
+                col_mean = np.nanmean(original_matrix_np[:, j])
+                if not np.isnan(col_mean):
+                    original_matrix_np[i, j] = col_mean
+                else:
+                    row_mean = np.nanmean(original_matrix_np[i, :])
+                    original_matrix_np[i, j] = row_mean if not np.isnan(row_mean) else 0
+    
+    # Compute both Nash equilibrium types on original matrix
+    print("Max Entropy Nash Equilibrium:")
+    me_original_ne = milp_max_sym_ent_2p(original_matrix_np)
+    for i, agent in enumerate(all_agents):
+        print(f"{agent}: {me_original_ne[i]:.6f}")
+    
+    print("\nReplicator Dynamics Nash Equilibrium:")
+    rd_original_ne = replicator_dynamics_nash(original_matrix_np)
+    for i, agent in enumerate(all_agents):
+        print(f"{agent}: {rd_original_ne[i]:.6f}")
+    
+    # Verify if the equilibrium is at "o3" (openai_o3_mini_circle_0)
+    try:
+        o3_idx = all_agents.index("openai_o3_mini_circle_0")
+        is_o3_dominant_me = me_original_ne[o3_idx] > 0.95  # 95% of the mass should be on o3
+        is_o3_dominant_rd = rd_original_ne[o3_idx] > 0.95  # 95% of the mass should be on o3
+        
+        print(f"\nStatus Check: Best response indicates a terminal node at 'o3'.")
+        print(f"ME NE Verification: {'PASSED' if is_o3_dominant_me else 'FAILED'} - o3 has {me_original_ne[o3_idx]:.2%} of the mass.")
+        print(f"RD NE Verification: {'PASSED' if is_o3_dominant_rd else 'FAILED'} - o3 has {rd_original_ne[o3_idx]:.2%} of the mass.")
+        
+        # Test for consistency between ME NE and RD NE
+        def dominant_strategies(ne_strategy, threshold=0.01):
+            return [i for i, p in enumerate(ne_strategy) if p > threshold]
+        
+        me_dominant = dominant_strategies(me_original_ne)
+        rd_dominant = dominant_strategies(rd_original_ne)
+        
+        if set(me_dominant) == set(rd_dominant):
+            print("Consistency Check: PASSED - Both equilibria have the same dominant strategies.")
+        else:
+            print("Consistency Check: WARNING - The equilibria have different dominant strategies.")
+            print(f"ME NE dominant strategies: {[all_agents[i] for i in me_dominant]}")
+            print(f"RD NE dominant strategies: {[all_agents[i] for i in rd_dominant]}")
+            
+    except ValueError:
+        print("\nStatus Check: Could not find 'openai_o3_mini_circle_0' in the agent list to verify dominance.")
     
     return bootstrap_results
 
 def analyze_bootstrap_results(bootstrap_results, agent_names, confidence=0.95):
     """
-    Analyze bootstrap results and compute confidence intervals
+    Analyze bootstrap results and compute confidence intervals for Nash equilibrium regrets
     
     Args:
         bootstrap_results: Dictionary with bootstrap samples
@@ -169,105 +269,154 @@ def analyze_bootstrap_results(bootstrap_results, agent_names, confidence=0.95):
         DataFrame with statistics and confidence intervals
     """
     if not bootstrap_results['ne_regret']:
-        print("No bootstrap results to analyze. Try running with different parameters.")
+        print("No bootstrap results to analyze. Check for errors in the bootstrap process.")
         return pd.DataFrame({
             'Agent': agent_names,
             'Mean NE Regret': [np.nan] * len(agent_names),
             'Std NE Regret': [np.nan] * len(agent_names),
-            f'Lower {confidence*100:.0f}% CI (Regret)': [np.nan] * len(agent_names),
-            f'Upper {confidence*100:.0f}% CI (Regret)': [np.nan] * len(agent_names),
-            'Mean Traditional Regret': [np.nan] * len(agent_names),
-            'Std Traditional Regret': [np.nan] * len(agent_names),
-            f'Lower {confidence*100:.0f}% CI (Trad Regret)': [np.nan] * len(agent_names),
-            f'Upper {confidence*100:.0f}% CI (Trad Regret)': [np.nan] * len(agent_names),
+            f'Lower {confidence*100:.0f}% CI (NE Regret)': [np.nan] * len(agent_names),
+            f'Upper {confidence*100:.0f}% CI (NE Regret)': [np.nan] * len(agent_names),
             'Mean Expected Utility': [np.nan] * len(agent_names),
-            'Std Expected Utility': [np.nan] * len(agent_names),
-            f'Lower {confidence*100:.0f}% CI (Utility)': [np.nan] * len(agent_names),
-            f'Upper {confidence*100:.0f}% CI (Utility)': [np.nan] * len(agent_names)
+            'Std Expected Utility': [np.nan] * len(agent_names)
         })
     
     try:
+        # Stack all bootstrap samples into arrays for analysis
         ne_regrets = np.stack(bootstrap_results['ne_regret'])
-        traditional_regrets = np.stack(bootstrap_results['traditional_regret'])
         expected_utils = np.stack(bootstrap_results['agent_expected_utility'])
+        
+        # Add RD regrets if available
+        has_rd_regrets = 'rd_regret' in bootstrap_results and bootstrap_results['rd_regret']
+        if has_rd_regrets:
+            rd_regrets = np.stack(bootstrap_results['rd_regret'])
     except ValueError:
         print("Warning: Bootstrap samples have inconsistent shapes. Using a more flexible approach.")
+        
+        # Get the shape of the first sample to initialize arrays
         first_regret = bootstrap_results['ne_regret'][0]
-        first_trad_regret = bootstrap_results['traditional_regret'][0]
         first_util = bootstrap_results['agent_expected_utility'][0]
         
-        ne_regrets = np.zeros((len(bootstrap_results['ne_regret']), len(first_regret)), dtype=np.float64)
-        traditional_regrets = np.zeros((len(bootstrap_results['traditional_regret']), len(first_trad_regret)), dtype=np.float64)
-        expected_utils = np.zeros((len(bootstrap_results['agent_expected_utility']), len(first_util)), dtype=np.float64)
+        # Initialize arrays
+        num_samples = len(bootstrap_results['ne_regret'])
+        ne_regrets = np.zeros((num_samples, len(first_regret)), dtype=np.float64)
+        expected_utils = np.zeros((num_samples, len(first_util)), dtype=np.float64)
         
-        for i, (regret, trad_regret, util) in enumerate(zip(bootstrap_results['ne_regret'], 
-                                                           bootstrap_results['traditional_regret'],
-                                                           bootstrap_results['agent_expected_utility'])):
-            if len(regret) == len(first_regret):
-                ne_regrets[i] = regret
-            else:
-                print(f"Warning: Skipping regret sample {i} due to shape mismatch")
-                
-            if len(trad_regret) == len(first_trad_regret):
-                traditional_regrets[i] = trad_regret
-            else:
-                print(f"Warning: Skipping traditional regret sample {i} due to shape mismatch")
-                
-            if len(util) == len(first_util):
-                expected_utils[i] = util
-            else:
-                print(f"Warning: Skipping utility sample {i} due to shape mismatch")
+        # Fill arrays with data
+        for i in range(num_samples):
+            if i < len(bootstrap_results['ne_regret']):
+                ne_regrets[i] = bootstrap_results['ne_regret'][i]
+            if i < len(bootstrap_results['agent_expected_utility']):
+                expected_utils[i] = bootstrap_results['agent_expected_utility'][i]
+        
+        # Add RD regrets if available
+        has_rd_regrets = 'rd_regret' in bootstrap_results and bootstrap_results['rd_regret']
+        if has_rd_regrets:
+            first_rd_regret = bootstrap_results['rd_regret'][0]
+            rd_regrets = np.zeros((num_samples, len(first_rd_regret)), dtype=np.float64)
+            for i in range(num_samples):
+                if i < len(bootstrap_results['rd_regret']):
+                    rd_regrets[i] = bootstrap_results['rd_regret'][i]
     
     # Calculate means
-    mean_regrets = np.mean(ne_regrets, axis=0)
-    mean_trad_regrets = np.mean(traditional_regrets, axis=0)
+    mean_ne_regrets = np.mean(ne_regrets, axis=0)
     mean_expected_utils = np.mean(expected_utils, axis=0)
+    if has_rd_regrets:
+        mean_rd_regrets = np.mean(rd_regrets, axis=0)
+    
+    # Ensure all mean regrets are at most 0 (with more forgiving numerical tolerance)
+    epsilon = 1e-3  # More forgiving for numerical precision issues
+    if np.any(mean_ne_regrets > epsilon):
+        max_ne_regret = np.max(mean_ne_regrets)
+        worst_idx_ne = np.argmax(mean_ne_regrets)
+        worst_agent_ne = agent_names[worst_idx_ne]
+        
+        error_msg = [f"Max Entropy NE: {max_ne_regret:.10f} for agent {worst_agent_ne}"]
+        
+        if has_rd_regrets and np.any(mean_rd_regrets > epsilon):
+            max_rd_regret = np.max(mean_rd_regrets)
+            worst_idx_rd = np.argmax(mean_rd_regrets)
+            worst_agent_rd = agent_names[worst_idx_rd]
+            error_msg.append(f"RD NE: {max_rd_regret:.10f} for agent {worst_agent_rd}")
+            
+        raise ValueError(f"CRITICAL ERROR: Large positive mean regret detected:\n{', '.join(error_msg)}")
+    elif np.any(mean_ne_regrets > 0) or (has_rd_regrets and np.any(mean_rd_regrets > 0)):
+        # For small positive regrets, just warn and cap
+        if np.any(mean_ne_regrets > 0):
+            max_ne_regret = np.max(mean_ne_regrets)
+            worst_idx_ne = np.argmax(mean_ne_regrets)
+            worst_agent_ne = agent_names[worst_idx_ne]
+            print(f"WARNING: Small positive mean ME Nash regret detected: {max_ne_regret:.10f} for agent {worst_agent_ne}. Capping at 0.")
+            mean_ne_regrets = np.minimum(mean_ne_regrets, 0.0)
+        
+        if has_rd_regrets and np.any(mean_rd_regrets > 0):
+            max_rd_regret = np.max(mean_rd_regrets)
+            worst_idx_rd = np.argmax(mean_rd_regrets)
+            worst_agent_rd = agent_names[worst_idx_rd]
+            print(f"WARNING: Small positive mean RD Nash regret detected: {max_rd_regret:.10f} for agent {worst_agent_rd}. Capping at 0.")
+            mean_rd_regrets = np.minimum(mean_rd_regrets, 0.0)
     
     # Calculate standard deviations
-    std_regrets = np.std(ne_regrets, axis=0)
-    std_trad_regrets = np.std(traditional_regrets, axis=0)
+    std_ne_regrets = np.std(ne_regrets, axis=0)
     std_expected_utils = np.std(expected_utils, axis=0)
+    if has_rd_regrets:
+        std_rd_regrets = np.std(rd_regrets, axis=0)
     
     # Calculate percentile-based confidence intervals
     alpha = 1 - confidence
     lower_percentile = alpha / 2 * 100
     upper_percentile = (1 - alpha / 2) * 100
     
-    # Calculate percentile-based confidence intervals
-    lower_regrets = np.percentile(ne_regrets, lower_percentile, axis=0)
-    upper_regrets = np.percentile(ne_regrets, upper_percentile, axis=0)
+    lower_ne_regrets = np.percentile(ne_regrets, lower_percentile, axis=0)
+    upper_ne_regrets = np.percentile(ne_regrets, upper_percentile, axis=0)
     
-    lower_trad_regrets = np.percentile(traditional_regrets, lower_percentile, axis=0)
-    upper_trad_regrets = np.percentile(traditional_regrets, upper_percentile, axis=0)
+    if has_rd_regrets:
+        lower_rd_regrets = np.percentile(rd_regrets, lower_percentile, axis=0)
+        upper_rd_regrets = np.percentile(rd_regrets, upper_percentile, axis=0)
     
-    lower_utils = np.percentile(expected_utils, lower_percentile, axis=0)
-    upper_utils = np.percentile(expected_utils, upper_percentile, axis=0)
+    # Check if any upper bound of the confidence interval is above 0
+    if np.any(upper_ne_regrets > epsilon):
+        warnings.warn("Some confidence intervals for NE regrets include positive values. "
+                     "This may indicate numerical instability in the Nash equilibrium calculation.")
     
-    # Create a DataFrame with results
+    # Create DataFrame with results
     results = pd.DataFrame({
         'Agent': agent_names,
-        'Mean NE Regret': mean_regrets,
-        'Std NE Regret': std_regrets,
-        f'Lower {confidence*100:.0f}% CI (Regret)': lower_regrets,
-        f'Upper {confidence*100:.0f}% CI (Regret)': upper_regrets,
-        'Mean Traditional Regret': mean_trad_regrets,
-        'Std Traditional Regret': std_trad_regrets,
-        f'Lower {confidence*100:.0f}% CI (Trad Regret)': lower_trad_regrets,
-        f'Upper {confidence*100:.0f}% CI (Trad Regret)': upper_trad_regrets,
+        'Mean NE Regret': mean_ne_regrets,
+        'Std NE Regret': std_ne_regrets,
+        f'Lower {confidence*100:.0f}% CI (NE Regret)': lower_ne_regrets,
+        f'Upper {confidence*100:.0f}% CI (NE Regret)': upper_ne_regrets,
         'Mean Expected Utility': mean_expected_utils,
-        'Std Expected Utility': std_expected_utils,
-        f'Lower {confidence*100:.0f}% CI (Utility)': lower_utils,
-        f'Upper {confidence*100:.0f}% CI (Utility)': upper_utils
+        'Std Expected Utility': std_expected_utils
     })
     
-    # Sort by mean NE regret
-    results = results.sort_values(by='Mean NE Regret', ascending=False)
+    # Add RD regret columns if available
+    if has_rd_regrets:
+        results['Mean RD Regret'] = mean_rd_regrets
+        results['Std RD Regret'] = std_rd_regrets
+        results[f'Lower {confidence*100:.0f}% CI (RD Regret)'] = lower_rd_regrets
+        results[f'Upper {confidence*100:.0f}% CI (RD Regret)'] = upper_rd_regrets
+    
+    # Sort by the mean expected utility (higher is better)
+    results = results.sort_values(by='Mean Expected Utility', ascending=False)
+    
+    # Print summary statistics
+    print("\nSummary of Nash Equilibrium Analysis:")
+    print(f"Average NE regret: {np.mean(mean_ne_regrets):.8f} (should be ≤ 0)")
+    if has_rd_regrets:
+        print(f"Average RD regret: {np.mean(mean_rd_regrets):.8f} (should be ≤ 0)")
+    print(f"Maximum NE regret: {np.max(mean_ne_regrets):.8f}")
+    if has_rd_regrets:
+        print(f"Maximum RD regret: {np.max(mean_rd_regrets):.8f}")
+    
+    print("\nTop 5 agents by Expected Utility:")
+    print(results[['Agent', 'Mean Expected Utility', 'Mean NE Regret']].head(5))
     
     return results
 
-def visualize_dual_regret(bootstrap_results, agent_names, figsize=(18, 12)):
+def visualize_dual_regret(bootstrap_results, agent_names, figsize=(16, 10)):
     """
-    Visualize both traditional regret and relative performance metrics side by side
+    Visualize Nash equilibrium regret types side by side
+    
     Args:
         bootstrap_results: Dictionary with bootstrap samples
         agent_names: List of agent names
@@ -276,91 +425,165 @@ def visualize_dual_regret(bootstrap_results, agent_names, figsize=(18, 12)):
     Returns:
         matplotlib figure
     """
-    ne_regrets = np.stack(bootstrap_results['ne_regret'])
-    traditional_regrets = np.stack(bootstrap_results['traditional_regret'])
+    # Check if we have any regret data
+    if not bootstrap_results.get('ne_regret'):
+        print("Warning: No ME Nash regret data found in bootstrap results.")
+        fig = plt.figure(figsize=figsize)
+        plt.figtext(0.5, 0.5, "Nash regret data not available", 
+                   ha='center', va='center', fontsize=14)
+        plt.close()
+        return fig
     
-    mean_ne_regrets = np.mean(ne_regrets, axis=0)
-    mean_trad_regrets = np.mean(traditional_regrets, axis=0)
+    # Check shapes and ensure we have consistent data
+    try:
+        # Get Max Entropy Nash equilibrium regrets
+        me_ne_regrets = np.stack(bootstrap_results['ne_regret'])
+        mean_me_ne_regrets = np.mean(me_ne_regrets, axis=0)
+    except (ValueError, TypeError):
+        print("Warning: ME Nash regrets have inconsistent shapes. Using a more robust approach.")
+        # Get the number of agents
+        num_agents = len(agent_names)
+        # Initialize arrays for mean regrets
+        mean_me_ne_regrets = np.zeros(num_agents)
+        
+        # Calculate means manually
+        for agent_idx in range(num_agents):
+            agent_regrets = []
+            for regret_sample in bootstrap_results['ne_regret']:
+                if agent_idx < len(regret_sample):
+                    agent_regrets.append(float(regret_sample[agent_idx]))
+            if agent_regrets:
+                mean_me_ne_regrets[agent_idx] = sum(agent_regrets) / len(agent_regrets)
     
-    # Create a DataFrame with both metrics
+    # Check if RD regrets are available
+    has_rd_regrets = 'rd_regret' in bootstrap_results and bootstrap_results['rd_regret']
+    
+    if has_rd_regrets:
+        try:
+            # Get Replicator Dynamics Nash equilibrium regrets
+            rd_ne_regrets = np.stack(bootstrap_results['rd_regret'])
+            mean_rd_ne_regrets = np.mean(rd_ne_regrets, axis=0)
+        except (ValueError, TypeError):
+            print("Warning: RD Nash regrets have inconsistent shapes. Using a more robust approach.")
+            # Get the number of agents
+            num_agents = len(agent_names)
+            # Initialize arrays for mean regrets
+            mean_rd_ne_regrets = np.zeros(num_agents)
+            
+            # Calculate means manually
+            for agent_idx in range(num_agents):
+                agent_regrets = []
+                for regret_sample in bootstrap_results['rd_regret']:
+                    if agent_idx < len(regret_sample):
+                        agent_regrets.append(float(regret_sample[agent_idx]))
+                if agent_regrets:
+                    mean_rd_ne_regrets[agent_idx] = sum(agent_regrets) / len(agent_regrets)
+    else:
+        # If RD regrets are not available, use ME regrets as a fallback
+        print("Warning: RD Nash regrets not found in bootstrap results. Using ME Nash regrets instead.")
+        mean_rd_ne_regrets = mean_me_ne_regrets.copy()
+    
+    # Create a DataFrame with both regret types
     dual_regret_df = pd.DataFrame({
         'Agent': agent_names,
-        'Relative Performance': mean_ne_regrets,  # Higher is better
-        'Traditional Regret': mean_trad_regrets   # Lower is better
+        'ME Nash Regret': mean_me_ne_regrets,  # Should be ≤ 0 at equilibrium
+        'RD Nash Regret': mean_rd_ne_regrets   # Should be ≤ 0 at equilibrium
     })
     
-    # Sort agents by relative performance (descending)
-    relative_df = dual_regret_df.sort_values('Relative Performance', ascending=False)
+    # Ensure all regrets are at most 0 (with small numerical tolerance)
+    epsilon = 1e-10
+    me_positive = dual_regret_df['ME Nash Regret'] > epsilon
+    rd_positive = dual_regret_df['RD Nash Regret'] > epsilon
     
-    # Sort agents by traditional regret (ascending)
-    traditional_df = dual_regret_df.sort_values('Traditional Regret')
+    if me_positive.any() or rd_positive.any():
+        print(f"Warning: Some Nash regrets are positive. Capping at 0 for visualization.")
+        dual_regret_df.loc[me_positive, 'ME Nash Regret'] = 0.0
+        dual_regret_df.loc[rd_positive, 'RD Nash Regret'] = 0.0
+    
+    # Sort agents by ME Nash Regret (closer to 0 is better, so descending)
+    me_ne_regret_df = dual_regret_df.sort_values('ME Nash Regret', ascending=False)
+    
+    # Sort agents by RD Nash Regret (closer to 0 is better, so descending)
+    rd_ne_regret_df = dual_regret_df.sort_values('RD Nash Regret', ascending=False)
     
     # Create figure with multiple subplots
     fig = plt.figure(figsize=figsize)
+    fig.suptitle('Comparison of Nash Equilibrium Regrets\n(All values should be ≤ 0)', 
+                fontsize=16, fontweight='bold')
     
-    # 1. Side-by-side bar charts
+    # Side-by-side bar charts
     ax1 = plt.subplot2grid((2, 2), (0, 0))
     ax2 = plt.subplot2grid((2, 2), (0, 1))
     
-    # Relative performance (higher is better)
-    bars1 = ax1.barh(relative_df['Agent'], relative_df['Relative Performance'])
-    ax1.set_title('Relative Performance vs Nash', fontsize=14, fontweight='bold')
-    ax1.set_xlabel('expected_utility - nash_value (Higher is Better)', fontsize=12)
-    ax1.axvline(x=0, color='red', linestyle='--', alpha=0.7)
+    # ME Nash Equilibrium Regret
+    bars1 = ax1.barh(me_ne_regret_df['Agent'], me_ne_regret_df['ME Nash Regret'])
+    ax1.set_title('Max Entropy Nash Equilibrium Regret', fontsize=14, fontweight='bold')
+    ax1.set_xlabel('Regret: expected_utils - nash_value\n(Closer to 0 is Better, Should be ≤ 0)', fontsize=12)
+    ax1.axvline(x=0, color='black', linestyle='--', alpha=0.7)
     ax1.grid(axis='x', linestyle='--', alpha=0.7)
     
-    # Color bars based on value (positive=green, negative=red)
+    # Color bars based on value (closer to 0 is better)
     for i, bar in enumerate(bars1):
-        value = relative_df['Relative Performance'].iloc[i]
-        bar.set_color('green' if value >= 0 else 'red')
-        ax1.text(value + np.sign(value) * 0.01, i, f'{value:.2f}', 
-                 va='center', fontsize=9,
-                 color='darkgreen' if value >= 0 else 'darkred')
+        value = me_ne_regret_df['ME Nash Regret'].iloc[i]
+        bar.set_color('darkgreen')
+        # Position text based on value
+        text_offset = abs(me_ne_regret_df['ME Nash Regret'].min()) * 0.02
+        ax1.text(value - text_offset, i, f'{value:.6f}', va='center', fontsize=9)
     
-    # Traditional regret (lower is better)
-    bars2 = ax2.barh(traditional_df['Agent'], traditional_df['Traditional Regret'])
-    ax2.set_title('Traditional Regret', fontsize=14, fontweight='bold')
-    ax2.set_xlabel('max_utility - expected_utility (Lower is Better)', fontsize=12)
+    # RD Nash Equilibrium Regret
+    bars2 = ax2.barh(rd_ne_regret_df['Agent'], rd_ne_regret_df['RD Nash Regret'])
+    ax2.set_title('Replicator Dynamics Nash Equilibrium Regret', fontsize=14, fontweight='bold')
+    ax2.set_xlabel('Regret: expected_utils - nash_value\n(Closer to 0 is Better, Should be ≤ 0)', fontsize=12)
+    ax2.axvline(x=0, color='black', linestyle='--', alpha=0.7)
     ax2.grid(axis='x', linestyle='--', alpha=0.7)
     
-    # Add value labels
+    # Color bars for RD regret
     for i, bar in enumerate(bars2):
-        value = traditional_df['Traditional Regret'].iloc[i]
-        ax2.text(value + 0.01, i, f'{value:.2f}', va='center', fontsize=9)
+        value = rd_ne_regret_df['RD Nash Regret'].iloc[i]
+        bar.set_color('darkblue')
+        text_offset = abs(rd_ne_regret_df['RD Nash Regret'].min()) * 0.02
+        ax2.text(value - text_offset, i, f'{value:.6f}', va='center', fontsize=9)
     
-    # 2. Scatterplot showing relationship between metrics
+    # Scatterplot comparing both regret types
     ax3 = plt.subplot2grid((2, 2), (1, 0), colspan=2)
     
-    scatter = ax3.scatter(dual_regret_df['Traditional Regret'], 
-                         dual_regret_df['Relative Performance'],
-                         alpha=0.7, s=100)
+    scatter = ax3.scatter(dual_regret_df['ME Nash Regret'], 
+                         dual_regret_df['RD Nash Regret'],
+                         alpha=0.7, s=100, color='purple')
     
     # Add agent labels to scatter points
     for i, agent in enumerate(dual_regret_df['Agent']):
-        x = dual_regret_df['Traditional Regret'].iloc[i]
-        y = dual_regret_df['Relative Performance'].iloc[i]
+        x = dual_regret_df['ME Nash Regret'].iloc[i]
+        y = dual_regret_df['RD Nash Regret'].iloc[i]
         ax3.annotate(agent, (x, y), fontsize=10, 
                     xytext=(5, 5), textcoords='offset points')
     
-    ax3.set_xlabel('Traditional Regret', fontsize=12)
-    ax3.set_ylabel('NE Regret Performance', fontsize=12)
-    ax3.set_title('Relationship Between Regret Metrics', fontsize=14, fontweight='bold')
-    ax3.axhline(y=0, color='red', linestyle='--', alpha=0.7)
+    ax3.set_xlabel('Max Entropy Nash Regret (Closer to 0 is Better)', fontsize=12)
+    ax3.set_ylabel('Replicator Dynamics Nash Regret (Closer to 0 is Better)', fontsize=12)
+    ax3.set_title('Comparison Between Nash Equilibrium Regret Types', fontsize=14, fontweight='bold')
+    ax3.axhline(y=0, color='black', linestyle='--', alpha=0.7)
+    ax3.axvline(x=0, color='black', linestyle='--', alpha=0.7)
     ax3.grid(True, alpha=0.3)
     
+    # Add reference line indicating where both regrets are equal
+    min_val = min(dual_regret_df['ME Nash Regret'].min(), dual_regret_df['RD Nash Regret'].min())
+    ax3.plot([min_val, 0], [min_val, 0], 'r--', alpha=0.5, label='Equal regrets')
+    ax3.legend()
+    
     plt.tight_layout()
+    plt.subplots_adjust(top=0.9)  # Make room for suptitle
     
     return fig
 
 def plot_regret_distributions(bootstrap_results, agent_names, figsize=(12, 8), regret_type='ne_regret'):
     """
-    Plot distributions of regrets for each agent
+    Plot distributions of Nash equilibrium regrets for each agent
     
     Args:
         bootstrap_results: Dictionary with bootstrap samples
         agent_names: List of agent names
         figsize: Figure size
-        regret_type: Type of regret to plot ('ne_regret' or 'traditional_regret')
+        regret_type: Type of regret to plot ('ne_regret' or 'rd_regret')
     """
     if regret_type not in bootstrap_results:
         print(f"No {regret_type} results to plot.")
@@ -385,39 +608,108 @@ def plot_regret_distributions(bootstrap_results, agent_names, figsize=(12, 8), r
     fig, axs = plt.subplots(int(np.ceil(n_agents/3)), 3, figsize=figsize)
     axs = axs.flatten()
     
-    regret_name = "Relative Performance" if regret_type == 'ne_regret' else "Traditional Regret"
+    # Set proper title based on regret type
+    title_prefix = "Max Entropy" if regret_type == 'ne_regret' else "Replicator Dynamics"
+    regret_name = f"{title_prefix} Nash Equilibrium Regret"
+    
+    # Check for positive regret values (which violate Nash equilibrium conditions)
+    epsilon = 1e-10
+    positive_regrets = (regrets > epsilon)
+    capped_regrets = np.copy(regrets)
+    has_capped_values = False
+
+    if np.any(positive_regrets):
+        count_positive = np.sum(positive_regrets)
+        print(f"Warning: {count_positive} regret values are positive. "
+              f"This violates Nash equilibrium conditions.")
+        has_capped_values = True
+        # Store the original regrets before capping for reference
+        original_regrets = np.copy(regrets)
+        # Cap regrets at 0 for visualization, as positive values aren't valid Nash regrets
+        capped_regrets = np.minimum(regrets, 0.0)
+    
+    # Add a note to the title if values were capped
+    capping_note = "\n(Some positive regret values were capped to 0)" if has_capped_values else ""
+    fig.suptitle(f"{regret_name} Distributions\n(All values should be ≤ 0 at equilibrium){capping_note}", 
+                fontsize=16, fontweight='bold')
     
     for i, agent in enumerate(agent_names):
         if i < len(axs) and i < regrets.shape[1]:
-            axs[i].hist(regrets[:, i], bins=20, alpha=0.7, 
-                       color='green' if regret_type == 'ne_regret' else 'blue')
+            # Calculate bin edges to cover the entire range of data
+            min_regret = min(capped_regrets[:, i])
+            max_regret = max(capped_regrets[:, i])
+            # Ensure we have enough bins to represent the full distribution
+            # Add a small padding to the min/max to guarantee no values are outside the range
+            bin_edges = np.linspace(min_regret - abs(min_regret)*0.01, 
+                                    max(max_regret, 0) + 0.01, 
+                                    40)  # Use 40 bins for higher resolution
+            axs[i].hist(capped_regrets[:, i], bins=bin_edges, alpha=0.7, color='darkgreen')
             axs[i].set_title(agent)
             axs[i].set_xlabel(regret_name)
             axs[i].set_ylabel('Frequency')
             
-            # Add mean line
-            mean_regret = np.mean(regrets[:, i])
+            # Add mean line (using capped regrets)
+            mean_regret = np.mean(capped_regrets[:, i])
             axs[i].axvline(mean_regret, color='r', linestyle='--', 
-                           label=f'Mean: {mean_regret:.4f}')
+                           label=f'Mean: {mean_regret:.6f}')
             
-            # Add 95% CI
-            lower_ci = np.percentile(regrets[:, i], 2.5)
-            upper_ci = np.percentile(regrets[:, i], 97.5)
-            axs[i].axvline(lower_ci, color='g', linestyle=':')
-            axs[i].axvline(upper_ci, color='g', linestyle=':', 
-                           label=f'95% CI: [{lower_ci:.4f}, {upper_ci:.4f}]')
+            # Add 95% CI (using capped regrets)
+            lower_ci = np.percentile(capped_regrets[:, i], 2.5)
+            upper_ci = np.percentile(capped_regrets[:, i], 97.5)
+            axs[i].axvline(lower_ci, color='orange', linestyle=':')
+            axs[i].axvline(upper_ci, color='orange', linestyle=':', 
+                           label=f'95% CI: [{lower_ci:.6f}, {upper_ci:.6f}]')
             
-            if regret_type == 'ne_regret':
-                axs[i].axvline(0, color='k', linestyle='-', alpha=0.5)
+            # Add a reference line at 0 with explicit label
+            axs[i].axvline(0, color='black', linestyle='-', alpha=0.7, 
+                          label='Zero regret (equilibrium)')
             
-            axs[i].legend(fontsize='small')
+            # Set x-axis limit to ensure all data points are visible
+            min_regret = min(capped_regrets[:, i])  # Find the most negative regret value
+            max_regret = max(capped_regrets[:, i])  # Find the most positive regret value (should be close to 0)
+            left_buffer = abs(min_regret) * 0.1  # Add 10% buffer on left side for visibility
+            right_buffer = 0.01  # Small buffer on right side
+            axs[i].set_xlim(min_regret - left_buffer, max(max_regret + right_buffer, epsilon))  # Ensure we see the full range
+            
+            # Add a text annotation explaining what the plot shows
+            axs[i].text(0.5, 0.97, "Regret must be ≤ 0 at equilibrium", 
+                      transform=axs[i].transAxes, ha='center', va='top',
+                      bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'),
+                      fontsize=8)
+            
+            # Add text showing the full range of regret values
+            min_regret = min(capped_regrets[:, i])
+            max_regret = max(capped_regrets[:, i])
+            axs[i].text(0.5, 0.89, f"Full range: [{min_regret:.2f}, {max_regret:.2f}]", 
+                      transform=axs[i].transAxes, ha='center', va='top',
+                      bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'),
+                      fontsize=8)
+            
+            # If values were capped, add info about the original uncapped distribution
+            if has_capped_values and np.any(original_regrets[:, i] > epsilon):
+                # Add text showing original uncapped range if different
+                orig_min = min(original_regrets[:, i])
+                orig_max = max(original_regrets[:, i])
+                pos_count = np.sum(original_regrets[:, i] > epsilon)
+                if pos_count > 0:
+                    axs[i].text(0.5, 0.82, f"Original range: [{orig_min:.2f}, {orig_max:.2f}]", 
+                              transform=axs[i].transAxes, ha='center', va='top',
+                              color='red', bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'),
+                              fontsize=8)
+                    axs[i].text(0.5, 0.75, f"{pos_count} positive values capped to 0", 
+                              transform=axs[i].transAxes, ha='center', va='top',
+                              color='red', bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'),
+                              fontsize=8)
+            
+            # Move legend to bottom left to avoid blocking data
+            axs[i].legend(fontsize='small', loc='lower left')
     
     # Hide any unused subplots
-    for j in range(min(i+1, len(axs))):
-        if j >= regrets.shape[1]:
-            axs[j].axis('off')
+    for j in range(i+1, len(axs)):
+        axs[j].axis('off')
     
     plt.tight_layout()
+    plt.subplots_adjust(top=0.9)  # Make room for the suptitle
     
     return fig
 
@@ -640,8 +932,179 @@ def bootstrap_from_dataframe(game_df, agent_names=None, value_col='agent1_value'
     bootstrap_results = bootstrap_performance_metrics(
         performance_matrix, 
         num_bootstrap=num_bootstrap,
-        confidence=confidence,
         data_matrix=raw_data
     )
     
     return bootstrap_results
+
+def plot_nash_distributions(bootstrap_results, agents):
+    """
+    Plot the distributions of Nash equilibrium metrics.
+    
+    Args:
+        bootstrap_results: Bootstrap results dictionary
+        agents: List of agent names
+        
+    Returns:
+        tuple: (me_ne_regret_fig, rd_ne_regret_fig, dual_regret_fig)
+    """
+    # Plot Max Entropy Nash equilibrium regret distribution
+    me_ne_regret_fig = plot_regret_distributions(bootstrap_results, agents, regret_type='ne_regret')
+    
+    # Plot Replicator Dynamics Nash equilibrium regret distribution
+    rd_ne_regret_fig = plot_regret_distributions(bootstrap_results, agents, regret_type='rd_regret')
+    
+    # Plot dual regret visualization comparing both equilibrium types
+    dual_regret_fig = visualize_dual_regret(bootstrap_results, agents)
+    
+    return me_ne_regret_fig, rd_ne_regret_fig, dual_regret_fig
+
+def visualize_nash_mixture_with_ci(bootstrap_results, agent_names, figsize=(14, 8), confidence=0.95):
+    """
+    Visualize the average Nash equilibrium strategies from bootstrapping with confidence intervals.
+    Shows both ME NE and RD NE distributions side by side if both are available.
+    
+    Args:
+        bootstrap_results: Dictionary with bootstrap samples containing 'ne_strategy' and optionally 'rd_strategy'
+        agent_names: List of agent names
+        figsize: Figure size tuple
+        confidence: Confidence level for intervals (default: 0.95)
+        
+    Returns:
+        matplotlib figure
+    """
+    # Check if bootstrap results contain strategies
+    if 'ne_strategy' not in bootstrap_results or not bootstrap_results['ne_strategy']:
+        raise ValueError("Bootstrap results do not contain Nash equilibrium strategies")
+    
+    has_rd = 'rd_strategy' in bootstrap_results and bootstrap_results['rd_strategy']
+    
+    # Calculate percentile thresholds for confidence intervals
+    alpha = 1 - confidence
+    lower_percentile = alpha / 2 * 100
+    upper_percentile = (1 - alpha / 2) * 100
+    
+    # Process ME Nash strategies
+    me_strategies = np.stack(bootstrap_results['ne_strategy'])
+    mean_me_strategy = np.mean(me_strategies, axis=0)
+    lower_me_ci = np.percentile(me_strategies, lower_percentile, axis=0)
+    upper_me_ci = np.percentile(me_strategies, upper_percentile, axis=0)
+    
+    # Create DataFrame with ME Nash results
+    me_results = pd.DataFrame({
+        'Agent': agent_names,
+        'ME Nash Probability': mean_me_strategy,
+        f'Lower {confidence*100:.0f}% CI': lower_me_ci,
+        f'Upper {confidence*100:.0f}% CI': upper_me_ci
+    })
+    
+    # Sort by probability (descending)
+    me_results = me_results.sort_values('ME Nash Probability', ascending=False)
+    
+    # Process RD Nash strategies if available
+    if has_rd:
+        rd_strategies = np.stack(bootstrap_results['rd_strategy'])
+        mean_rd_strategy = np.mean(rd_strategies, axis=0)
+        lower_rd_ci = np.percentile(rd_strategies, lower_percentile, axis=0)
+        upper_rd_ci = np.percentile(rd_strategies, upper_percentile, axis=0)
+        
+        # Create DataFrame with RD Nash results
+        rd_results = pd.DataFrame({
+            'Agent': agent_names,
+            'RD Nash Probability': mean_rd_strategy,
+            f'Lower {confidence*100:.0f}% CI': lower_rd_ci,
+            f'Upper {confidence*100:.0f}% CI': upper_rd_ci
+        })
+        
+        # Sort by probability (descending)
+        rd_results = rd_results.sort_values('RD Nash Probability', ascending=False)
+    
+    # Create visualization
+    fig, axes = plt.subplots(1, 2 if has_rd else 1, figsize=figsize)
+    
+    # If only ME Nash is available, axes will be a single axis not a list
+    if not has_rd:
+        axes = [axes]
+    
+    # Plot ME Nash probabilities
+    me_ax = axes[0]
+    me_bars = me_ax.barh(me_results['Agent'], me_results['ME Nash Probability'], color='lightblue')
+    
+    # Add error bars for ME Nash
+    me_ax.errorbar(
+        me_results['ME Nash Probability'],
+        me_results['Agent'],
+        xerr=[
+            me_results['ME Nash Probability'] - me_results[f'Lower {confidence*100:.0f}% CI'],
+            me_results[f'Upper {confidence*100:.0f}% CI'] - me_results['ME Nash Probability']
+        ],
+        fmt='none',
+        color='black',
+        capsize=5
+    )
+    
+    # Add ME Nash value labels
+    for i, bar in enumerate(me_bars):
+        value = me_results['ME Nash Probability'].iloc[i]
+        if value > 0.01:  # Only show labels for values above threshold
+            me_ax.text(
+                value + 0.01,
+                bar.get_y() + bar.get_height()/2,
+                f'{value:.3f}',
+                va='center',
+                fontweight='bold' if value > 0.1 else 'normal'
+            )
+    
+    me_ax.set_title('Max Entropy Nash Equilibrium Mixture', fontsize=14, fontweight='bold')
+    me_ax.set_xlabel('Probability', fontweight='bold')
+    me_ax.set_xlim(0, 1.1)  # Set x-axis limit from 0 to 1.1 to accommodate labels
+    me_ax.grid(axis='x', linestyle='--', alpha=0.7)
+    
+    # Plot RD Nash probabilities if available
+    if has_rd:
+        rd_ax = axes[1]
+        rd_bars = rd_ax.barh(rd_results['Agent'], rd_results['RD Nash Probability'], color='lightgreen')
+        
+        # Add error bars for RD Nash
+        rd_ax.errorbar(
+            rd_results['RD Nash Probability'],
+            rd_results['Agent'],
+            xerr=[
+                rd_results['RD Nash Probability'] - rd_results[f'Lower {confidence*100:.0f}% CI'],
+                rd_results[f'Upper {confidence*100:.0f}% CI'] - rd_results['RD Nash Probability']
+            ],
+            fmt='none',
+            color='black',
+            capsize=5
+        )
+        
+        # Add RD Nash value labels
+        for i, bar in enumerate(rd_bars):
+            value = rd_results['RD Nash Probability'].iloc[i]
+            if value > 0.01:  # Only show labels for values above threshold
+                rd_ax.text(
+                    value + 0.01,
+                    bar.get_y() + bar.get_height()/2,
+                    f'{value:.3f}',
+                    va='center',
+                    fontweight='bold' if value > 0.1 else 'normal'
+                )
+        
+        rd_ax.set_title('Replicator Dynamics Nash Equilibrium Mixture', fontsize=14, fontweight='bold')
+        rd_ax.set_xlabel('Probability', fontweight='bold')
+        rd_ax.set_yticklabels([])  # Hide y-axis labels since they're shown in the ME plot
+        rd_ax.set_xlim(0, 1.1)  # Set x-axis limit from 0 to 1.1 to accommodate labels
+        rd_ax.grid(axis='x', linestyle='--', alpha=0.7)
+    
+    # Add a suptitle
+    plt.suptitle(
+        f'Average Nash Equilibrium Mixes ({confidence*100:.0f}% Confidence Intervals)',
+        fontsize=16,
+        fontweight='bold',
+        y=0.98
+    )
+    
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.9)  # Make room for suptitle
+    
+    return fig

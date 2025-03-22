@@ -349,7 +349,7 @@ def save_results_to_csv(matrices, bootstrap_stats, ne_strategy_df, save_dir):
     # Save Nash equilibrium strategy
     ne_strategy_df.to_csv(os.path.join(save_dir, 'nash_equilibrium_strategy.csv'), index=False)
 
-def create_matrix_heatmap_with_rd_regret(performance_matrix, rd_regret_df, regret_type, title="Performance Matrix with RD Nash Regret", 
+def create_matrix_heatmap_with_rd_regret(performance_matrix, rd_regret_df, title="Performance Matrix with RD Nash Regret", 
                                       cmap="coolwarm", figsize=(16, 12)):
     """
     Create a heatmap visualization of a performance matrix with Replicator Dynamics Nash regret values.
@@ -357,7 +357,6 @@ def create_matrix_heatmap_with_rd_regret(performance_matrix, rd_regret_df, regre
     Parameters:
     - performance_matrix: pandas DataFrame containing the performance data
     - rd_regret_df: DataFrame containing regret values calculated against RD Nash
-    - regret_type: 'RD Nash Regret' or 'RD Traditional Regret'
     - title: title for the plot
     - cmap: colormap to use
     - figsize: figure size (width, height)
@@ -396,7 +395,8 @@ def create_matrix_heatmap_with_rd_regret(performance_matrix, rd_regret_df, regre
     # Create a Series of regrets aligned with performance matrix index
     regrets = pd.Series(index=numeric_matrix.index)
     
-    # Extract regret values from rd_regret_df
+    # Extract RD Nash regret values from rd_regret_df
+    regret_type = 'RD Nash Regret'
     for agent in numeric_matrix.index:
         idx = rd_regret_df[rd_regret_df['Agent'] == agent].index
         if len(idx) > 0:
@@ -408,29 +408,41 @@ def create_matrix_heatmap_with_rd_regret(performance_matrix, rd_regret_df, regre
     regrets = regrets.dropna()
     
     if len(regrets) > 0:
-        # Get colors based on regret values (for Nash regret, higher is better - use direct colormap)
-        # For traditional regret, lower is better - use reversed colormap
-        if regret_type == 'RD Nash Regret':
-            norm = plt.Normalize(regrets.min(), regrets.max())
-            colors = plt.cm.viridis(norm(regrets.values))
-        else:  # Traditional regret
-            norm = plt.Normalize(regrets.min(), regrets.max())
-            colors = plt.cm.viridis_r(norm(regrets.values))
+        # Ensure all regrets are at most 0 (with small tolerance)
+        epsilon = 1e-8
+        if (regrets > epsilon).any():
+            print(f"Warning: Some RD Nash regrets are positive: {regrets[regrets > epsilon].values}")
+            print("Setting these regrets to 0 for visualization correctness.")
+            regrets[regrets > epsilon] = 0.0
+            
+        # Sort by regret (closer to 0 is better)
+        regrets = regrets.sort_values(ascending=False)
+            
+        # Use a colormap that shows closer to 0 as better (green)
+        norm = plt.Normalize(regrets.min(), 0)  # 0 is the upper bound
+        colors = plt.cm.RdYlGn(norm(regrets.values))
         
         # Plot bars in the same order as the heatmap rows
         for i, (agent, value) in enumerate(regrets.items()):
             y_pos = list(numeric_matrix.index).index(agent)
             ax_regret.barh(y_pos, value, color=colors[i], height=0.8)
-            ax_regret.text(value + (regrets.max() * 0.02), y_pos, f"{value:.2f}", 
+            
+            # Position text based on value
+            text_offset = abs(regrets.min()) * 0.02 if regrets.min() < 0 else 0.01
+            ax_regret.text(value - text_offset, y_pos, f"{value:.4f}", 
                           va='center', fontsize=9)
         
         # Set y-tick labels to agent names (same as heatmap)
         ax_regret.set_yticks(range(len(numeric_matrix.index)))
         ax_regret.set_yticklabels([])  # No need for labels, they're already on the heatmap
         
-        # Set labels
-        ax_regret.set_xlabel(regret_type, fontweight='bold')
-        ax_regret.set_title(regret_type, fontweight='bold')
+        # Set labels and add reference line at 0
+        ax_regret.set_xlabel('RD Nash Regret\n(closer to 0 is better)', fontweight='bold')
+        ax_regret.set_title('RD Nash Regret\n(should be ≤ 0)', fontweight='bold')
+        ax_regret.axvline(x=0, color='black', linestyle='--', alpha=0.7)
+        
+        # Set x-axis limits to show all bars clearly
+        ax_regret.set_xlim(min(regrets.min() * 1.1, -0.001), 0.001)  # Small buffer around 0
         
         # Set y-axis limits to match heatmap
         ax_regret.set_ylim(ax_heatmap.get_ylim())
@@ -449,7 +461,7 @@ def create_matrix_heatmap_with_rd_regret(performance_matrix, rd_regret_df, regre
 
 def visualize_rd_regret_heatmaps(performance_matrix, rd_regret_df, save_dir=None):
     """
-    Create heatmap visualizations with RD Nash regret and traditional regret marginals.
+    Create heatmap visualizations with RD Nash regret marginals.
     
     Args:
         performance_matrix: Performance matrix DataFrame
@@ -469,7 +481,6 @@ def visualize_rd_regret_heatmaps(performance_matrix, rd_regret_df, save_dir=None
     fig_nash = create_matrix_heatmap_with_rd_regret(
         performance_matrix,
         rd_regret_df,
-        regret_type='RD Nash Regret',
         title="Performance Matrix with RD Nash Regret"
     )
     figures['performance_with_rd_nash_regret'] = fig_nash
@@ -478,20 +489,6 @@ def visualize_rd_regret_heatmaps(performance_matrix, rd_regret_df, save_dir=None
         filepath = os.path.join(save_dir, 'performance_with_rd_nash_regret.png')
         fig_nash.savefig(filepath, bbox_inches='tight', dpi=300)
         plt.close(fig_nash)
-    
-    # Create heatmap with traditional regret marginal
-    fig_trad = create_matrix_heatmap_with_rd_regret(
-        performance_matrix,
-        rd_regret_df,
-        regret_type='RD Traditional Regret',
-        title="Performance Matrix with RD Traditional Regret"
-    )
-    figures['performance_with_rd_traditional_regret'] = fig_trad
-    
-    if save_dir:
-        filepath = os.path.join(save_dir, 'performance_with_rd_traditional_regret.png')
-        fig_trad.savefig(filepath, bbox_inches='tight', dpi=300)
-        plt.close(fig_trad)
     
     return figures
 

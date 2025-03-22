@@ -9,6 +9,7 @@ def create_matrix_heatmap_with_nash_regret(performance_matrix, nash_regrets, tit
                                          cmap="coolwarm", figsize=(16, 12)):
     """
     Create a heatmap visualization of a performance matrix with Nash regret values.
+    Nash regret values should be at most 0 in a proper Nash equilibrium.
     
     Parameters:
     - performance_matrix: pandas DataFrame containing the performance data
@@ -62,6 +63,7 @@ def create_matrix_heatmap_with_nash_regret(performance_matrix, nash_regrets, tit
                         if 'regret' in col.lower():
                             regrets[agent] = nash_regrets.loc[agent, col]
                             break
+                    # If no regret column found, use the first numeric column
                     if np.isnan(regrets[agent]):
                         for col in nash_regrets.columns:
                             if pd.api.types.is_numeric_dtype(nash_regrets[col]):
@@ -75,21 +77,43 @@ def create_matrix_heatmap_with_nash_regret(performance_matrix, nash_regrets, tit
     
     regrets = regrets.dropna()
     
-    regrets = regrets.sort_values(ascending=True)
+    # Ensure all regrets are non-positive (using a small tolerance)
+    '''
+    epsilon = 1e-8
+    if (regrets > epsilon).any():
+        print(f"Warning: Some regrets are positive: {regrets[regrets > epsilon].values}")
+        print("Setting these regrets to 0 for visualization correctness.")
+        regrets[regrets > epsilon] = 0.0
+    '''
+    # Sort regrets by value (in Nash equilibrium, less negative is better)
+    regrets = regrets.sort_values(ascending=False)
     
     if len(regrets) > 0:
-        colors = plt.cm.viridis(np.linspace(0, 1, len(regrets)))
+        # Use a colormap that shows close-to-zero regrets as green and more negative regrets as red
+        # Since all regrets should be ≤ 0, we'll create a diverging colormap focused on negative values
+        norm = plt.Normalize(regrets.min(), 0)  # 0 is the upper bound for regrets
+        colors = plt.cm.RdYlGn(norm(regrets.values))  # Red (bad) to Yellow to Green (good)
+        
         bars = ax_regret.barh(range(len(regrets)), regrets.values, color=colors)
         
         for i, value in enumerate(regrets.values):
-            ax_regret.text(value + (max(regrets.values) * 0.02), i, f"{value:.2f}", 
-                          va='center', fontsize=9)
+            # Add text to show the value
+            # For Nash regrets, closer to 0 is better (less exploitability)
+            text_color = 'black'
+            ax_regret.text(value - (abs(regrets.min()) * 0.02), i, f"{value:.4f}", 
+                         va='center', fontsize=9, color=text_color)
         
         ax_regret.set_yticks(range(len(regrets)))
         ax_regret.set_yticklabels(regrets.index, fontweight='bold')
         
-        ax_regret.set_xlabel('Nash Equilibrium Regret', fontweight='bold')
-        ax_regret.set_title('NE Regret', fontweight='bold')
+        ax_regret.set_xlabel('Nash Equilibrium Regret\n(closer to 0 is better)', fontweight='bold')
+        ax_regret.set_title('NE Regret\n(should be ≤ 0)', fontweight='bold')
+        
+        # Add a horizontal line at 0
+        ax_regret.axvline(x=0, color='black', linestyle='--', alpha=0.7)
+        
+        # Set x-axis limits to show all bars clearly
+        ax_regret.set_xlim(min(regrets.min() * 1.1, -0.001), 0.001)  # Small buffer around 0
         
         ax_regret.spines['top'].set_visible(False)
         ax_regret.spines['right'].set_visible(False)
@@ -182,150 +206,15 @@ def create_matrix_with_relative_performance(performance_matrix, bootstrap_stats,
     plt.tight_layout()
     return fig
 
-def create_matrix_with_traditional_regret(performance_matrix, bootstrap_stats, title="Performance Matrix with Traditional Regret", figsize=(12, 10)):
+def create_dual_regret_visualization(performance_matrix, bootstrap_stats, title="Nash Regret Analysis", 
+                                   figsize=(18, 14)):
     """
-    Create a heatmap of the performance matrix with traditional regret
-    
-    Args:
-        performance_matrix: DataFrame with performance data
-        bootstrap_stats: DataFrame with bootstrap statistics
-        title: Plot title
-        figsize: Figure size
-        
-    Returns:
-        matplotlib figure
-    """
-    # Sort agents by traditional regret (ascending - lower is better)
-    sorted_agents = bootstrap_stats.sort_values("Mean Traditional Regret")["Agent"].tolist()
-    
-    # Reindex the performance matrix
-    sorted_matrix = performance_matrix.loc[sorted_agents, sorted_agents]
-    
-    # Create the figure
-    fig = plt.figure(figsize=figsize)
-    
-    # Add regret bar on the right
-    gs = gridspec.GridSpec(1, 2, width_ratios=[4, 1])
-    
-    # Matrix heatmap
-    ax1 = plt.subplot(gs[0])
-    matrix_heatmap = sns.heatmap(
-        sorted_matrix, 
-        annot=True, 
-        fmt=".2f", 
-        cmap="YlGnBu",
-        cbar_kws={"label": "Performance"}, 
-        ax=ax1
-    )
-    ax1.set_title("Performance Matrix\n(Agents ordered by Traditional Regret)", fontsize=14)
-    
-    # Regret bar chart
-    ax2 = plt.subplot(gs[1])
-    
-    # Extract regret values for sorted agents
-    regret_values = bootstrap_stats.set_index("Agent").loc[sorted_agents, "Mean Traditional Regret"]
-    
-    regret_bars = ax2.barh(
-        range(len(sorted_agents)), 
-        regret_values,
-        color='skyblue',
-        alpha=0.8
-    )
-    
-    ax2.set_yticks(range(len(sorted_agents)))
-    ax2.set_yticklabels([])  # Hide agent names since they're shown in the matrix
-    ax2.set_xlabel("Traditional Regret\n(Lower is Better)", fontsize=12)
-    ax2.set_title("Traditional Regret", fontsize=14)
-    
-    # Add value labels
-    for i, bar in enumerate(regret_bars):
-        value = regret_values.iloc[i]
-        ax2.text(value + 0.01, i, f'{value:.3f}', va='center', fontsize=9)
-    
-    plt.suptitle(title, fontsize=16, y=1.02)
-    plt.tight_layout()
-    
-    return fig
-
-def create_matrix_with_relative_performance(performance_matrix, bootstrap_stats, title="Performance Matrix with Relative Performance", figsize=(12, 10)):
-    """
-    Create a heatmap of the performance matrix with relative performance
-    
-    Args:
-        performance_matrix: DataFrame with performance data
-        bootstrap_stats: DataFrame with bootstrap statistics
-        title: Plot title
-        figsize: Figure size
-        
-    Returns:
-        matplotlib figure
-    """
-    # Sort agents by relative performance (descending - higher is better)
-    sorted_agents = bootstrap_stats.sort_values("Mean NE Regret", ascending=False)["Agent"].tolist()
-    
-    # Reindex the performance matrix
-    sorted_matrix = performance_matrix.loc[sorted_agents, sorted_agents]
-    
-    # Create the figure
-    fig = plt.figure(figsize=figsize)
-    
-    # Add regret bar on the right
-    gs = gridspec.GridSpec(1, 2, width_ratios=[4, 1])
-    
-    # Matrix heatmap
-    ax1 = plt.subplot(gs[0])
-    matrix_heatmap = sns.heatmap(
-        sorted_matrix, 
-        annot=True, 
-        fmt=".2f", 
-        cmap="YlGnBu",
-        cbar_kws={"label": "Performance"}, 
-        ax=ax1
-    )
-    ax1.set_title("Performance Matrix\n(Agents ordered by Relative Performance)", fontsize=14)
-    
-    # Regret bar chart
-    ax2 = plt.subplot(gs[1])
-    
-    # Extract regret values for sorted agents
-    regret_values = bootstrap_stats.set_index("Agent").loc[sorted_agents, "Mean NE Regret"]
-    
-    regret_bars = ax2.barh(
-        range(len(sorted_agents)), 
-        regret_values,
-        color=['green' if x >= 0 else 'red' for x in regret_values],
-        alpha=0.8
-    )
-    
-    ax2.set_yticks(range(len(sorted_agents)))
-    ax2.set_yticklabels([])  # Hide agent names since they're shown in the matrix
-    ax2.set_xlabel("Relative Performance\n(Higher is Better)", fontsize=12)
-    ax2.set_title("Relative Performance", fontsize=14)
-    ax2.axvline(x=0, color='black', linestyle='--', alpha=0.7)
-    
-    # Add value labels
-    for i, bar in enumerate(regret_bars):
-        value = regret_values.iloc[i]
-        text_offset = np.sign(value) * 0.01
-        ax2.text(value + text_offset, i, f'{value:.3f}', va='center', fontsize=9, 
-                color='darkgreen' if value >= 0 else 'darkred')
-    
-    plt.suptitle(title, fontsize=16, y=1.02)
-    plt.tight_layout()
-    
-    return fig
-
-def create_dual_regret_heatmap(performance_matrix, bootstrap_stats, title="Performance Matrix with Dual Regret Metrics", 
-                              cmap="coolwarm", figsize=(20, 12)):
-    """
-    Create a heatmap visualization of a performance matrix with both traditional regret and 
-    relative performance (NE regret) metrics.
+    Create a visualization with both Nash equilibrium regret and relative performance.
     
     Parameters:
     - performance_matrix: pandas DataFrame containing the performance data
-    - bootstrap_stats: DataFrame containing both regret metrics for each agent
+    - bootstrap_stats: DataFrame with bootstrap statistics
     - title: title for the plot
-    - cmap: colormap to use
     - figsize: figure size (width, height)
     
     Returns:
@@ -339,95 +228,115 @@ def create_dual_regret_heatmap(performance_matrix, bootstrap_stats, title="Perfo
     mask = np.isnan(numeric_matrix)
     
     fig = plt.figure(figsize=figsize)
-    gs = plt.GridSpec(1, 6, figure=fig, width_ratios=[4, 1, 1, 0.2, 0.2, 0.2])
+    gs = gridspec.GridSpec(2, 3, height_ratios=[2, 1], width_ratios=[3, 1, 1])
     
-    ax_heatmap = fig.add_subplot(gs[0, 0])
-    ax_relative = fig.add_subplot(gs[0, 1])
-    ax_traditional = fig.add_subplot(gs[0, 2])
+    # Main heatmap
+    ax_matrix = plt.subplot(gs[0, 0])
     
-    # Heatmap of performance matrix
-    sns.heatmap(numeric_matrix, ax=ax_heatmap, cmap=cmap, annot=True, fmt=".2f",
-                cbar=False, linewidths=0.5, mask=mask)
+    # Nash regret subplot
+    ax_nash = plt.subplot(gs[0, 1])
     
-    ax_heatmap.set_title(title, fontsize=16, fontweight='bold')
-    ax_heatmap.set_xticklabels(ax_heatmap.get_xticklabels(), rotation=45, ha='right', fontweight='bold')
-    ax_heatmap.set_yticklabels(ax_heatmap.get_yticklabels(), fontweight='bold')
+    # Scatter plot at bottom
+    ax_scatter = plt.subplot(gs[1, :])
     
-    # Process bootstrap_stats to get both regret metrics
-    relative_regrets = pd.Series(index=numeric_matrix.index)
-    traditional_regrets = pd.Series(index=numeric_matrix.index)
+    # Draw the main heatmap
+    sns.heatmap(numeric_matrix, ax=ax_matrix, cmap="YlGnBu", annot=True, fmt=".2f",
+                cbar=True, linewidths=0.5, mask=mask, 
+                cbar_kws={"label": "Performance Score", "shrink": 0.8})
     
-    if isinstance(bootstrap_stats, pd.DataFrame):
-        if 'Mean NE Regret' in bootstrap_stats.columns and 'Agent' in bootstrap_stats.columns:
-            # Get relative regret (NE regret)
-            regrets_dict = dict(zip(bootstrap_stats['Agent'], bootstrap_stats['Mean NE Regret']))
-            for agent in numeric_matrix.index:
-                if agent in regrets_dict:
-                    relative_regrets[agent] = regrets_dict[agent]
-                else:
-                    relative_regrets[agent] = np.nan
+    ax_matrix.set_title("Performance Matrix", fontsize=16, fontweight='bold')
+    ax_matrix.set_xticklabels(ax_matrix.get_xticklabels(), rotation=45, ha='right', fontweight='bold')
+    ax_matrix.set_yticklabels(ax_matrix.get_yticklabels(), fontweight='bold')
+    
+    # Prepare data
+    ne_regrets = pd.Series(index=numeric_matrix.index)
+    
+    # Get Nash regret if available
+    if 'Mean NE Regret' in bootstrap_stats.columns:
+        ne_dict = dict(zip(bootstrap_stats['Agent'], bootstrap_stats['Mean NE Regret']))
+        for agent in numeric_matrix.index:
+            if agent in ne_dict:
+                ne_regrets[agent] = ne_dict[agent]
+            else:
+                ne_regrets[agent] = np.nan
+    
+    # Sort agents by Nash regret
+    ne_regrets = ne_regrets.dropna()
+    ne_regrets = ne_regrets.sort_values()  # Lower is better for NE regret
+    
+    # Plot Nash regret (lower is better)
+    if len(ne_regrets) > 0:
+        # Normalize regrets for colormap
+        norm = plt.Normalize(ne_regrets.min(), ne_regrets.max())
+        colors = plt.cm.viridis_r(norm(ne_regrets.values))  # Reversed so lower is better
+        
+        bars = ax_nash.barh(range(len(ne_regrets)), ne_regrets.values, color=colors)
+        
+        for i, value in enumerate(ne_regrets.values):
+            ax_nash.text(value + (ne_regrets.max() * 0.02), i, f"{value:.2f}", 
+                        va='center', fontsize=9)
+        
+        ax_nash.set_yticks(range(len(ne_regrets)))
+        ax_nash.set_yticklabels(ne_regrets.index, fontweight='bold')
+        
+        ax_nash.set_xlabel('Nash Equilibrium Regret', fontweight='bold')
+        ax_nash.set_title('NE Regret\n(Lower is Better)', fontweight='bold')
+        
+        ax_nash.spines['top'].set_visible(False)
+        ax_nash.spines['right'].set_visible(False)
+    else:
+        ax_nash.text(0.5, 0.5, "No valid Nash regret data", 
+                    ha='center', va='center', fontsize=12)
+        ax_nash.axis('off')
+    
+    # Prepare scatter plot data
+    scatter_data = []
+    for agent in numeric_matrix.index:
+        if agent in ne_regrets:
+            ne_regret = ne_regrets[agent]
             
-            # Get traditional regret if available
-            if 'Mean Traditional Regret' in bootstrap_stats.columns:
-                trad_dict = dict(zip(bootstrap_stats['Agent'], bootstrap_stats['Mean Traditional Regret']))
-                for agent in numeric_matrix.index:
-                    if agent in trad_dict:
-                        traditional_regrets[agent] = trad_dict[agent]
-                    else:
-                        traditional_regrets[agent] = np.nan
+            # Calculate mean performance as average of row
+            mean_performance = numeric_matrix.loc[agent].mean()
+            
+            scatter_data.append({
+                'Agent': agent,
+                'NE Regret': ne_regret,
+                'Mean Performance': mean_performance
+            })
     
-    relative_regrets = relative_regrets.dropna()
-    traditional_regrets = traditional_regrets.dropna()
-    
-    # Sort both regret series
-    relative_regrets = relative_regrets.sort_values(ascending=False)  # Higher is better
-    traditional_regrets = traditional_regrets.sort_values(ascending=True)  # Lower is better
-    
-    # Plot relative performance (higher is better)
-    if len(relative_regrets) > 0:
-        rel_colors = ['green' if val >= 0 else 'red' for val in relative_regrets.values]
-        bars1 = ax_relative.barh(range(len(relative_regrets)), relative_regrets.values, color=rel_colors)
+    if scatter_data:
+        scatter_df = pd.DataFrame(scatter_data)
         
-        for i, value in enumerate(relative_regrets.values):
-            text_color = 'darkgreen' if value >= 0 else 'darkred'
-            ax_relative.text(value + np.sign(value) * (max(abs(min(relative_regrets.values)), 
-                                                          abs(max(relative_regrets.values))) * 0.02), 
-                           i, f"{value:.2f}", va='center', fontsize=9, color=text_color)
+        # Create scatter plot
+        sns.scatterplot(
+            x='NE Regret', 
+            y='Mean Performance', 
+            data=scatter_df,
+            s=100,
+            alpha=0.7,
+            ax=ax_scatter
+        )
         
-        ax_relative.set_yticks(range(len(relative_regrets)))
-        ax_relative.set_yticklabels(relative_regrets.index, fontweight='bold')
+        # Add agent labels to points
+        for i, row in scatter_df.iterrows():
+            ax_scatter.annotate(
+                row['Agent'],
+                (row['NE Regret'], row['Mean Performance']),
+                xytext=(5, 5),
+                textcoords='offset points',
+                fontsize=10
+            )
         
-        ax_relative.set_xlabel('Relative Performance\n(expected_utility - nash_value)', fontweight='bold')
-        ax_relative.set_title('Relative Performance\n(Higher is Better)', fontweight='bold')
+        ax_scatter.set_title('NE Regret vs. Mean Performance', fontsize=14, fontweight='bold')
+        ax_scatter.set_xlabel('Nash Equilibrium Regret (Lower is Better)', fontweight='bold')
+        ax_scatter.set_ylabel('Mean Performance (Higher is Better)', fontweight='bold')
         
-        ax_relative.axvline(x=0, color='r', linestyle='--', alpha=0.7)
-        ax_relative.spines['top'].set_visible(False)
-        ax_relative.spines['right'].set_visible(False)
+        # Add grid
+        ax_scatter.grid(True, alpha=0.3)
     else:
-        ax_relative.text(0.5, 0.5, "No valid relative performance data", 
+        ax_scatter.text(0.5, 0.5, "Insufficient data for scatter plot", 
                       ha='center', va='center', fontsize=12)
-        ax_relative.axis('off')
-    
-    # Plot traditional regret (lower is better)
-    if len(traditional_regrets) > 0:
-        bars2 = ax_traditional.barh(range(len(traditional_regrets)), traditional_regrets.values, color='blue')
-        
-        for i, value in enumerate(traditional_regrets.values):
-            ax_traditional.text(value + (max(traditional_regrets.values) * 0.02), 
-                              i, f"{value:.2f}", va='center', fontsize=9)
-        
-        ax_traditional.set_yticks(range(len(traditional_regrets)))
-        ax_traditional.set_yticklabels(traditional_regrets.index, fontweight='bold')
-        
-        ax_traditional.set_xlabel('Traditional Regret\n(max_utility - expected_utility)', fontweight='bold')
-        ax_traditional.set_title('Traditional Regret\n(Lower is Better)', fontweight='bold')
-        
-        ax_traditional.spines['top'].set_visible(False)
-        ax_traditional.spines['right'].set_visible(False)
-    else:
-        ax_traditional.text(0.5, 0.5, "No valid traditional regret data", 
-                         ha='center', va='center', fontsize=12)
-        ax_traditional.axis('off')
+        ax_scatter.axis('off')
     
     plt.tight_layout()
     return fig 

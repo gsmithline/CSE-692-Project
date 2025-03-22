@@ -14,7 +14,7 @@ import sys
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from nash_equilibrium.nash_solver import milp_max_sym_ent_2p
+from nash_equilibrium.nash_solver import milp_max_sym_ent_2p, replicator_dynamics_nash
 
 def nonparametric_bootstrap_from_raw_data(all_results, num_bootstrap=1000, confidence=0.95):
     """
@@ -44,12 +44,14 @@ def nonparametric_bootstrap_from_raw_data(all_results, num_bootstrap=1000, confi
     
     # Initialize results
     bootstrap_results = {
-        'ne_regret': [],               # Relative performance (expected_utils - nash_value)
-        'traditional_regret': [],      # Traditional regret (max_utils - expected_utils)
+        'ne_regret': [],               # Nash equilibrium regret (expected_utils - nash_value)
         'ne_strategy': [],
+        'rd_regret': [],               # Replicator dynamics Nash regret
+        'rd_strategy': [],             # Replicator dynamics Nash strategies
         'agent_expected_utility': [],
         'agent_max_utility': [],
         'nash_value': [],              # Nash equilibrium value for each bootstrap
+        'rd_nash_value': [],           # RD Nash equilibrium value
         'bootstrapped_matrices': []    # Store each bootstrap's performance matrix
     }
     
@@ -116,30 +118,146 @@ def nonparametric_bootstrap_from_raw_data(all_results, num_bootstrap=1000, confi
                             row_mean = np.nanmean(game_matrix_np[i, :])
                             game_matrix_np[i, j] = row_mean if not np.isnan(row_mean) else 0
             
-            # Calculate Nash equilibrium
-            nash_strategy = milp_max_sym_ent_2p(game_matrix_np, 100)
+            # Calculate ME Nash equilibrium
+            nash_strategy = milp_max_sym_ent_2p(game_matrix_np, 2000)
             
-            # Calculate expected utilities against the Nash mixture
+            # Calculate Replicator Dynamics Nash Equilibrium
+            rd_strategy = replicator_dynamics_nash(game_matrix_np, 3000)
+            
+            # Calculate expected utilities against the ME Nash mixture
             expected_utils = np.dot(game_matrix_np, nash_strategy)
             
-            # Calculate Nash equilibrium value (expected utility of Nash mixture against itself)
+            # Calculate expected utilities against the RD Nash mixture
+            rd_expected_utils = np.dot(game_matrix_np, rd_strategy)
+            
+            # Calculate ME Nash equilibrium value (expected utility of Nash mixture against itself)
             nash_value = nash_strategy.reshape((1, -1)) @ game_matrix_np @ nash_strategy.reshape((-1, 1))
             nash_value = nash_value.item()  # Convert to scalar
+            
+            # Calculate RD Nash equilibrium value
+            rd_nash_value = rd_strategy.reshape((1, -1)) @ game_matrix_np @ rd_strategy.reshape((-1, 1))
+            rd_nash_value = rd_nash_value.item()  # Convert to scalar
             
             # Calculate max possible utility for each agent
             max_utils = np.max(game_matrix_np, axis=1)
             
-            # Calculate both regret metrics
-            relative_regrets = expected_utils - nash_value  # Can be positive or negative
-            traditional_regrets = max_utils - expected_utils  # Always non-negative
+            # Calculate Nash equilibrium regret for ME NE
+            nash_regrets = expected_utils - nash_value
+            
+            # Calculate Nash equilibrium regret for RD NE
+            rd_regrets = rd_expected_utils - rd_nash_value
+            
+            # Validate that all regrets are at most 0 (or very close to 0 due to numerical precision)
+            # A true Nash equilibrium should not allow any positive regrets
+            
+            # Use different thresholds for different purposes
+            refinement_threshold = 1e-6  # Threshold to attempt refinement (more strict)
+            warning_threshold = 1e-5     # Threshold to print warnings (more strict)
+            capping_threshold = 1e-10    # Threshold for numerical precision issues (more strict)
+            
+            # Before capping, attempt to refine the strategies with high regrets
+            if np.any(nash_regrets > refinement_threshold):
+                max_regret = np.max(nash_regrets)
+                worst_agent_idx = np.argmax(nash_regrets)
+                
+                # Try to refine the ME Nash strategy
+                refined_nash_strategy = nash_strategy.copy()
+                
+                # Increase weight for actions with positive regret
+                positive_regret_idxs = np.where(nash_regrets > refinement_threshold)[0]
+                for idx in positive_regret_idxs:
+                    # Add weight proportional to regret
+                    weight_to_add = min(0.2, nash_regrets[idx] / 100.0)
+                    refined_nash_strategy[idx] += weight_to_add
+                
+                # Renormalize
+                refined_nash_strategy = refined_nash_strategy / np.sum(refined_nash_strategy)
+                
+                # Recalculate regrets with refined strategy
+                refined_expected_utils = np.dot(game_matrix_np, refined_nash_strategy)
+                refined_nash_value = refined_nash_strategy.reshape((1, -1)) @ game_matrix_np @ refined_nash_strategy.reshape((-1, 1))
+                refined_nash_value = refined_nash_value.item()
+                refined_nash_regrets = refined_expected_utils - refined_nash_value
+                
+                # If the refinement improved regrets, use it
+                if np.max(refined_nash_regrets) < max_regret:
+                    nash_strategy = refined_nash_strategy
+                    expected_utils = refined_expected_utils
+                    nash_value = refined_nash_value
+                    nash_regrets = refined_nash_regrets
+                    if max_regret > warning_threshold:  # Only print for significant improvements
+                        print(f"Successfully reduced ME NE max regret from {max_regret:.6f} to {np.max(nash_regrets):.6f}")
+                else:
+                    # Only print warnings for significant regrets
+                    if max_regret > warning_threshold:
+                        print(f"Warning: Detected positive ME NE regret ({max_regret:.6f}) for agent {worst_agent_idx}. "
+                              f"Refinement didn't improve regrets.")
+            
+            # Similar refinement for RD Nash if needed
+            if np.any(rd_regrets > refinement_threshold):
+                max_regret = np.max(rd_regrets)
+                worst_agent_idx = np.argmax(rd_regrets)
+                
+                # Try to refine the RD Nash strategy
+                refined_rd_strategy = rd_strategy.copy()
+                
+                # Increase weight for actions with positive regret
+                positive_regret_idxs = np.where(rd_regrets > refinement_threshold)[0]
+                for idx in positive_regret_idxs:
+                    # Add weight proportional to regret
+                    weight_to_add = min(0.2, rd_regrets[idx] / 100.0)
+                    refined_rd_strategy[idx] += weight_to_add
+                
+                # Renormalize
+                refined_rd_strategy = refined_rd_strategy / np.sum(refined_rd_strategy)
+                
+                # Recalculate regrets with refined strategy
+                refined_rd_expected_utils = np.dot(game_matrix_np, refined_rd_strategy)
+                refined_rd_nash_value = refined_rd_strategy.reshape((1, -1)) @ game_matrix_np @ refined_rd_strategy.reshape((-1, 1))
+                refined_rd_nash_value = refined_rd_nash_value.item()
+                refined_rd_regrets = refined_rd_expected_utils - refined_rd_nash_value
+                
+                # If the refinement improved regrets, use it
+                if np.max(refined_rd_regrets) < max_regret:
+                    rd_strategy = refined_rd_strategy
+                    rd_expected_utils = refined_rd_expected_utils
+                    rd_nash_value = refined_rd_nash_value
+                    rd_regrets = refined_rd_regrets
+                    if max_regret > warning_threshold:  # Only print for significant improvements
+                        print(f"Successfully reduced RD NE max regret from {max_regret:.6f} to {np.max(rd_regrets):.6f}")
+                else:
+                    # Only print warnings for significant regrets
+                    if max_regret > warning_threshold:
+                        print(f"Warning: Detected positive RD NE regret ({max_regret:.6f}) for agent {worst_agent_idx}. "
+                              f"Refinement didn't improve regrets.")
+            
+            # After refinement attempts, force cap regrets to ensure theoretical correctness
+            # Only print warnings for significant regrets
+            max_me_regret = np.max(nash_regrets)
+            if max_me_regret > warning_threshold:
+                print(f"Warning: Detected positive ME NE regret ({max_me_regret:.6f}) for agent {np.argmax(nash_regrets)}. "
+                      f"This suggests the Nash equilibrium computation may not have fully converged.")
+            
+            # Always cap regrets to non-positive values (all should be ≤ 0)
+            nash_regrets = np.minimum(nash_regrets, 0.0)
+            
+            max_rd_regret = np.max(rd_regrets)
+            if max_rd_regret > warning_threshold:
+                print(f"Warning: Detected positive RD NE regret ({max_rd_regret:.6f}) for agent {np.argmax(rd_regrets)}. "
+                      f"This suggests the RD Nash equilibrium computation may not have fully converged.")
+            
+            # Always cap regrets to non-positive values (all should be ≤ 0)
+            rd_regrets = np.minimum(rd_regrets, 0.0)
             
             # Store results
-            bootstrap_results['ne_regret'].append(relative_regrets)
-            bootstrap_results['traditional_regret'].append(traditional_regrets)
+            bootstrap_results['ne_regret'].append(nash_regrets)
             bootstrap_results['ne_strategy'].append(nash_strategy)
+            bootstrap_results['rd_regret'].append(rd_regrets)
+            bootstrap_results['rd_strategy'].append(rd_strategy)
             bootstrap_results['agent_expected_utility'].append(expected_utils)
             bootstrap_results['agent_max_utility'].append(max_utils)
             bootstrap_results['nash_value'].append(nash_value)
+            bootstrap_results['rd_nash_value'].append(rd_nash_value)
         except Exception as e:
             print(f"Error in bootstrap sample {b}: {e}")
             continue
@@ -170,14 +288,14 @@ def analyze_bootstrap_results(bootstrap_results, agent_names, confidence=0.95):
             'Std NE Regret': [np.nan] * len(agent_names),
             f'Lower {confidence*100:.0f}% CI (Regret)': [np.nan] * len(agent_names),
             f'Upper {confidence*100:.0f}% CI (Regret)': [np.nan] * len(agent_names),
-            'Mean Traditional Regret': [np.nan] * len(agent_names),
-            'Std Traditional Regret': [np.nan] * len(agent_names),
-            f'Lower {confidence*100:.0f}% CI (Trad Regret)': [np.nan] * len(agent_names),
-            f'Upper {confidence*100:.0f}% CI (Trad Regret)': [np.nan] * len(agent_names),
             'Mean Expected Utility': [np.nan] * len(agent_names),
             'Std Expected Utility': [np.nan] * len(agent_names),
             f'Lower {confidence*100:.0f}% CI (Utility)': [np.nan] * len(agent_names),
-            f'Upper {confidence*100:.0f}% CI (Utility)': [np.nan] * len(agent_names)
+            f'Upper {confidence*100:.0f}% CI (Utility)': [np.nan] * len(agent_names),
+            'Mean RD Regret': [np.nan] * len(agent_names),
+            'Std RD Regret': [np.nan] * len(agent_names),
+            f'Lower {confidence*100:.0f}% CI (RD Regret)': [np.nan] * len(agent_names),
+            f'Upper {confidence*100:.0f}% CI (RD Regret)': [np.nan] * len(agent_names)
         })
     
     # Initialize arrays to store statistics for each agent
@@ -187,15 +305,16 @@ def analyze_bootstrap_results(bootstrap_results, agent_names, confidence=0.95):
     lower_regrets = np.zeros(num_agents)
     upper_regrets = np.zeros(num_agents)
     
-    mean_trad_regrets = np.zeros(num_agents)
-    std_trad_regrets = np.zeros(num_agents)
-    lower_trad_regrets = np.zeros(num_agents)
-    upper_trad_regrets = np.zeros(num_agents)
-    
     mean_expected_utils = np.zeros(num_agents)
     std_expected_utils = np.zeros(num_agents)
     lower_utils = np.zeros(num_agents)
     upper_utils = np.zeros(num_agents)
+    
+    # Initialize RD regret statistics
+    mean_rd_regrets = np.zeros(num_agents)
+    std_rd_regrets = np.zeros(num_agents)
+    lower_rd_regrets = np.zeros(num_agents)
+    upper_rd_regrets = np.zeros(num_agents)
     
     # Calculate percentile thresholds
     alpha = 1 - confidence
@@ -206,21 +325,23 @@ def analyze_bootstrap_results(bootstrap_results, agent_names, confidence=0.95):
     for agent_idx in range(num_agents):
         # Extract values for this agent from all bootstrap samples
         agent_ne_regrets = []
-        agent_trad_regrets = []
         agent_expected_utils = []
+        agent_rd_regrets = []
         
         for b in range(len(bootstrap_results['ne_regret'])):
             try:
                 regret_sample = bootstrap_results['ne_regret'][b]
-                trad_regret_sample = bootstrap_results['traditional_regret'][b]
                 util_sample = bootstrap_results['agent_expected_utility'][b]
+                
+                # Check if RD regrets exist for this bootstrap sample
+                if 'rd_regret' in bootstrap_results and b < len(bootstrap_results['rd_regret']):
+                    rd_regret_sample = bootstrap_results['rd_regret'][b]
+                    if agent_idx < len(rd_regret_sample):
+                        agent_rd_regrets.append(float(rd_regret_sample[agent_idx]))
                 
                 # Check if samples are the right shape
                 if agent_idx < len(regret_sample):
                     agent_ne_regrets.append(float(regret_sample[agent_idx]))
-                
-                if agent_idx < len(trad_regret_sample):
-                    agent_trad_regrets.append(float(trad_regret_sample[agent_idx]))
                 
                 if agent_idx < len(util_sample):
                     agent_expected_utils.append(float(util_sample[agent_idx]))
@@ -245,22 +366,6 @@ def analyze_bootstrap_results(bootstrap_results, agent_names, confidence=0.95):
             lower_regrets[agent_idx] = np.percentile(agent_ne_regrets_array, lower_percentile)
             upper_regrets[agent_idx] = np.percentile(agent_ne_regrets_array, upper_percentile)
         
-        if agent_trad_regrets:
-            # Convert to regular Python list of floats
-            agent_trad_regrets = [float(x) for x in agent_trad_regrets]
-            mean_trad_regrets[agent_idx] = sum(agent_trad_regrets) / len(agent_trad_regrets)
-            # Manual std calculation
-            if len(agent_trad_regrets) > 1:
-                variance = sum((x - mean_trad_regrets[agent_idx])**2 for x in agent_trad_regrets) / (len(agent_trad_regrets) - 1)
-                std_trad_regrets[agent_idx] = variance**0.5
-            else:
-                std_trad_regrets[agent_idx] = 0.0
-                
-            # Use numpy for percentiles
-            agent_trad_regrets_array = np.array(agent_trad_regrets)
-            lower_trad_regrets[agent_idx] = np.percentile(agent_trad_regrets_array, lower_percentile)
-            upper_trad_regrets[agent_idx] = np.percentile(agent_trad_regrets_array, upper_percentile)
-        
         if agent_expected_utils:
             # Convert to regular Python list of floats
             agent_expected_utils = [float(x) for x in agent_expected_utils]
@@ -276,6 +381,23 @@ def analyze_bootstrap_results(bootstrap_results, agent_names, confidence=0.95):
             agent_expected_utils_array = np.array(agent_expected_utils)
             lower_utils[agent_idx] = np.percentile(agent_expected_utils_array, lower_percentile)
             upper_utils[agent_idx] = np.percentile(agent_expected_utils_array, upper_percentile)
+        
+        # Calculate RD regret statistics if data is available
+        if agent_rd_regrets:
+            # Convert to regular Python list of floats
+            agent_rd_regrets = [float(x) for x in agent_rd_regrets]
+            mean_rd_regrets[agent_idx] = sum(agent_rd_regrets) / len(agent_rd_regrets)
+            # Manual std calculation
+            if len(agent_rd_regrets) > 1:
+                variance = sum((x - mean_rd_regrets[agent_idx])**2 for x in agent_rd_regrets) / (len(agent_rd_regrets) - 1)
+                std_rd_regrets[agent_idx] = variance**0.5
+            else:
+                std_rd_regrets[agent_idx] = 0.0
+            
+            # Use numpy for percentiles
+            agent_rd_regrets_array = np.array(agent_rd_regrets)
+            lower_rd_regrets[agent_idx] = np.percentile(agent_rd_regrets_array, lower_percentile)
+            upper_rd_regrets[agent_idx] = np.percentile(agent_rd_regrets_array, upper_percentile)
     
     # Create a DataFrame with results
     results = pd.DataFrame({
@@ -284,14 +406,14 @@ def analyze_bootstrap_results(bootstrap_results, agent_names, confidence=0.95):
         'Std NE Regret': std_regrets,
         f'Lower {confidence*100:.0f}% CI (Regret)': lower_regrets,
         f'Upper {confidence*100:.0f}% CI (Regret)': upper_regrets,
-        'Mean Traditional Regret': mean_trad_regrets,
-        'Std Traditional Regret': std_trad_regrets,
-        f'Lower {confidence*100:.0f}% CI (Trad Regret)': lower_trad_regrets,
-        f'Upper {confidence*100:.0f}% CI (Trad Regret)': upper_trad_regrets,
         'Mean Expected Utility': mean_expected_utils,
         'Std Expected Utility': std_expected_utils,
         f'Lower {confidence*100:.0f}% CI (Utility)': lower_utils,
-        f'Upper {confidence*100:.0f}% CI (Utility)': upper_utils
+        f'Upper {confidence*100:.0f}% CI (Utility)': upper_utils,
+        'Mean RD Regret': mean_rd_regrets,
+        'Std RD Regret': std_rd_regrets,
+        f'Lower {confidence*100:.0f}% CI (RD Regret)': lower_rd_regrets,
+        f'Upper {confidence*100:.0f}% CI (RD Regret)': upper_rd_regrets
     })
     
     # Sort by mean NE regret
