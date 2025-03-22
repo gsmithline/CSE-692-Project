@@ -101,7 +101,6 @@ def milp_max_sym_ent_2p(game_matrix, max_iter=10000):
             # Normalize to ensure valid probability distribution
             strategy = strategy / np.sum(strategy)
         
-        # Calculate regret for this strategy
         regret = calculate_max_regret(game_matrix_np, strategy)
         if regret < best_regret:
             best_strategy = strategy.copy()
@@ -110,17 +109,12 @@ def milp_max_sym_ent_2p(game_matrix, max_iter=10000):
     if best_strategy is not None:
         strategy = best_strategy
     else:
-        # Fallback to uniform if all methods failed
         #TODO: this should never happen
         strategy = np.ones(n) / n
     
-    # final refinement step: perform regret minimization
     strategy = minimize_max_regret(game_matrix_np, strategy, max_iterations=100)
     
-    # Maximum entropy among Nash equilibria means maximizing entropy 
-    # within the support of the Nash equilibrium
-    # Find the support of the Nash equilibrium (where prob > small threshold)
-    support_threshold = 1e-6
+    support_threshold = 1e-16 #go as small as possible
     support = np.where(strategy > support_threshold)[0]
     
     if len(support) > 1:
@@ -144,6 +138,7 @@ def milp_max_sym_ent_2p(game_matrix, max_iter=10000):
             new_regret = calculate_max_regret(game_matrix_np, strategy)
             if new_regret > best_regret + 1e-6:  
                 strategy = best_strategy
+
     
     return strategy
 
@@ -332,7 +327,7 @@ def minimize_max_regret(game_matrix, initial_strategy, max_iterations=100, learn
         regrets = expected_payoffs - avg_payoff
         
         # Identify the indexes with positive regret
-        positive_idxs = np.where(regrets > 1e-12)[0]
+        positive_idxs = np.where(regrets > 1e-4)[0]
         
         # Try giving each of those indexes slightly more weight
         for idx in positive_idxs:

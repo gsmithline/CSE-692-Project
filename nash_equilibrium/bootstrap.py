@@ -125,7 +125,7 @@ def bootstrap_performance_metrics(performance_matrix, num_bootstrap=1000, data_m
             me_ne_regrets = me_expected_utils - me_nash_value
             
             # 6. ME NE: Validate that all regrets are at most 0
-            epsilon = 1e-4  # Even more forgiving numerical tolerance for bootstrapping
+            epsilon = 1e-6  # Even more forgiving numerical tolerance for bootstrapping
             if np.any(me_ne_regrets > epsilon):
                 max_regret = np.max(me_ne_regrets)
                 worst_agent_idx = np.argmax(me_ne_regrets)
@@ -134,14 +134,13 @@ def bootstrap_performance_metrics(performance_matrix, num_bootstrap=1000, data_m
                              f"This violates Nash equilibrium conditions. Halting program.")
                 raise ValueError(error_msg)
             elif np.any(me_ne_regrets > 0):
-                # If we have very small positive values, just warn and cap them
                 max_regret = np.max(me_ne_regrets)
                 worst_agent_idx = np.argmax(me_ne_regrets)
                 worst_agent = all_agents[worst_agent_idx]
                 print(f"WARNING: Detected small positive ME Nash regret ({max_regret:.10f}) for agent {worst_agent}. "
                       f"Capping at 0 due to likely numerical precision issues.")
                 # Cap all regret values at 0
-                me_ne_regrets = np.minimum(me_ne_regrets, 0.0)
+                #me_ne_regrets = np.minimum(me_ne_regrets, 0.0)
             
             # 7. RD NE: Calculate expected utilities against the RD Nash mixture
             rd_expected_utils = np.dot(game_matrix_np, rd_nash_strategy)
@@ -608,16 +607,14 @@ def plot_regret_distributions(bootstrap_results, agent_names, figsize=(12, 8), r
     fig, axs = plt.subplots(int(np.ceil(n_agents/3)), 3, figsize=figsize)
     axs = axs.flatten()
     
-    # Set proper title based on regret type
     title_prefix = "Max Entropy" if regret_type == 'ne_regret' else "Replicator Dynamics"
     regret_name = f"{title_prefix} Nash Equilibrium Regret"
     
-    # Check for positive regret values (which violate Nash equilibrium conditions)
     epsilon = 1e-10
     positive_regrets = (regrets > epsilon)
     capped_regrets = np.copy(regrets)
     has_capped_values = False
-
+    '''
     if np.any(positive_regrets):
         count_positive = np.sum(positive_regrets)
         print(f"Warning: {count_positive} regret values are positive. "
@@ -627,7 +624,7 @@ def plot_regret_distributions(bootstrap_results, agent_names, figsize=(12, 8), r
         original_regrets = np.copy(regrets)
         # Cap regrets at 0 for visualization, as positive values aren't valid Nash regrets
         capped_regrets = np.minimum(regrets, 0.0)
-    
+    '''
     # Add a note to the title if values were capped
     capping_note = "\n(Some positive regret values were capped to 0)" if has_capped_values else ""
     fig.suptitle(f"{regret_name} Distributions\n(All values should be ≤ 0 at equilibrium){capping_note}", 

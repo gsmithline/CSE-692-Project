@@ -239,6 +239,7 @@ def nonparametric_bootstrap_from_raw_data(all_results, num_bootstrap=1000, confi
                       f"This suggests the Nash equilibrium computation may not have fully converged.")
             
             # Always cap regrets to non-positive values (all should be ≤ 0)
+            '''
             nash_regrets = np.minimum(nash_regrets, 0.0)
             
             max_rd_regret = np.max(rd_regrets)
@@ -248,7 +249,7 @@ def nonparametric_bootstrap_from_raw_data(all_results, num_bootstrap=1000, confi
             
             # Always cap regrets to non-positive values (all should be ≤ 0)
             rd_regrets = np.minimum(rd_regrets, 0.0)
-            
+            '''
             # Store results
             bootstrap_results['ne_regret'].append(nash_regrets)
             bootstrap_results['ne_strategy'].append(nash_strategy)

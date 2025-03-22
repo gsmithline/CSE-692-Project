@@ -79,7 +79,7 @@ def create_matrix_heatmap_with_nash_regret(performance_matrix, nash_regrets, tit
     
     # Ensure all regrets are non-positive (using a small tolerance)
     '''
-    epsilon = 1e-8
+    epsilon = 1e-4
     if (regrets > epsilon).any():
         print(f"Warning: Some regrets are positive: {regrets[regrets > epsilon].values}")
         print("Setting these regrets to 0 for visualization correctness.")
