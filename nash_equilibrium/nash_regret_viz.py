@@ -5,6 +5,9 @@ import seaborn as sns
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.gridspec as gridspec
 
+# Define a consistent numerical threshold for the entire module
+EPSILON = 1e-8  # Consistent threshold for numerical operations
+
 def create_matrix_heatmap_with_nash_regret(performance_matrix, nash_regrets, title="Performance Matrix with Nash Regret", 
                                          cmap="coolwarm", figsize=(16, 12)):
     """
@@ -78,13 +81,11 @@ def create_matrix_heatmap_with_nash_regret(performance_matrix, nash_regrets, tit
     regrets = regrets.dropna()
     
     # Ensure all regrets are non-positive (using a small tolerance)
-    '''
-    epsilon = 1e-4
-    if (regrets > epsilon).any():
-        print(f"Warning: Some regrets are positive: {regrets[regrets > epsilon].values}")
+    if (regrets > EPSILON).any():
+        print(f"Warning: Some regrets are positive: {regrets[regrets > EPSILON].values}")
         print("Setting these regrets to 0 for visualization correctness.")
-        regrets[regrets > epsilon] = 0.0
-    '''
+        regrets[regrets > EPSILON] = 0.0
+    
     # Sort regrets by value (in Nash equilibrium, less negative is better)
     regrets = regrets.sort_values(ascending=False)
     

@@ -263,7 +263,6 @@ def nonparametric_bootstrap_from_raw_data(all_results, num_bootstrap=1000, confi
             print(f"Error in bootstrap sample {b}: {e}")
             continue
     
-    # Calculate statistics and confidence intervals
     bootstrap_stats = analyze_bootstrap_results(bootstrap_results, all_agents, confidence)
     bootstrap_results['statistics'] = bootstrap_stats
     
@@ -322,9 +321,7 @@ def analyze_bootstrap_results(bootstrap_results, agent_names, confidence=0.95):
     lower_percentile = alpha / 2 * 100
     upper_percentile = (1 - alpha / 2) * 100
     
-    # Process each agent's statistics individually to avoid dimensionality issues
     for agent_idx in range(num_agents):
-        # Extract values for this agent from all bootstrap samples
         agent_ne_regrets = []
         agent_expected_utils = []
         agent_rd_regrets = []

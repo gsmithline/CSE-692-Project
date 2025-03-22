@@ -3,8 +3,10 @@ Nash equilibrium solver for 2-player games.
 """
 
 import numpy as np
-from scipy.optimize import linprog
+from scipy.optimize import linprog, minimize
 import warnings
+import scipy.sparse as sp
+from scipy.special import entr
 
 def milp_max_sym_ent_2p(game_matrix, max_iter=10000):
     """
@@ -17,6 +19,10 @@ def milp_max_sym_ent_2p(game_matrix, max_iter=10000):
     Returns:
         nash_strategy: equilibrium strategy (probability distribution over actions)
     """
+    # Constants for numerical stability and threshold consistency
+    EPSILON = 1e-8  # Main threshold for regret/convergence across all functions
+    SUPPORT_THRESHOLD = EPSILON  # Threshold for determining support
+    
     game_matrix_np = np.array(game_matrix, dtype=np.float64)
     
     if np.isnan(game_matrix_np).any():
@@ -30,14 +36,16 @@ def milp_max_sym_ent_2p(game_matrix, max_iter=10000):
     
     n = game_matrix_np.shape[0]
     
-    # Multiple attempts with different methods to find best solution
+    #multiple attempts with different methods to find best solution
     best_strategy = None
     best_regret = float('inf')
     
-    # First attempt: Try linear programming
+    #try linear programming with entropy regularization
+    # used Zun's code as an example
     try:
+        # 
         c = np.zeros(n + 1)
-        c[-1] = -1  
+        c[-1] = -1 #max nash val
         
         A_ub = np.zeros((n, n + 1))
         for i in range(n):
@@ -54,95 +62,123 @@ def milp_max_sym_ent_2p(game_matrix, max_iter=10000):
         
         result = linprog(c, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq, bounds=bounds, method='highs', 
                           options={'disp': False, 
-                                  'primal_feasibility_tolerance': 1e-10,
-                                  'dual_feasibility_tolerance': 1e-10})
+                                  'primal_feasibility_tolerance': EPSILON,
+                                  'dual_feasibility_tolerance': EPSILON})
         
         if result.success:
             strategy = result.x[:-1]
             strategy = strategy / np.sum(strategy)
             regret = calculate_max_regret(game_matrix_np, strategy)
-            best_strategy = strategy
-            best_regret = regret
+            
+            if regret <= EPSILON:
+                best_strategy = strategy
+                best_regret = regret
+                
+                # identify the support of ne 
+                support = strategy > SUPPORT_THRESHOLD
+                
+                if np.sum(support) > 1:
+                    # get expected utility of ne 
+                    expected_payoffs = np.dot(game_matrix_np, strategy)
+                    nash_value = np.dot(strategy, expected_payoffs)
+                    
+                    def support_constraints(x):
+                        expected_utils = np.dot(game_matrix_np, x)
+                        return np.array([expected_utils[i] - nash_value for i in range(n) if support[i]])
+                    
+                    def neg_entropy(x):
+                        return -np.sum(entr(x + EPSILON))  # Add epsilon to avoid log(0)
+                    
+                    def neg_entropy_grad(x):
+                        return -np.log(x + EPSILON) - 1
+                    
+                    def sum_to_one(x):
+                        return np.sum(x) - 1
+                    
+                    x0 = strategy.copy()
+                    
+                    bnds = [(0, 1) for _ in range(n)]
+                    
+                    constraints = []
+                    
+                    constraints.append({'type': 'eq', 'fun': sum_to_one})
+                    
+                    support_indices = np.where(support)[0]
+                    for i in support_indices:
+                        def constraint_i(x, i=i, nash_value=nash_value):
+                            return np.dot(game_matrix_np[i], x) - nash_value
+                        constraints.append({'type': 'eq', 'fun': constraint_i})
+                    
+                    try:
+                        entropy_result = minimize(
+                            neg_entropy,
+                            x0,
+                            jac=neg_entropy_grad,
+                            bounds=bnds,
+                            constraints=constraints,
+                            method='SLSQP',
+                            options={'maxiter': 1000, 'ftol': EPSILON}
+                        )
+                        
+                        if entropy_result.success:
+                            entropy_strategy = entropy_result.x
+                            entropy_strategy = entropy_strategy / np.sum(entropy_strategy)
+                            entropy_regret = calculate_max_regret(game_matrix_np, entropy_strategy)
+                            
+                            if entropy_regret <= best_regret + EPSILON:
+                                best_strategy = entropy_strategy
+                                best_regret = entropy_regret
+                    except Exception as e:
+                        warnings.warn(f"Entropy maximization failed: {e}", UserWarning)
     except Exception as e:
         warnings.warn(f"Linear programming solver failed: {e}", UserWarning)
     
-    # Second attempt: Use iterative method with multiple learning rates
-    learning_rates = [0.5, 0.2, 0.1, 0.05, 0.02, 0.01]
-    for lr_init in learning_rates:
-        # Initial strategy - uniform distribution
-        strategy = np.ones(n) / n 
-        
-        # Use a stricter convergence criterion
-        convergence_threshold = 1e-12
-        
-        for iteration in range(max_iter):
-            br_payoff = game_matrix_np @ strategy  
-            max_payoff = np.max(br_payoff)  
+    if best_strategy is None:
+        learning_rates = [0.5, 0.2, 0.1, 0.05, 0.02, 0.01]
+        for lr_init in learning_rates:
+            strategy = np.ones(n) / n 
             
-            epsilon = max_payoff - np.dot(br_payoff, strategy)
+            convergence_threshold = EPSILON
             
-            if epsilon < convergence_threshold:
-                break
+            for iteration in range(max_iter):
+                br_payoff = game_matrix_np @ strategy  
+                max_payoff = np.max(br_payoff)  
                 
-            tol = 1e-10
-            br_indices = np.where(np.abs(br_payoff - max_payoff) < tol)[0]
+                epsilon = max_payoff - np.dot(br_payoff, strategy)
+                
+                if epsilon < convergence_threshold:
+                    break
+                    
+                br_indices = np.where(np.abs(br_payoff - max_payoff) < EPSILON)[0]
+                
+                if len(br_indices) == 1:
+                    new_strategy = np.zeros(n)
+                    new_strategy[br_indices[0]] = 1.0
+                else:
+                    new_strategy = np.zeros(n)
+                    new_strategy[br_indices] = 1.0 / len(br_indices)
+                
+                learning_rate = lr_init * (1.0 - iteration / max_iter)
+                strategy = (1 - learning_rate) * strategy + learning_rate * new_strategy
+                
+                strategy = strategy / np.sum(strategy)
             
-            if len(br_indices) == 1:
-                new_strategy = np.zeros(n)
-                new_strategy[br_indices[0]] = 1.0
-            else:
-                new_strategy = np.zeros(n)
-                new_strategy[br_indices] = 1.0 / len(br_indices)
-            
-            # Use a decreasing learning rate for better convergence
-            learning_rate = lr_init * (1.0 - iteration / max_iter)
-            strategy = (1 - learning_rate) * strategy + learning_rate * new_strategy
-            
-            # Normalize to ensure valid probability distribution
-            strategy = strategy / np.sum(strategy)
-        
-        regret = calculate_max_regret(game_matrix_np, strategy)
-        if regret < best_regret:
-            best_strategy = strategy.copy()
-            best_regret = regret
+            regret = calculate_max_regret(game_matrix_np, strategy)
+            if regret < best_regret:
+                best_strategy = strategy.copy()
+                best_regret = regret
     
     if best_strategy is not None:
         strategy = best_strategy
     else:
-        #TODO: this should never happen
         strategy = np.ones(n) / n
     
-    strategy = minimize_max_regret(game_matrix_np, strategy, max_iterations=100)
-    
-    support_threshold = 1e-16 #go as small as possible
-    support = np.where(strategy > support_threshold)[0]
-    
-    if len(support) > 1:
-        expected_payoffs = np.dot(game_matrix_np, strategy)
-        avg_payoff = np.dot(strategy, expected_payoffs)
-        
-        equal_payoff_actions = []
-        for action in support:
-            if abs(expected_payoffs[action] - avg_payoff) < 1e-6:
-                equal_payoff_actions.append(action)
-        
-        if len(equal_payoff_actions) > 1:
-            total_prob = sum(strategy[action] for action in equal_payoff_actions)
-            
-            avg_prob = total_prob / len(equal_payoff_actions)
-            for action in equal_payoff_actions:
-                strategy[action] = avg_prob
-            
-            strategy = strategy / np.sum(strategy)
-            
-            new_regret = calculate_max_regret(game_matrix_np, strategy)
-            if new_regret > best_regret + 1e-6:  
-                strategy = best_strategy
-
+    if best_regret > EPSILON:
+        strategy = minimize_max_regret(game_matrix_np, strategy, max_iterations=100, epsilon=EPSILON)
     
     return strategy
 
-def replicator_dynamics_nash(game_matrix, max_iter=10000, convergence_threshold=1e-12):
+def replicator_dynamics_nash(game_matrix, max_iter=10000, convergence_threshold=None):
     """
     Compute Nash equilibrium using replicator dynamics for 2-player games
     
@@ -154,6 +190,10 @@ def replicator_dynamics_nash(game_matrix, max_iter=10000, convergence_threshold=
     Returns:
         nash_strategy: equilibrium strategy (probability distribution over actions)
     """
+    EPSILON = 1e-8
+    if convergence_threshold is None:
+        convergence_threshold = EPSILON
+    
     game_matrix_np = np.array(game_matrix, dtype=np.float64)
     
     # Handle missing values
@@ -176,7 +216,7 @@ def replicator_dynamics_nash(game_matrix, max_iter=10000, convergence_threshold=
     ]
     
     # Add some random initial points
-    num_random_points = 10  # 1000 is too many for most applications
+    num_random_points = 10
     for _ in range(num_random_points):
         random_point = np.random.random(n)
         random_point = random_point / np.sum(random_point)
@@ -187,21 +227,16 @@ def replicator_dynamics_nash(game_matrix, max_iter=10000, convergence_threshold=
         # Initialize with the given strategy
         strategy = initial_strategy.copy()
         
-        # Implementation of replicator dynamics with reinforcement learning
         for iteration in range(max_iter):
-            # Expected payoff vector
             expected_payoffs = np.dot(game_matrix_np, strategy)
             
-            # Average payoff
             avg_payoff = np.dot(strategy, expected_payoffs)
             
-            # Compute new strategy using replicator dynamics equation
-            new_strategy = strategy * (expected_payoffs / max(avg_payoff, 1e-10))
+            new_strategy = strategy * (expected_payoffs / max(avg_payoff, EPSILON))
             
-            # Normalize to ensure valid probability distribution
+           
             new_strategy = new_strategy / new_strategy.sum()
             
-            # Check for convergence
             diff = np.linalg.norm(new_strategy - strategy)
             if diff < convergence_threshold:
                 strategy = new_strategy
@@ -209,27 +244,22 @@ def replicator_dynamics_nash(game_matrix, max_iter=10000, convergence_threshold=
                 
             strategy = new_strategy
         
-        # Calculate regret for this strategy
         regret = calculate_max_regret(game_matrix_np, strategy)
         if regret < best_regret:
             best_strategy = strategy.copy()
             best_regret = regret
     
-    # If we found a strategy, use it
     if best_strategy is not None:
         strategy = best_strategy
     else:
-        # Fallback to uniform if all methods failed
         strategy = np.ones(n) / n
     
-    # Final refinement step: perform regret minimization
-    strategy = minimize_max_regret(game_matrix_np, strategy, max_iterations=100)
+    if best_regret > EPSILON:
+        strategy = minimize_max_regret(game_matrix_np, strategy, max_iterations=100, epsilon=EPSILON)
     
-    # Final verification
     regret = calculate_max_regret(game_matrix_np, strategy)
     if regret > convergence_threshold:
-        # If regret is still too high, try a more aggressive regret minimization
-        strategy = minimize_max_regret(game_matrix_np, strategy, max_iterations=500, learning_rate=0.2)
+        strategy = minimize_max_regret(game_matrix_np, strategy, max_iterations=500, learning_rate=0.2, epsilon=EPSILON)
     
     return strategy
 
@@ -248,11 +278,9 @@ def calculate_max_regret(game_matrix, strategy):
     avg_payoff = np.dot(strategy, expected_payoffs)
     regrets = expected_payoffs - avg_payoff
     
-    # A true Nash equilibrium should have non-positive regrets
-    # The maximum regret should be at most 0
     return np.max(regrets)
 
-def minimize_max_regret(game_matrix, initial_strategy, max_iterations=100, learning_rate=0.1):
+def minimize_max_regret(game_matrix, initial_strategy, max_iterations=100, learning_rate=0.1, epsilon=1e-8):
     """
     Refine a strategy to minimize maximum regret
     
@@ -261,6 +289,7 @@ def minimize_max_regret(game_matrix, initial_strategy, max_iterations=100, learn
         initial_strategy: initial probability distribution over actions
         max_iterations: maximum number of iterations
         learning_rate: learning rate for updates
+        epsilon: numerical tolerance threshold
         
     Returns:
         refined_strategy: refined probability distribution
@@ -270,7 +299,7 @@ def minimize_max_regret(game_matrix, initial_strategy, max_iterations=100, learn
     best_strategy = strategy.copy()
     best_regret = calculate_max_regret(game_matrix, strategy)
     
-    if best_regret <= 1e-12:
+    if best_regret <= epsilon:
         return strategy
     
     learning_rates = [learning_rate, learning_rate*0.5, learning_rate*0.2, learning_rate*0.1]
@@ -286,9 +315,7 @@ def minimize_max_regret(game_matrix, initial_strategy, max_iterations=100, learn
             max_regret_idx = np.argmax(regrets)
             max_regret = regrets[max_regret_idx]
             
-            # If maximum regret is already non-positive, we're done
-            if max_regret <= 1e-12:
-                # Check if this is better than our best so far
+            if max_regret <= epsilon:
                 current_regret = calculate_max_regret(game_matrix, local_strategy)
                 if current_regret < best_regret:
                     best_strategy = local_strategy.copy()
@@ -304,53 +331,40 @@ def minimize_max_regret(game_matrix, initial_strategy, max_iterations=100, learn
                 update = np.zeros(n)
                 update[max_regret_idx] = 1.0
             
-            # Adjust learning rate based on current iteration
             current_lr = current_lr_base * (1.0 - iteration / max_iterations)
             
-            # Apply update
             local_strategy = (1 - current_lr) * local_strategy + current_lr * update
             
-            # Normalize to ensure valid probability distribution
             local_strategy = local_strategy / np.sum(local_strategy)
             
-            # Check if this improved the maximum regret
             current_regret = calculate_max_regret(game_matrix, local_strategy)
             if current_regret < best_regret:
                 best_strategy = local_strategy.copy()
                 best_regret = current_regret
         
-    # For very small remaining regrets, try a more targeted approach
-    if best_regret > 1e-12:
-        # Get regrets for the best strategy
+    if best_regret > epsilon:
         expected_payoffs = np.dot(game_matrix, best_strategy)
         avg_payoff = np.dot(best_strategy, expected_payoffs)
         regrets = expected_payoffs - avg_payoff
         
-        # Identify the indexes with positive regret
-        positive_idxs = np.where(regrets > 1e-4)[0]
+        positive_idxs = np.where(regrets > epsilon)[0]
         
-        # Try giving each of those indexes slightly more weight
         for idx in positive_idxs:
             for weight in [0.001, 0.01, 0.05, 0.1, 0.2]:
-                # Create a new strategy with increased weight for this index
                 modified_strategy = best_strategy.copy()
                 modified_strategy[idx] += weight
                 modified_strategy = modified_strategy / np.sum(modified_strategy)
                 
-                # Calculate regret
                 modified_regret = calculate_max_regret(game_matrix, modified_strategy)
                 
-                # If this improves the regret, update the best strategy
                 if modified_regret < best_regret:
                     best_strategy = modified_strategy
                     best_regret = modified_regret
                     
-                    # If regret is now non-positive or extremely small, we're done
-                    if best_regret <= 1e-12:
+                    if best_regret <= epsilon:
                         break
             
-            # If regret is now non-positive or extremely small, we're done
-            if best_regret <= 1e-12:
+            if best_regret <= epsilon:
                 break
     
     return best_strategy

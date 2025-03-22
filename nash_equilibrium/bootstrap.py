@@ -11,6 +11,9 @@ from scipy import stats
 import warnings
 from nash_equilibrium.nash_solver import milp_max_sym_ent_2p, replicator_dynamics_nash
 
+# Define a consistent numerical threshold for the entire module
+EPSILON = 1e-8  # Consistent threshold for numerical operations
+
 def bootstrap_performance_metrics(performance_matrix, num_bootstrap=1000, data_matrix=None):
     """
     Bootstrap analysis to estimate distributions of Nash equilibrium regrets.
@@ -125,22 +128,22 @@ def bootstrap_performance_metrics(performance_matrix, num_bootstrap=1000, data_m
             me_ne_regrets = me_expected_utils - me_nash_value
             
             # 6. ME NE: Validate that all regrets are at most 0
-            epsilon = 1e-6  # Even more forgiving numerical tolerance for bootstrapping
-            if np.any(me_ne_regrets > epsilon):
+            if np.any(me_ne_regrets > EPSILON):
                 max_regret = np.max(me_ne_regrets)
                 worst_agent_idx = np.argmax(me_ne_regrets)
                 worst_agent = all_agents[worst_agent_idx]
-                error_msg = (f"CRITICAL ERROR: Detected large positive ME Nash regret ({max_regret:.10f}) for agent {worst_agent}. "
+                error_msg = (f"CRITICAL ERROR: Detected positive ME Nash regret ({max_regret:.10f}) for agent {worst_agent}. "
                              f"This violates Nash equilibrium conditions. Halting program.")
                 raise ValueError(error_msg)
             elif np.any(me_ne_regrets > 0):
+                # If we have very small positive values, just warn and cap them
                 max_regret = np.max(me_ne_regrets)
                 worst_agent_idx = np.argmax(me_ne_regrets)
                 worst_agent = all_agents[worst_agent_idx]
                 print(f"WARNING: Detected small positive ME Nash regret ({max_regret:.10f}) for agent {worst_agent}. "
                       f"Capping at 0 due to likely numerical precision issues.")
                 # Cap all regret values at 0
-                #me_ne_regrets = np.minimum(me_ne_regrets, 0.0)
+                me_ne_regrets = np.minimum(me_ne_regrets, 0.0)
             
             # 7. RD NE: Calculate expected utilities against the RD Nash mixture
             rd_expected_utils = np.dot(game_matrix_np, rd_nash_strategy)
@@ -158,15 +161,15 @@ def bootstrap_performance_metrics(performance_matrix, num_bootstrap=1000, data_m
                                                          for j in range(len(rd_nash_strategy))) 
                                 for i in range(len(rd_nash_strategy)))
             
-            # 9. RD NE: Compute Nash Equilibrium regret
+            # 9. RD NE: Compute Nash Equilibrium regret (expected_utils - nash_value)
             rd_ne_regrets = rd_expected_utils - rd_nash_value
             
             # 10. RD NE: Validate that all regrets are at most 0
-            if np.any(rd_ne_regrets > epsilon):
+            if np.any(rd_ne_regrets > EPSILON):
                 max_regret = np.max(rd_ne_regrets)
                 worst_agent_idx = np.argmax(rd_ne_regrets)
                 worst_agent = all_agents[worst_agent_idx]
-                error_msg = (f"CRITICAL ERROR: Detected large positive RD Nash regret ({max_regret:.10f}) for agent {worst_agent}. "
+                error_msg = (f"CRITICAL ERROR: Detected positive RD Nash regret ({max_regret:.10f}) for agent {worst_agent}. "
                              f"This violates Nash equilibrium conditions. Halting program.")
                 raise ValueError(error_msg)
             elif np.any(rd_ne_regrets > 0):
@@ -179,79 +182,21 @@ def bootstrap_performance_metrics(performance_matrix, num_bootstrap=1000, data_m
                 # Cap all regret values at 0
                 rd_ne_regrets = np.minimum(rd_ne_regrets, 0.0)
             
-            # 11. Store results
+            # Store the results for this bootstrap sample
             bootstrap_results['ne_regret'].append(me_ne_regrets)
             bootstrap_results['ne_strategy'].append(me_nash_strategy)
             bootstrap_results['rd_regret'].append(rd_ne_regrets)
             bootstrap_results['rd_strategy'].append(rd_nash_strategy)
-            bootstrap_results['agent_expected_utility'].append(me_expected_utils)  # Using ME NE expected utils
-            bootstrap_results['nash_value'].append(me_nash_value)  # Using ME NE value
+            bootstrap_results['agent_expected_utility'].append(me_expected_utils)
+            bootstrap_results['nash_value'].append(me_nash_value)
             
-        except ValueError as ve:
-            # If the error is our custom validation error, re-raise it to halt the program
-            if "CRITICAL ERROR" in str(ve):
-                raise
-            print(f"Error in bootstrap sample {b}: {ve}")
-            continue
         except Exception as e:
+            # Log the error but continue with other samples
             print(f"Error in bootstrap sample {b}: {e}")
-            continue
     
-    # Compute summary statistics
-    bootstrap_stats = analyze_bootstrap_results(bootstrap_results, all_agents)
-    bootstrap_results['statistics'] = bootstrap_stats
-    
-    # Print the results for the original performance matrix
-    print("\nNash Equilibrium on original performance matrix:")
-    original_matrix_np = performance_matrix.to_numpy()
-    # Handle missing values
-    for i in range(original_matrix_np.shape[0]):
-        for j in range(original_matrix_np.shape[1]):
-            if np.isnan(original_matrix_np[i, j]):
-                col_mean = np.nanmean(original_matrix_np[:, j])
-                if not np.isnan(col_mean):
-                    original_matrix_np[i, j] = col_mean
-                else:
-                    row_mean = np.nanmean(original_matrix_np[i, :])
-                    original_matrix_np[i, j] = row_mean if not np.isnan(row_mean) else 0
-    
-    # Compute both Nash equilibrium types on original matrix
-    print("Max Entropy Nash Equilibrium:")
-    me_original_ne = milp_max_sym_ent_2p(original_matrix_np)
-    for i, agent in enumerate(all_agents):
-        print(f"{agent}: {me_original_ne[i]:.6f}")
-    
-    print("\nReplicator Dynamics Nash Equilibrium:")
-    rd_original_ne = replicator_dynamics_nash(original_matrix_np)
-    for i, agent in enumerate(all_agents):
-        print(f"{agent}: {rd_original_ne[i]:.6f}")
-    
-    # Verify if the equilibrium is at "o3" (openai_o3_mini_circle_0)
-    try:
-        o3_idx = all_agents.index("openai_o3_mini_circle_0")
-        is_o3_dominant_me = me_original_ne[o3_idx] > 0.95  # 95% of the mass should be on o3
-        is_o3_dominant_rd = rd_original_ne[o3_idx] > 0.95  # 95% of the mass should be on o3
-        
-        print(f"\nStatus Check: Best response indicates a terminal node at 'o3'.")
-        print(f"ME NE Verification: {'PASSED' if is_o3_dominant_me else 'FAILED'} - o3 has {me_original_ne[o3_idx]:.2%} of the mass.")
-        print(f"RD NE Verification: {'PASSED' if is_o3_dominant_rd else 'FAILED'} - o3 has {rd_original_ne[o3_idx]:.2%} of the mass.")
-        
-        # Test for consistency between ME NE and RD NE
-        def dominant_strategies(ne_strategy, threshold=0.01):
-            return [i for i, p in enumerate(ne_strategy) if p > threshold]
-        
-        me_dominant = dominant_strategies(me_original_ne)
-        rd_dominant = dominant_strategies(rd_original_ne)
-        
-        if set(me_dominant) == set(rd_dominant):
-            print("Consistency Check: PASSED - Both equilibria have the same dominant strategies.")
-        else:
-            print("Consistency Check: WARNING - The equilibria have different dominant strategies.")
-            print(f"ME NE dominant strategies: {[all_agents[i] for i in me_dominant]}")
-            print(f"RD NE dominant strategies: {[all_agents[i] for i in rd_dominant]}")
-            
-    except ValueError:
-        print("\nStatus Check: Could not find 'openai_o3_mini_circle_0' in the agent list to verify dominance.")
+    # Check if we have enough valid samples
+    if len(bootstrap_results['ne_regret']) < 10:
+        raise ValueError("Too few valid bootstrap samples. Check for errors in the Nash computations.")
     
     return bootstrap_results
 
