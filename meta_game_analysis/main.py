@@ -7,6 +7,13 @@ import argparse
 import pandas as pd
 import numpy as np
 
+# Set matplotlib configuration directory to a writable location
+# This avoids the warning about matplotlib config directory not being writable
+os.environ['MPLCONFIGDIR'] = os.path.join(os.path.expanduser('~'), '.matplotlib_temp')
+os.makedirs(os.environ['MPLCONFIGDIR'], exist_ok=True)
+
+import matplotlib.pyplot as plt
+
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -43,6 +50,7 @@ from meta_game_analysis.nash_analysis import (
     print_rd_nash_summary,
     print_nash_comparison
 )
+from nash_equilibrium.nash_regret_viz import create_matrix_heatmap_with_nash_regret
 
 def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_analysis/results", 
                  num_bootstrap=100, confidence=0.95, global_samples=1000, 
@@ -63,10 +71,8 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
     print(f"Results will be saved to {output_dir}")
     print(f"Using discount factor (gamma): {discount_factor}")
     
-    # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
     
-    # Step 1: Process all games
     print("\nStep 1: Processing game data...")
     all_results, agent_performance, agent_final_rounds, agent_game_counts, agent_final_rounds_self_play = process_all_games(
         input_dir,
@@ -79,45 +85,35 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
     print(f"Global max Nash welfare: {global_max_nash_welfare:.2f}")
     print(f"Global max social welfare: {global_standard_max:.2f}")
     
-    # Step 3: Create performance matrices
     print("\nStep 3: Creating performance matrices...")
     performance_matrices = create_performance_matrices(all_results, agent_performance, agent_final_rounds)
     
-    # Get list of all agents
     all_agents = sorted(list(performance_matrices['overall_agent_performance'].keys()))
     
-    # Step 4: Create welfare matrices
     print("\nStep 4: Creating welfare matrices...")
     welfare_matrices = create_welfare_matrices(all_results, all_agents, global_max_nash_welfare)
     
-    # Step 5: Clean matrix names
     print("\nStep 5: Cleaning matrix names...")
     cleaned_matrices = {}
     
-    # Clean performance matrices
     performance_matrix_names = ['performance_matrix', 'std_dev_matrix', 'variance_matrix', 'scaled_performance_matrix', 'count_matrix']
     for name in performance_matrix_names:
         if name in performance_matrices:
             cleaned_matrices[name] = clean_matrix_names(performance_matrices[name], get_display_name)
     
-    # Clean welfare matrices
     for name, matrix in welfare_matrices.items():
         cleaned_matrices[name] = clean_matrix_names(matrix, get_display_name)
     
-    # Step 6: Filter matrices to exclude specific agents if needed
     print("\nStep 6: Filtering matrices...")
-    exclude_agents = ['anthropic_3.7_sonnet_circle_4']  # Add any agents to exclude
+    exclude_agents = ['anthropic_3.7_sonnet_circle_4']  
     filtered_matrices = filter_matrices(cleaned_matrices, exclude_agents)
     
-    # Step 7: Run Nash equilibrium analysis
     print("\nStep 7: Running Nash equilibrium analysis...")
     performance_matrix = filtered_matrices['performance_matrix']
     
-    # Check for pure Nash equilibria
     print("\nChecking for pure Nash equilibria in the performance matrix:")
     print_pure_nash_info(performance_matrix)
     
-    # Calculate Nash equilibrium using replicator dynamics
     print("\nFinding Nash equilibrium using replicator dynamics with multiple restarts:")
     rd_nash_df = find_nash_with_replicator_dynamics(
         performance_matrix, 
@@ -128,14 +124,11 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
     print("\nNash Equilibrium from Replicator Dynamics:")
     print(rd_nash_df)
     
-    # Calculate and print Max Entropy Nash Equilibrium for the plain performance matrix
     print("\nCalculating Max Entropy Nash Equilibrium for the plain performance matrix...")
     from nash_equilibrium.nash_solver import milp_max_sym_ent_2p
     
-    # Convert performance matrix to numpy array
     performance_matrix_np = performance_matrix.to_numpy()
     
-    # Handle missing values
     for i in range(performance_matrix_np.shape[0]):
         for j in range(performance_matrix_np.shape[1]):
             if np.isnan(performance_matrix_np[i, j]):
@@ -146,10 +139,8 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
                     row_mean = np.nanmean(performance_matrix_np[i, :])
                     performance_matrix_np[i, j] = row_mean if not np.isnan(row_mean) else 0
     
-    # Calculate ME Nash equilibrium
     me_nash_strategy = milp_max_sym_ent_2p(performance_matrix_np)
     
-    # Create DataFrame for display
     agents = performance_matrix.index.tolist()
     me_strategy_df = pd.DataFrame({
         'Agent': agents,
@@ -160,7 +151,6 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
     print(me_strategy_df)
     
     if use_raw_bootstrap:
-        # Use non-parametric bootstrapping with raw game data
         print("\nUsing non-parametric bootstrapping with raw game data...")
         bootstrap_results, bootstrap_stats, ne_strategy_df, agent_names = run_raw_data_nash_analysis(
             all_results,
@@ -168,7 +158,6 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
             confidence_level=confidence
         )
     else:
-        # Use traditional bootstrapping with the performance matrix
         print("\nUsing traditional bootstrapping with performance matrix...")
         bootstrap_results, bootstrap_stats, acceptance_matrix, ne_strategy_df = run_nash_analysis(
             performance_matrix,
@@ -179,7 +168,6 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
     print("\nMax Entropy Nash Equilibrium from bootstrapping:")
     print(ne_strategy_df)
     
-    # Generate comprehensive Nash equilibrium statistics
     print("\nGenerating comprehensive Nash equilibrium statistics...")
     comparison_df, rd_regret_df, rd_nash_value = generate_all_nash_stats(
         performance_matrix, 
@@ -188,22 +176,17 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
         rd_nash_df
     )
     
-    # Print statistics for both Nash concepts
     print_rd_nash_summary(rd_regret_df, rd_nash_df, rd_nash_value)
     print_nash_comparison(comparison_df)
     
-    # Calculate acceptance ratio if needed
     if 'acceptance_matrix' not in filtered_matrices and len(all_results) > 0:
         agents = performance_matrix.index.tolist()
         acceptance_matrix = calculate_acceptance_ratio(all_results, agents)
         filtered_matrices['acceptance_matrix'] = clean_matrix_names(acceptance_matrix, get_display_name)
     
-    # Step 8: Create visualizations
     print("\nStep 8: Creating visualizations...")
-    # Visualize welfare matrices
     welfare_figures = visualize_welfare_matrices(filtered_matrices, os.path.join(output_dir, 'heatmaps'))
     
-    # Create best response graphs
     print("Creating best response graphs...")
     best_response_graph = create_best_response_graph(
         performance_matrix, 
@@ -217,7 +200,6 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
         save_dir=os.path.join(output_dir, 'graphs')
     )
     
-    # Visualize Nash equilibrium results for Max Entropy Nash
     print("Creating Max Entropy Nash equilibrium visualizations...")
     max_entropy_nash_dir = os.path.join(output_dir, 'max_entropy_nash')
     os.makedirs(max_entropy_nash_dir, exist_ok=True)
@@ -259,28 +241,53 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
         has_rd_regrets = True
         print("Found RD regret data from non-parametric bootstrapping. Including in visualizations.")
     
-    me_ne_regret_fig, rd_ne_regret_fig, dual_regret_fig, nash_mixture_fig = plot_nash_distributions(
+    # Get Nash equilibrium visualizations
+    nash_plot_figures = plot_nash_distributions(
         bootstrap_results, 
         agents_list,
         include_rd_regrets=has_rd_regrets
     )
     
     # Save Nash plots
-    nash_plot_figures = {
-        'me_nash_equilibrium_regret': me_ne_regret_fig,
-        'rd_nash_equilibrium_regret': rd_ne_regret_fig,
-        'nash_regret_comparison': dual_regret_fig,
-        'nash_mixture_with_ci': nash_mixture_fig
-    }
     save_nash_plots(nash_plot_figures, max_entropy_nash_dir)
+    
+    # Create and save normal regret visualization if available
+    normal_regret_dir = os.path.join(output_dir, "normal_regret")
+    os.makedirs(normal_regret_dir, exist_ok=True)
+    
+    # Extract normal regret plots if they exist
+    normal_regret_figures = {
+        k: v for k, v in nash_plot_figures.items() 
+        if 'normal_regret' in k or 'normal_comparison' in k
+    }
+    
+    if normal_regret_figures:
+        print("Saving normal regret visualizations...")
+        save_nash_plots(normal_regret_figures, normal_regret_dir)
+    
+    # Create performance matrix with Nash regret visualization
+    print("Creating performance matrix with Nash regret visualization...")
+    performance_with_regret_fig = create_matrix_heatmap_with_nash_regret(
+        performance_matrix,
+        bootstrap_stats,
+        title="Performance Matrix with Nash Equilibrium Regret"
+    )
+    
+    if performance_with_regret_fig is not None:
+        performance_with_regret_path = os.path.join(output_dir, "performance_matrix_with_regret.png")
+        performance_with_regret_fig.savefig(performance_with_regret_path, bbox_inches='tight', dpi=300)
+        plt.close(performance_with_regret_fig)
     
     # Also save RD plots to the RD Nash directory if available
     if has_rd_regrets:
         rd_plot_figures = {
-            'rd_nash_equilibrium_regret': rd_ne_regret_fig,
-            'nash_regret_comparison': dual_regret_fig
+            'rd_ne_regret': nash_plot_figures.get('rd_ne_regret'),
+            'dual_ne_regret': nash_plot_figures.get('dual_ne_regret')
         }
-        save_nash_plots(rd_plot_figures, rd_nash_dir)
+        # Only include plots that exist
+        rd_plot_figures = {k: v for k, v in rd_plot_figures.items() if v is not None}
+        if rd_plot_figures:  # Only save if we have any valid figures
+            save_nash_plots(rd_plot_figures, rd_nash_dir)
     
     # Step 9: Save results to CSV files
     print("\nStep 9: Saving results to CSV files...")

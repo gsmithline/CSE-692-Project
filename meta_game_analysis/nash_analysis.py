@@ -13,9 +13,10 @@ from nash_equilibrium import (
     bootstrap_performance_metrics,
     analyze_bootstrap_results,
     plot_regret_distributions,
-    compute_acceptance_ratio_matrix
+    compute_acceptance_ratio_matrix,
+    plot_normal_regret_distributions,
+    visualize_normal_regret_comparison
 )
-# Import the visualize_dual_regret function
 from nash_equilibrium.bootstrap import visualize_dual_regret
 
 def run_nash_analysis(performance_matrix, num_bootstrap_samples=100, confidence_level=0.95):
@@ -30,15 +31,13 @@ def run_nash_analysis(performance_matrix, num_bootstrap_samples=100, confidence_
     Returns:
         tuple: (bootstrap_results, bootstrap_stats, acceptance_matrix, ne_strategy_df)
     """
-    # Get list of agents from performance matrix
     agents = performance_matrix.index.tolist()
     
-    # Run bootstrapping
     print(f"Running bootstrapping with {num_bootstrap_samples} samples...")
     bootstrap_results = bootstrap_performance_metrics(
         performance_matrix, 
         num_bootstrap=num_bootstrap_samples, 
-        data_matrix={}  # Empty data matrix since we're not doing non-parametric bootstrapping
+        data_matrix={} 
     )
 
     print(f"\nComputing {confidence_level*100:.0f}% confidence intervals...")
@@ -68,32 +67,63 @@ def plot_nash_distributions(bootstrap_results, agents, include_rd_regrets=False)
         include_rd_regrets: Whether to look for RD regrets in bootstrap_results (for non-parametric bootstrapping)
         
     Returns:
-        tuple: (me_ne_regret_fig, rd_ne_regret_fig, dual_regret_fig, nash_mixture_fig)
+        dict: Dictionary of figure objects with keys like 'me_ne_regret', 'rd_ne_regret', etc.
     """
-    # Plot Max Entropy Nash equilibrium regret distribution
-    me_ne_regret_fig = plot_regret_distributions(bootstrap_results, agents, regret_type='ne_regret')
+    figures = {}
     
-    # Check if RD regrets are available
-    has_rd_regrets = ('rd_regret' in bootstrap_results and bootstrap_results['rd_regret']) or include_rd_regrets
+    try:
+        # Plot Max Entropy Nash equilibrium regret distribution
+        me_ne_regret_fig = plot_regret_distributions(bootstrap_results, agents, regret_type='ne_regret')
+        if me_ne_regret_fig is not None:
+            figures['me_ne_regret'] = me_ne_regret_fig
+        
+        # Check if RD regrets are available
+        has_rd_regrets = ('rd_regret' in bootstrap_results and bootstrap_results['rd_regret']) or include_rd_regrets
+        
+        # Plot Replicator Dynamics Nash equilibrium regret distribution if available
+        if has_rd_regrets:
+            rd_ne_regret_fig = plot_regret_distributions(bootstrap_results, agents, regret_type='rd_regret')
+            if rd_ne_regret_fig is not None:
+                figures['rd_ne_regret'] = rd_ne_regret_fig
+        
+        # Check if normal regrets are available
+        has_me_normal = 'me_normal_regret' in bootstrap_results and bootstrap_results['me_normal_regret']
+        has_rd_normal = 'rd_normal_regret' in bootstrap_results and bootstrap_results['rd_normal_regret']
+        
+        # Plot normal regret distributions if available
+        if has_me_normal:
+            me_normal_regret_fig = plot_normal_regret_distributions(bootstrap_results, agents, regret_type='me_normal_regret')
+            if me_normal_regret_fig is not None:
+                figures['me_normal_regret'] = me_normal_regret_fig
+        
+        if has_rd_normal:
+            rd_normal_regret_fig = plot_normal_regret_distributions(bootstrap_results, agents, regret_type='rd_normal_regret')
+            if rd_normal_regret_fig is not None:
+                figures['rd_normal_regret'] = rd_normal_regret_fig
+        
+        # Plot comparison of normal regrets if both types are available
+        if has_me_normal and has_rd_normal:
+            normal_comparison_fig = visualize_normal_regret_comparison(bootstrap_results, agents)
+            if normal_comparison_fig is not None:
+                figures['normal_regret_comparison'] = normal_comparison_fig
+        
+        # Plot dual regret visualization comparing both equilibrium types
+        dual_regret_fig = visualize_dual_regret(bootstrap_results, agents)
+        if dual_regret_fig is not None:
+            figures['dual_ne_regret'] = dual_regret_fig
+        
+        # Create Nash mixture visualization with confidence intervals
+        from nash_equilibrium.bootstrap import visualize_nash_mixture_with_ci
+        nash_mixture_fig = visualize_nash_mixture_with_ci(bootstrap_results, agents)
+        if nash_mixture_fig is not None:
+            figures['nash_mixture'] = nash_mixture_fig
     
-    # Plot Replicator Dynamics Nash equilibrium regret distribution if available
-    if has_rd_regrets:
-        rd_ne_regret_fig = plot_regret_distributions(bootstrap_results, agents, regret_type='rd_regret')
-    else:
-        # Create an empty figure as a placeholder
-        rd_ne_regret_fig = plt.figure()
-        plt.figtext(0.5, 0.5, "Replicator Dynamics Nash regrets not available", 
-                   ha='center', va='center', fontsize=14)
-        plt.close()  # Close the figure to avoid displaying it now
+    except Exception as e:
+        print(f"Error generating Nash distribution plots: {e}")
+        import traceback
+        traceback.print_exc()
     
-    # Plot dual regret visualization comparing both equilibrium types
-    dual_regret_fig = visualize_dual_regret(bootstrap_results, agents)
-    
-    # Create Nash mixture visualization with confidence intervals
-    from nash_equilibrium.bootstrap import visualize_nash_mixture_with_ci
-    nash_mixture_fig = visualize_nash_mixture_with_ci(bootstrap_results, agents)
-    
-    return me_ne_regret_fig, rd_ne_regret_fig, dual_regret_fig, nash_mixture_fig
+    return figures
 
 def save_nash_plots(figures, save_dir):
     """
@@ -106,10 +136,24 @@ def save_nash_plots(figures, save_dir):
     os.makedirs(save_dir, exist_ok=True)
     
     for name, fig in figures.items():
-        filename = f"{name}.png"
-        filepath = os.path.join(save_dir, filename)
-        fig.savefig(filepath, bbox_inches='tight', dpi=300)
-        plt.close(fig)
+        # Skip if fig is not a valid matplotlib figure
+        if fig is None:
+            print(f"Warning: Figure '{name}' is None, skipping")
+            continue
+            
+        # Check if fig is a valid object with savefig method
+        if not hasattr(fig, 'savefig'):
+            print(f"Warning: Figure '{name}' is not a valid figure object (type: {type(fig)}), skipping")
+            continue
+            
+        try:
+            filename = f"{name}.png"
+            filepath = os.path.join(save_dir, filename)
+            fig.savefig(filepath, bbox_inches='tight', dpi=300)
+            plt.close(fig)
+        except Exception as e:
+            print(f"Error saving figure '{name}': {e}")
+            continue
 
 def print_nash_summary(bootstrap_stats, ne_strategy_df, bootstrap_results):
     """
@@ -131,16 +175,53 @@ def print_nash_summary(bootstrap_stats, ne_strategy_df, bootstrap_results):
                 # Use pre-computed statistics from bootstrap_stats to avoid numpy errors
                 mean_regrets = bootstrap_stats['Mean NE Regret'].values
                 std_regrets = bootstrap_stats['Std NE Regret'].values
+                
+                # Check for normal regrets if available
+                has_me_normal = 'Mean ME Normal Regret' in bootstrap_stats.columns
+                has_rd_normal = 'Mean RD Normal Regret' in bootstrap_stats.columns
+                
+                if has_me_normal:
+                    mean_me_normal_regrets = bootstrap_stats['Mean ME Normal Regret'].values
+                    std_me_normal_regrets = bootstrap_stats['Std ME Normal Regret'].values
+                
+                if has_rd_normal:
+                    mean_rd_normal_regrets = bootstrap_stats['Mean RD Normal Regret'].values
+                    std_rd_normal_regrets = bootstrap_stats['Std RD Normal Regret'].values
             else:
                 # We already have computed statistics in bootstrap_stats
                 mean_regrets = bootstrap_stats['Mean NE Regret'].values
                 std_regrets = bootstrap_stats['Std NE Regret'].values
+                
+                # Check for normal regrets if available
+                has_me_normal = 'Mean ME Normal Regret' in bootstrap_stats.columns
+                has_rd_normal = 'Mean RD Normal Regret' in bootstrap_stats.columns
+                
+                if has_me_normal:
+                    mean_me_normal_regrets = bootstrap_stats['Mean ME Normal Regret'].values
+                    std_me_normal_regrets = bootstrap_stats['Std ME Normal Regret'].values
+                
+                if has_rd_normal:
+                    mean_rd_normal_regrets = bootstrap_stats['Mean RD Normal Regret'].values
+                    std_rd_normal_regrets = bootstrap_stats['Std RD Normal Regret'].values
             
             print("\nStatistical Summary of Nash Equilibrium Analysis:")
             print(f"Average NE regret across all agents: {np.mean(mean_regrets):.4f}")
             print(f"Maximum average regret: {np.max(mean_regrets):.4f}")
             print(f"Minimum average regret: {np.min(mean_regrets):.4f}")
             print(f"Standard deviation of average regrets: {np.std(mean_regrets, ddof=1):.4f}")
+            
+            # Print normal regret summary if available
+            if has_me_normal:
+                print(f"\nAverage ME normal regret across all agents: {np.mean(mean_me_normal_regrets):.4f}")
+                print(f"Maximum average ME normal regret: {np.max(mean_me_normal_regrets):.4f}")
+                print(f"Minimum average ME normal regret: {np.min(mean_me_normal_regrets):.4f}")
+                print(f"Standard deviation of average ME normal regrets: {np.std(mean_me_normal_regrets, ddof=1):.4f}")
+            
+            if has_rd_normal:
+                print(f"\nAverage RD normal regret across all agents: {np.mean(mean_rd_normal_regrets):.4f}")
+                print(f"Maximum average RD normal regret: {np.max(mean_rd_normal_regrets):.4f}")
+                print(f"Minimum average RD normal regret: {np.min(mean_rd_normal_regrets):.4f}")
+                print(f"Standard deviation of average RD normal regrets: {np.std(mean_rd_normal_regrets, ddof=1):.4f}")
         else:
             print("\nNo valid bootstrap regret data available.")
             return
@@ -464,59 +545,48 @@ def calculate_regrets_against_replicator_nash(performance_matrix, rd_nash_strate
     Returns:
         DataFrame with regret statistics
     """
-    # Convert performance matrix to numpy array
     if isinstance(performance_matrix, pd.DataFrame):
         agent_names = performance_matrix.index.tolist()
         payoff_matrix = performance_matrix.to_numpy()
     else:
         raise ValueError("Performance matrix must be a pandas DataFrame")
     
-    # Extract Nash strategy as a vector
     nash_strategy = np.zeros(len(agent_names))
     for i, agent in enumerate(agent_names):
         idx = rd_nash_strategy[rd_nash_strategy['Agent'] == agent].index
         if len(idx) > 0:
             nash_strategy[i] = rd_nash_strategy.loc[idx[0], 'Nash Probability']
     
-    # Handle NaN values in the payoff matrix
+    # NOTE: There really shouldn't be any but just in case
     for i in range(payoff_matrix.shape[0]):
         for j in range(payoff_matrix.shape[1]):
             if np.isnan(payoff_matrix[i, j]):
                 col_mean = np.nanmean(payoff_matrix[:, j])
                 payoff_matrix[i, j] = col_mean if not np.isnan(col_mean) else 0
     
-    # Check if we have a pure Nash equilibrium (just for debugging info)
-    is_pure_nash = np.max(nash_strategy) > 0.99
+    is_pure_nash = np.max(nash_strategy) == 1.0
     if is_pure_nash:
         pure_nash_idx = np.argmax(nash_strategy)
         pure_nash_agent = agent_names[pure_nash_idx]
         print(f"\nDetected pure Nash equilibrium: {pure_nash_agent}")
     
-    # Calculate expected utilities against the Nash mixture
     expected_utils = np.dot(payoff_matrix, nash_strategy)
     
-    # Calculate expected utilities of Nash mixture against each agent
     nash_vs_agents = np.zeros(len(agent_names))
     for i in range(len(agent_names)):
-        # Calculate how the Nash mixture performs against agent i
         nash_vs_agents[i] = np.dot(nash_strategy, payoff_matrix[:, i])
     
-    # Calculate regrets as expected utils against Nash minus Nash's expected utils against agent
     relative_regrets = expected_utils - nash_vs_agents
     
-    # Calculate Nash equilibrium value (expected utility of Nash mixture against itself)
     nash_value = nash_strategy.reshape((1, -1)) @ payoff_matrix @ nash_strategy.reshape((-1, 1))
-    nash_value = nash_value.item()  # Convert to scalar
+    nash_value = nash_value.item()  
     print(f"Nash equilibrium value: {nash_value:.2f}")
     
-    # Debug print for each agent
     for i, agent in enumerate(agent_names):
         print(f"Agent {agent}: Payoff vs Nash = {expected_utils[i]:.2f}, Nash vs Agent = {nash_vs_agents[i]:.2f}, Regret = {relative_regrets[i]:.2f}")
     
-    # Calculate max possible utility for each agent
     max_utils = np.max(payoff_matrix, axis=1)
     
-    # Create DataFrame with results
     results = pd.DataFrame({
         'Agent': agent_names,
         'RD Nash Regret': relative_regrets,
@@ -540,13 +610,10 @@ def generate_all_nash_stats(performance_matrix, bootstrap_stats, ne_strategy_df,
     Returns:
         tuple: (comparison_df, rd_regret_df)
     """
-    # Calculate regrets against replicator dynamics Nash
     rd_regret_df, rd_nash_value = calculate_regrets_against_replicator_nash(performance_matrix, rd_nash_df)
     
-    # Create a comparison DataFrame
     comparison = []
     for agent in performance_matrix.index:
-        # Find agent in bootstrap stats
         bs_row = bootstrap_stats[bootstrap_stats['Agent'] == agent]
         me_regret = bs_row['Mean NE Regret'].values[0] if len(bs_row) > 0 else np.nan
         
@@ -603,19 +670,16 @@ def print_nash_comparison(comparison_df):
     """
     print("\nNash Equilibrium Comparison:")
     
-    # Print agents in order of Max Entropy Nash probability
     me_ordered = comparison_df.sort_values('ME Nash Probability', ascending=False)
     print("\nAgents by Max Entropy Nash probability:")
     for i, row in me_ordered.iterrows():
         print(f"{row['Agent']}: {row['ME Nash Probability']:.4f}")
     
-    # Print agents in order of Replicator Dynamics Nash probability
     rd_ordered = comparison_df.sort_values('RD Nash Probability', ascending=False)
     print("\nAgents by Replicator Dynamics Nash probability:")
     for i, row in rd_ordered.iterrows():
         print(f"{row['Agent']}: {row['RD Nash Probability']:.4f}")
     
-    # Calculate discrepancy between the two Nash concepts
     comparison_df['Probability Difference'] = np.abs(comparison_df['ME Nash Probability'] - comparison_df['RD Nash Probability'])
     comparison_df['Regret Difference'] = np.abs(comparison_df['ME Nash Regret'] - comparison_df['RD Nash Regret'])
     
@@ -625,6 +689,7 @@ def print_nash_comparison(comparison_df):
         print(f"{row['Agent']}: ME prob={row['ME Nash Probability']:.4f}, RD prob={row['RD Nash Probability']:.4f}")
     
     # Correlation between the two concepts
+    # NOTE: might be helpful? need more data? 
     me_probs = comparison_df['ME Nash Probability'].values
     rd_probs = comparison_df['RD Nash Probability'].values
     try:
