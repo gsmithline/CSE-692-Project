@@ -9,10 +9,16 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
 import warnings
-from nash_equilibrium.nash_solver import milp_max_sym_ent_2p, replicator_dynamics_nash
+from nash_equilibrium.nash_solver import (
+    milp_max_sym_ent_2p,
+    replicator_dynamics_nash,
+    calculate_max_regret,
+    minimize_max_regret,
+    EPSILON
+)
 
 # Define a consistent numerical threshold for the entire module
-EPSILON = .05  # Consistent threshold for numerical operations
+EPSILON = EPSILON  # Use the imported EPSILON value
 
 def bootstrap_performance_metrics(performance_matrix, num_bootstrap=1000, data_matrix=None):
     """
@@ -141,7 +147,7 @@ def bootstrap_performance_metrics(performance_matrix, num_bootstrap=1000, data_m
                 print(f"WARNING: Detected small positive ME Nash regret ({max_regret:.10f}) for agent {worst_agent}. "
                       f"Capping at 0 due to likely numerical precision issues.")
                 # Cap all regret values at 0
-                me_ne_regrets = np.minimum(me_ne_regrets, 0.0)
+                #me_ne_regrets = np.minimum(me_ne_regrets, 0.0)
             
             # 8. ME NE: Validate that all normal regrets are at most 0
             if np.any(me_normal_regrets > EPSILON):
@@ -159,7 +165,7 @@ def bootstrap_performance_metrics(performance_matrix, num_bootstrap=1000, data_m
                 print(f"WARNING: Detected small positive ME normal regret ({max_normal_regret:.10f}) for agent {worst_normal_agent}. "
                       f"Capping at 0 due to likely numerical precision issues.")
                 # Cap all normal regret values at 0
-                me_normal_regrets = np.minimum(me_normal_regrets, 0.0)
+                #me_normal_regrets = np.minimum(me_normal_regrets, 0.0)
             
             # 9. RD NE: Calculate expected utilities against the RD Nash mixture
             rd_expected_utils = np.dot(game_matrix_np, rd_nash_strategy)
@@ -203,7 +209,7 @@ def bootstrap_performance_metrics(performance_matrix, num_bootstrap=1000, data_m
                 print(f"WARNING: Detected small positive RD Nash regret ({max_regret:.10f}) for agent {worst_agent}. "
                       f"Capping at 0 due to likely numerical precision issues.")
                 # Cap all regret values at 0
-                rd_ne_regrets = np.minimum(rd_ne_regrets, 0.0)
+                #rd_ne_regrets = np.minimum(rd_ne_regrets, 0.0)
             
             # 14. RD NE: Validate that all normal regrets are at most 0
             if np.any(rd_normal_regrets > EPSILON):
@@ -221,7 +227,7 @@ def bootstrap_performance_metrics(performance_matrix, num_bootstrap=1000, data_m
                 print(f"WARNING: Detected small positive RD normal regret ({max_normal_regret:.10f}) for agent {worst_normal_agent}. "
                       f"Capping at 0 due to likely numerical precision issues.")
                 # Cap all normal regret values at 0
-                rd_normal_regrets = np.minimum(rd_normal_regrets, 0.0)
+                #rd_normal_regrets = np.minimum(rd_normal_regrets, 0.0)
             
             # Store the results for this bootstrap sample
             bootstrap_results['ne_regret'].append(me_ne_regrets)
@@ -372,28 +378,28 @@ def analyze_bootstrap_results(bootstrap_results, agent_names, confidence=0.95):
             worst_idx_ne = np.argmax(mean_ne_regrets)
             worst_agent_ne = agent_names[worst_idx_ne]
             print(f"WARNING: Small positive mean ME Nash regret detected: {max_ne_regret:.10f} for agent {worst_agent_ne}. Capping at 0.")
-            mean_ne_regrets = np.minimum(mean_ne_regrets, 0.0)
+            #mean_ne_regrets = np.minimum(mean_ne_regrets, 0.0)
         
         if has_rd_regrets and np.any(mean_rd_regrets > 0):
             max_rd_regret = np.max(mean_rd_regrets)
             worst_idx_rd = np.argmax(mean_rd_regrets)
             worst_agent_rd = agent_names[worst_idx_rd]
             print(f"WARNING: Small positive mean RD Nash regret detected: {max_rd_regret:.10f} for agent {worst_agent_rd}. Capping at 0.")
-            mean_rd_regrets = np.minimum(mean_rd_regrets, 0.0)
+            #mean_rd_regrets = np.minimum(mean_rd_regrets, 0.0)
             
         if has_me_normal_regrets and np.any(mean_me_normal_regrets > 0):
             max_me_normal = np.max(mean_me_normal_regrets)
             worst_idx_me_normal = np.argmax(mean_me_normal_regrets)
             worst_agent_me_normal = agent_names[worst_idx_me_normal]
             print(f"WARNING: Small positive mean ME normal regret detected: {max_me_normal:.10f} for agent {worst_agent_me_normal}. Capping at 0.")
-            mean_me_normal_regrets = np.minimum(mean_me_normal_regrets, 0.0)
+            #mean_me_normal_regrets = np.minimum(mean_me_normal_regrets, 0.0)
             
         if has_rd_normal_regrets and np.any(mean_rd_normal_regrets > 0):
             max_rd_normal = np.max(mean_rd_normal_regrets)
             worst_idx_rd_normal = np.argmax(mean_rd_normal_regrets)
             worst_agent_rd_normal = agent_names[worst_idx_rd_normal]
             print(f"WARNING: Small positive mean RD normal regret detected: {max_rd_normal:.10f} for agent {worst_agent_rd_normal}. Capping at 0.")
-            mean_rd_normal_regrets = np.minimum(mean_rd_normal_regrets, 0.0)
+            #mean_rd_normal_regrets = np.minimum(mean_rd_normal_regrets, 0.0)
     
     # Calculate standard deviations
     std_ne_regrets = np.std(ne_regrets, axis=0)
@@ -688,8 +694,6 @@ def plot_regret_distributions(bootstrap_results, agent_names, figsize=(12, 8), r
     
     epsilon = EPSILON  # Use consistent epsilon threshold
     positive_regrets = (regrets > epsilon)
-    capped_regrets = np.copy(regrets)
-    has_capped_values = False
     
     if np.any(positive_regrets):
         count_positive = np.sum(positive_regrets)
@@ -704,55 +708,52 @@ def plot_regret_distributions(bootstrap_results, agent_names, figsize=(12, 8), r
         
         print(f"Warning: {count_positive}/{total_regrets} regret values ({percent_positive:.2f}%) are above EPSILON={epsilon:.2e}.")
         print(f"         Worst agent: '{worst_agent}' with {agent_violation_counts[worst_agent_idx]}/{samples_per_agent} samples ({(agent_violation_counts[worst_agent_idx]/samples_per_agent)*100:.2f}%) showing positive regrets.")
-        
-        has_capped_values = True
-        # Store the original regrets before capping for reference
-        original_regrets = np.copy(regrets)
-        # Cap regrets at 0 for visualization, as positive values aren't valid Nash regrets
-        capped_regrets = np.minimum(regrets, 0.0)
     
-    # Add a note to the title if values were capped
-    capping_note = f"\n({count_positive}/{total_regrets} positive values were capped to 0)" if has_capped_values else ""
-    fig.suptitle(f"{regret_name} Distributions\n(All values should be ≤ 0 at equilibrium){capping_note}", 
+    # Add a note to the title about positive regrets if they exist
+    positive_note = f"\n({count_positive}/{total_regrets} samples have positive regrets)" if np.any(positive_regrets) else ""
+    fig.suptitle(f"{regret_name} Distributions\n(Values should be ≤ 0 at equilibrium){positive_note}", 
                 fontsize=16, fontweight='bold')
     
     for i, agent in enumerate(agent_names):
         if i < len(axs) and i < regrets.shape[1]:
+            agent_regrets = regrets[:, i]
+            
             # Calculate bin edges to cover the entire range of data
-            min_regret = min(capped_regrets[:, i])
-            max_regret = max(capped_regrets[:, i])
+            min_regret = min(agent_regrets)
+            max_regret = max(agent_regrets)
             # Ensure we have enough bins to represent the full distribution
             # Add a small padding to the min/max to guarantee no values are outside the range
             bin_edges = np.linspace(min_regret - abs(min_regret)*0.01, 
-                                    max(max_regret, 0) + 0.01, 
-                                    40)  # Use 40 bins for higher resolution
-            axs[i].hist(capped_regrets[:, i], bins=bin_edges, alpha=0.7, color='darkgreen')
+                                  max_regret + abs(max_regret)*0.01, 
+                                  40)  # Use 40 bins for higher resolution
+            
+            # Plot histogram with original (uncapped) regrets
+            axs[i].hist(agent_regrets, bins=bin_edges, alpha=0.7, 
+                       color='darkgreen' if regret_type == 'ne_regret' else 'darkblue')
             axs[i].set_title(agent)
             axs[i].set_xlabel(regret_name)
             axs[i].set_ylabel('Frequency')
             
-            # Add mean line (using capped regrets)
-            mean_regret = np.mean(capped_regrets[:, i])
+            # Add mean line
+            mean_regret = np.mean(agent_regrets)
             axs[i].axvline(mean_regret, color='r', linestyle='--', 
-                           label=f'Mean: {mean_regret:.6f}')
+                          label=f'Mean: {mean_regret:.6f}')
             
-            # Add 95% CI (using capped regrets)
-            lower_ci = np.percentile(capped_regrets[:, i], 2.5)
-            upper_ci = np.percentile(capped_regrets[:, i], 97.5)
+            # Add 95% CI
+            lower_ci = np.percentile(agent_regrets, 2.5)
+            upper_ci = np.percentile(agent_regrets, 97.5)
             axs[i].axvline(lower_ci, color='orange', linestyle=':')
             axs[i].axvline(upper_ci, color='orange', linestyle=':', 
-                           label=f'95% CI: [{lower_ci:.6f}, {upper_ci:.6f}]')
+                          label=f'95% CI: [{lower_ci:.6f}, {upper_ci:.6f}]')
             
             # Add a reference line at 0 with explicit label
             axs[i].axvline(0, color='black', linestyle='-', alpha=0.7, 
                           label='Zero regret (equilibrium)')
             
             # Set x-axis limit to ensure all data points are visible
-            min_regret = min(capped_regrets[:, i])  # Find the most negative regret value
-            max_regret = max(capped_regrets[:, i])  # Find the most positive regret value (should be close to 0)
-            left_buffer = abs(min_regret) * 0.1  # Add 10% buffer on left side for visibility
-            right_buffer = 0.01  # Small buffer on right side
-            axs[i].set_xlim(min_regret - left_buffer, max(max_regret + right_buffer, epsilon))  # Ensure we see the full range
+            left_buffer = abs(min_regret) * 0.1  # Add 10% buffer on left side
+            right_buffer = abs(max_regret) * 0.1  # Add 10% buffer on right side
+            axs[i].set_xlim(min_regret - left_buffer, max_regret + right_buffer)
             
             # Add a text annotation explaining what the plot shows
             axs[i].text(0.5, 0.97, "Regret must be ≤ 0 at equilibrium", 
@@ -761,28 +762,19 @@ def plot_regret_distributions(bootstrap_results, agent_names, figsize=(12, 8), r
                       fontsize=8)
             
             # Add text showing the full range of regret values
-            min_regret = min(capped_regrets[:, i])
-            max_regret = max(capped_regrets[:, i])
             axs[i].text(0.5, 0.89, f"Full range: [{min_regret:.2f}, {max_regret:.2f}]", 
                       transform=axs[i].transAxes, ha='center', va='top',
                       bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'),
                       fontsize=8)
             
-            # If values were capped, add info about the original uncapped distribution
-            if has_capped_values and np.any(original_regrets[:, i] > epsilon):
-                # Add text showing original uncapped range if different
-                orig_min = min(original_regrets[:, i])
-                orig_max = max(original_regrets[:, i])
-                pos_count = np.sum(original_regrets[:, i] > epsilon)
-                if pos_count > 0:
-                    axs[i].text(0.5, 0.82, f"Original range: [{orig_min:.2f}, {orig_max:.2f}]", 
-                              transform=axs[i].transAxes, ha='center', va='top',
-                              color='red', bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'),
-                              fontsize=8)
-                    axs[i].text(0.5, 0.75, f"{pos_count}/{len(original_regrets[:, i])} samples ({(pos_count/len(original_regrets[:, i]))*100:.1f}%) above EPSILON", 
-                              transform=axs[i].transAxes, ha='center', va='top',
-                              color='red', bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'),
-                              fontsize=8)
+            # If there are positive regrets for this agent, add info
+            agent_pos_count = np.sum(agent_regrets > epsilon)
+            if agent_pos_count > 0:
+                axs[i].text(0.5, 0.82, 
+                          f"{agent_pos_count}/{len(agent_regrets)} samples ({(agent_pos_count/len(agent_regrets))*100:.1f}%) above EPSILON", 
+                          transform=axs[i].transAxes, ha='center', va='top',
+                          color='red', bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'),
+                          fontsize=8)
             
             # Move legend to bottom left to avoid blocking data
             axs[i].legend(fontsize='small', loc='lower left')
@@ -834,8 +826,6 @@ def plot_normal_regret_distributions(bootstrap_results, agent_names, figsize=(12
     
     epsilon = EPSILON  # Use consistent epsilon threshold
     positive_regrets = (regrets > epsilon)
-    capped_regrets = np.copy(regrets)
-    has_capped_values = False
     
     if np.any(positive_regrets):
         count_positive = np.sum(positive_regrets)
@@ -850,55 +840,52 @@ def plot_normal_regret_distributions(bootstrap_results, agent_names, figsize=(12
         
         print(f"Warning: {count_positive}/{total_regrets} normal regret values ({percent_positive:.2f}%) are above EPSILON={epsilon:.2e}.")
         print(f"         Worst agent: '{worst_agent}' with {agent_violation_counts[worst_agent_idx]}/{samples_per_agent} samples ({(agent_violation_counts[worst_agent_idx]/samples_per_agent)*100:.2f}%) showing positive normal regrets.")
-        
-        has_capped_values = True
-        # Store the original regrets before capping for reference
-        original_regrets = np.copy(regrets)
-        # Cap regrets at 0 for visualization, as positive values aren't valid Nash regrets
-        capped_regrets = np.minimum(regrets, 0.0)
     
-    # Add a note to the title if values were capped
-    capping_note = f"\n({count_positive}/{total_regrets} positive values were capped to 0)" if has_capped_values else ""
-    fig.suptitle(f"{regret_name} Distributions\n(All values should be ≤ 0 at equilibrium){capping_note}", 
+    # Add a note to the title about positive normal regrets if they exist
+    positive_note = f"\n({count_positive}/{total_regrets} samples have positive normal regrets)" if np.any(positive_regrets) else ""
+    fig.suptitle(f"{regret_name} Distributions\n(Values should be ≤ 0 at equilibrium){positive_note}", 
                 fontsize=16, fontweight='bold')
     
     for i, agent in enumerate(agent_names):
         if i < len(axs) and i < regrets.shape[1]:
+            agent_regrets = regrets[:, i]
+            
             # Calculate bin edges to cover the entire range of data
-            min_regret = min(capped_regrets[:, i])
-            max_regret = max(capped_regrets[:, i])
+            min_regret = min(agent_regrets)
+            max_regret = max(agent_regrets)
             # Ensure we have enough bins to represent the full distribution
             # Add a small padding to the min/max to guarantee no values are outside the range
             bin_edges = np.linspace(min_regret - abs(min_regret)*0.01, 
-                                    max(max_regret, 0) + 0.01, 
-                                    40)  # Use 40 bins for higher resolution
-            axs[i].hist(capped_regrets[:, i], bins=bin_edges, alpha=0.7, color='darkblue')
+                                  max_regret + abs(max_regret)*0.01, 
+                                  40)  # Use 40 bins for higher resolution
+            
+            # Plot histogram with original (uncapped) regrets
+            axs[i].hist(agent_regrets, bins=bin_edges, alpha=0.7, 
+                       color='darkblue' if regret_type == 'rd_normal_regret' else 'darkgreen')
             axs[i].set_title(agent)
             axs[i].set_xlabel(regret_name)
             axs[i].set_ylabel('Frequency')
             
-            # Add mean line (using capped regrets)
-            mean_regret = np.mean(capped_regrets[:, i])
+            # Add mean line
+            mean_regret = np.mean(agent_regrets)
             axs[i].axvline(mean_regret, color='r', linestyle='--', 
-                           label=f'Mean: {mean_regret:.6f}')
+                          label=f'Mean: {mean_regret:.6f}')
             
-            # Add 95% CI (using capped regrets)
-            lower_ci = np.percentile(capped_regrets[:, i], 2.5)
-            upper_ci = np.percentile(capped_regrets[:, i], 97.5)
+            # Add 95% CI
+            lower_ci = np.percentile(agent_regrets, 2.5)
+            upper_ci = np.percentile(agent_regrets, 97.5)
             axs[i].axvline(lower_ci, color='orange', linestyle=':')
             axs[i].axvline(upper_ci, color='orange', linestyle=':', 
-                           label=f'95% CI: [{lower_ci:.6f}, {upper_ci:.6f}]')
+                          label=f'95% CI: [{lower_ci:.6f}, {upper_ci:.6f}]')
             
             # Add a reference line at 0 with explicit label
             axs[i].axvline(0, color='black', linestyle='-', alpha=0.7, 
                           label='Zero regret (equilibrium)')
             
             # Set x-axis limit to ensure all data points are visible
-            min_regret = min(capped_regrets[:, i])  # Find the most negative regret value
-            max_regret = max(capped_regrets[:, i])  # Find the most positive regret value (should be close to 0)
-            left_buffer = abs(min_regret) * 0.1  # Add 10% buffer on left side for visibility
-            right_buffer = 0.01  # Small buffer on right side
-            axs[i].set_xlim(min_regret - left_buffer, max(max_regret + right_buffer, epsilon))  # Ensure we see the full range
+            left_buffer = abs(min_regret) * 0.1  # Add 10% buffer on left side
+            right_buffer = abs(max_regret) * 0.1  # Add 10% buffer on right side
+            axs[i].set_xlim(min_regret - left_buffer, max_regret + right_buffer)
             
             # Add a text annotation explaining what the plot shows
             axs[i].text(0.5, 0.97, "Normal Regret must be ≤ 0 at equilibrium", 
@@ -907,28 +894,19 @@ def plot_normal_regret_distributions(bootstrap_results, agent_names, figsize=(12
                       fontsize=8)
             
             # Add text showing the full range of regret values
-            min_regret = min(capped_regrets[:, i])
-            max_regret = max(capped_regrets[:, i])
             axs[i].text(0.5, 0.89, f"Full range: [{min_regret:.2f}, {max_regret:.2f}]", 
                       transform=axs[i].transAxes, ha='center', va='top',
                       bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'),
                       fontsize=8)
             
-            # If values were capped, add info about the original uncapped distribution
-            if has_capped_values and np.any(original_regrets[:, i] > epsilon):
-                # Add text showing original uncapped range if different
-                orig_min = min(original_regrets[:, i])
-                orig_max = max(original_regrets[:, i])
-                pos_count = np.sum(original_regrets[:, i] > epsilon)
-                if pos_count > 0:
-                    axs[i].text(0.5, 0.82, f"Original range: [{orig_min:.2f}, {orig_max:.2f}]", 
-                              transform=axs[i].transAxes, ha='center', va='top',
-                              color='red', bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'),
-                              fontsize=8)
-                    axs[i].text(0.5, 0.75, f"{pos_count}/{len(original_regrets[:, i])} samples ({(pos_count/len(original_regrets[:, i]))*100:.1f}%) above EPSILON", 
-                              transform=axs[i].transAxes, ha='center', va='top',
-                              color='red', bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'),
-                              fontsize=8)
+            # If there are positive normal regrets for this agent, add info
+            agent_pos_count = np.sum(agent_regrets > epsilon)
+            if agent_pos_count > 0:
+                axs[i].text(0.5, 0.82, 
+                          f"{agent_pos_count}/{len(agent_regrets)} samples ({(agent_pos_count/len(agent_regrets))*100:.1f}%) above EPSILON", 
+                          transform=axs[i].transAxes, ha='center', va='top',
+                          color='red', bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'),
+                          fontsize=8)
             
             # Move legend to bottom left to avoid blocking data
             axs[i].legend(fontsize='small', loc='lower left')

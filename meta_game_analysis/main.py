@@ -81,7 +81,7 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
     
     # Step 2: Compute global maximum values
     print("\nStep 2: Computing global maximum values...")
-    global_max_nash_welfare, global_standard_max = compute_global_max_values(num_samples=10000)
+    global_max_nash_welfare, global_standard_max = compute_global_max_values(num_samples=10)
     print(f"Global max Nash welfare: {global_max_nash_welfare:.2f}")
     print(f"Global max social welfare: {global_standard_max:.2f}")
     

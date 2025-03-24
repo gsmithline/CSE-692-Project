@@ -238,18 +238,6 @@ def nonparametric_bootstrap_from_raw_data(all_results, num_bootstrap=1000, confi
                 print(f"Warning: Detected positive ME NE regret ({max_me_regret:.6f}) for agent {np.argmax(nash_regrets)}. "
                       f"This suggests the Nash equilibrium computation may not have fully converged.")
             
-            # Always cap regrets to non-positive values (all should be ≤ 0)
-            '''
-            nash_regrets = np.minimum(nash_regrets, 0.0)
-            
-            max_rd_regret = np.max(rd_regrets)
-            if max_rd_regret > warning_threshold:
-                print(f"Warning: Detected positive RD NE regret ({max_rd_regret:.6f}) for agent {np.argmax(rd_regrets)}. "
-                      f"This suggests the RD Nash equilibrium computation may not have fully converged.")
-            
-            # Always cap regrets to non-positive values (all should be ≤ 0)
-            rd_regrets = np.minimum(rd_regrets, 0.0)
-            '''
             # Store results
             bootstrap_results['ne_regret'].append(nash_regrets)
             bootstrap_results['ne_strategy'].append(nash_strategy)
@@ -270,7 +258,7 @@ def nonparametric_bootstrap_from_raw_data(all_results, num_bootstrap=1000, confi
 
 def analyze_bootstrap_results(bootstrap_results, agent_names, confidence=0.95):
     """
-    Analyze bootstrap results and compute confidence intervals
+    Analyze bootstrap results and compute confidence intervals for Nash equilibrium regrets
     
     Args:
         bootstrap_results: Dictionary with bootstrap samples
@@ -281,140 +269,230 @@ def analyze_bootstrap_results(bootstrap_results, agent_names, confidence=0.95):
         DataFrame with statistics and confidence intervals
     """
     if not bootstrap_results['ne_regret']:
-        print("No bootstrap results to analyze. Try running with different parameters.")
+        print("No bootstrap results to analyze. Check for errors in the bootstrap process.")
         return pd.DataFrame({
             'Agent': agent_names,
             'Mean NE Regret': [np.nan] * len(agent_names),
             'Std NE Regret': [np.nan] * len(agent_names),
-            f'Lower {confidence*100:.0f}% CI (Regret)': [np.nan] * len(agent_names),
-            f'Upper {confidence*100:.0f}% CI (Regret)': [np.nan] * len(agent_names),
+            f'Lower {confidence*100:.0f}% CI (NE Regret)': [np.nan] * len(agent_names),
+            f'Upper {confidence*100:.0f}% CI (NE Regret)': [np.nan] * len(agent_names),
             'Mean Expected Utility': [np.nan] * len(agent_names),
-            'Std Expected Utility': [np.nan] * len(agent_names),
-            f'Lower {confidence*100:.0f}% CI (Utility)': [np.nan] * len(agent_names),
-            f'Upper {confidence*100:.0f}% CI (Utility)': [np.nan] * len(agent_names),
-            'Mean RD Regret': [np.nan] * len(agent_names),
-            'Std RD Regret': [np.nan] * len(agent_names),
-            f'Lower {confidence*100:.0f}% CI (RD Regret)': [np.nan] * len(agent_names),
-            f'Upper {confidence*100:.0f}% CI (RD Regret)': [np.nan] * len(agent_names)
+            'Std Expected Utility': [np.nan] * len(agent_names)
         })
     
-    # Initialize arrays to store statistics for each agent
-    num_agents = len(agent_names)
-    mean_regrets = np.zeros(num_agents)
-    std_regrets = np.zeros(num_agents)
-    lower_regrets = np.zeros(num_agents)
-    upper_regrets = np.zeros(num_agents)
+    try:
+        # Stack all bootstrap samples into arrays for analysis
+        ne_regrets = np.stack(bootstrap_results['ne_regret'])
+        expected_utils = np.stack(bootstrap_results['agent_expected_utility'])
+        
+        # Add RD regrets if available
+        has_rd_regrets = 'rd_regret' in bootstrap_results and bootstrap_results['rd_regret']
+        if has_rd_regrets:
+            rd_regrets = np.stack(bootstrap_results['rd_regret'])
+            
+        # Add normal regrets if available
+        has_me_normal_regrets = 'me_normal_regret' in bootstrap_results and bootstrap_results['me_normal_regret']
+        has_rd_normal_regrets = 'rd_normal_regret' in bootstrap_results and bootstrap_results['rd_normal_regret']
+        
+        if has_me_normal_regrets:
+            me_normal_regrets = np.stack(bootstrap_results['me_normal_regret'])
+        
+        if has_rd_normal_regrets:
+            rd_normal_regrets = np.stack(bootstrap_results['rd_normal_regret'])
+    except ValueError:
+        print("Warning: Bootstrap samples have inconsistent shapes. Using a more flexible approach.")
+        
+        first_regret = bootstrap_results['ne_regret'][0]
+        first_util = bootstrap_results['agent_expected_utility'][0]
+        
+        num_samples = len(bootstrap_results['ne_regret'])
+        ne_regrets = np.zeros((num_samples, len(first_regret)), dtype=np.float64)
+        expected_utils = np.zeros((num_samples, len(first_util)), dtype=np.float64)
+        
+        for i in range(num_samples):
+            if i < len(bootstrap_results['ne_regret']):
+                ne_regrets[i] = bootstrap_results['ne_regret'][i]
+            if i < len(bootstrap_results['agent_expected_utility']):
+                expected_utils[i] = bootstrap_results['agent_expected_utility'][i]
+        
+        has_rd_regrets = 'rd_regret' in bootstrap_results and bootstrap_results['rd_regret']
+        if has_rd_regrets:
+            first_rd_regret = bootstrap_results['rd_regret'][0]
+            rd_regrets = np.zeros((num_samples, len(first_rd_regret)), dtype=np.float64)
+            for i in range(num_samples):
+                if i < len(bootstrap_results['rd_regret']):
+                    rd_regrets[i] = bootstrap_results['rd_regret'][i]
+        
+        has_me_normal_regrets = 'me_normal_regret' in bootstrap_results and bootstrap_results['me_normal_regret']
+        if has_me_normal_regrets:
+            first_me_normal = bootstrap_results['me_normal_regret'][0]
+            me_normal_regrets = np.zeros((num_samples, len(first_me_normal)), dtype=np.float64)
+            for i in range(num_samples):
+                if i < len(bootstrap_results['me_normal_regret']):
+                    me_normal_regrets[i] = bootstrap_results['me_normal_regret'][i]
+        
+        has_rd_normal_regrets = 'rd_normal_regret' in bootstrap_results and bootstrap_results['rd_normal_regret']
+        if has_rd_normal_regrets:
+            first_rd_normal = bootstrap_results['rd_normal_regret'][0]
+            rd_normal_regrets = np.zeros((num_samples, len(first_rd_normal)), dtype=np.float64)
+            for i in range(num_samples):
+                if i < len(bootstrap_results['rd_normal_regret']):
+                    rd_normal_regrets[i] = bootstrap_results['rd_normal_regret'][i]
     
-    mean_expected_utils = np.zeros(num_agents)
-    std_expected_utils = np.zeros(num_agents)
-    lower_utils = np.zeros(num_agents)
-    upper_utils = np.zeros(num_agents)
+    # Calculate means
+    mean_ne_regrets = np.mean(ne_regrets, axis=0)
+    mean_expected_utils = np.mean(expected_utils, axis=0)
+    if has_rd_regrets:
+        mean_rd_regrets = np.mean(rd_regrets, axis=0)
+    if has_me_normal_regrets:
+        mean_me_normal_regrets = np.mean(me_normal_regrets, axis=0)
+    if has_rd_normal_regrets:
+        mean_rd_normal_regrets = np.mean(rd_normal_regrets, axis=0)
     
-    # Initialize RD regret statistics
-    mean_rd_regrets = np.zeros(num_agents)
-    std_rd_regrets = np.zeros(num_agents)
-    lower_rd_regrets = np.zeros(num_agents)
-    upper_rd_regrets = np.zeros(num_agents)
+    # Calculate non-parametric standard deviations
+    std_ne_regrets = np.power(np.mean((ne_regrets - mean_ne_regrets) ** 2, axis=0), 0.5)
+    std_expected_utils = np.power(np.mean((expected_utils - mean_expected_utils) ** 2, axis=0), 0.5)
+    if has_rd_regrets:
+        std_rd_regrets = np.power(np.mean((rd_regrets - mean_rd_regrets) ** 2, axis=0), 0.5)
+    if has_me_normal_regrets:
+        std_me_normal_regrets = np.power(np.mean((me_normal_regrets - mean_me_normal_regrets) ** 2, axis=0), 0.5)
+    if has_rd_normal_regrets:
+        std_rd_normal_regrets = np.power(np.mean((rd_normal_regrets - mean_rd_normal_regrets) ** 2, axis=0), 0.5)
     
-    # Calculate percentile thresholds
+    epsilon = 1e-3  # More forgiving for numerical precision issues
+    if np.any(mean_ne_regrets > epsilon):
+        max_ne_regret = np.max(mean_ne_regrets)
+        worst_idx_ne = np.argmax(mean_ne_regrets)
+        worst_agent_ne = agent_names[worst_idx_ne]
+        
+        error_msg = [f"Max Entropy NE: {max_ne_regret:.10f} for agent {worst_agent_ne}"]
+        
+        if has_rd_regrets and np.any(mean_rd_regrets > epsilon):
+            max_rd_regret = np.max(mean_rd_regrets)
+            worst_idx_rd = np.argmax(mean_rd_regrets)
+            worst_agent_rd = agent_names[worst_idx_rd]
+            error_msg.append(f"RD NE: {max_rd_regret:.10f} for agent {worst_agent_rd}")
+        
+        if has_me_normal_regrets and np.any(mean_me_normal_regrets > epsilon):
+            max_me_normal = np.max(mean_me_normal_regrets)
+            worst_idx_me_normal = np.argmax(mean_me_normal_regrets)
+            worst_agent_me_normal = agent_names[worst_idx_me_normal]
+            error_msg.append(f"ME Normal: {max_me_normal:.10f} for agent {worst_agent_me_normal}")
+        
+        if has_rd_normal_regrets and np.any(mean_rd_normal_regrets > epsilon):
+            max_rd_normal = np.max(mean_rd_normal_regrets)
+            worst_idx_rd_normal = np.argmax(mean_rd_normal_regrets)
+            worst_agent_rd_normal = agent_names[worst_idx_rd_normal]
+            error_msg.append(f"RD Normal: {max_rd_normal:.10f} for agent {worst_agent_rd_normal}")
+            
+        print(f"WARNING: Large positive mean regret detected:\n{', '.join(error_msg)}")
+    elif np.any(mean_ne_regrets > 0) or (has_rd_regrets and np.any(mean_rd_regrets > 0)) or \
+         (has_me_normal_regrets and np.any(mean_me_normal_regrets > 0)) or \
+         (has_rd_normal_regrets and np.any(mean_rd_normal_regrets > 0)):
+        # For small positive regrets, just warn
+        if np.any(mean_ne_regrets > 0):
+            max_ne_regret = np.max(mean_ne_regrets)
+            worst_idx_ne = np.argmax(mean_ne_regrets)
+            worst_agent_ne = agent_names[worst_idx_ne]
+            print(f"WARNING: Small positive mean ME Nash regret detected: {max_ne_regret:.10f} for agent {worst_agent_ne}")
+        
+        if has_rd_regrets and np.any(mean_rd_regrets > 0):
+            max_rd_regret = np.max(mean_rd_regrets)
+            worst_idx_rd = np.argmax(mean_rd_regrets)
+            worst_agent_rd = agent_names[worst_idx_rd]
+            print(f"WARNING: Small positive mean RD Nash regret detected: {max_rd_regret:.10f} for agent {worst_agent_rd}")
+            
+        if has_me_normal_regrets and np.any(mean_me_normal_regrets > 0):
+            max_me_normal = np.max(mean_me_normal_regrets)
+            worst_idx_me_normal = np.argmax(mean_me_normal_regrets)
+            worst_agent_me_normal = agent_names[worst_idx_me_normal]
+            print(f"WARNING: Small positive mean ME normal regret detected: {max_me_normal:.10f} for agent {worst_agent_me_normal}")
+            
+        if has_rd_normal_regrets and np.any(mean_rd_normal_regrets > 0):
+            max_rd_normal = np.max(mean_rd_normal_regrets)
+            worst_idx_rd_normal = np.argmax(mean_rd_normal_regrets)
+            worst_agent_rd_normal = agent_names[worst_idx_rd_normal]
+            print(f"WARNING: Small positive mean RD normal regret detected: {max_rd_normal:.10f} for agent {worst_agent_rd_normal}")
+    
+    # Calculate percentile-based confidence intervals
     alpha = 1 - confidence
     lower_percentile = alpha / 2 * 100
     upper_percentile = (1 - alpha / 2) * 100
     
-    for agent_idx in range(num_agents):
-        agent_ne_regrets = []
-        agent_expected_utils = []
-        agent_rd_regrets = []
-        
-        for b in range(len(bootstrap_results['ne_regret'])):
-            try:
-                regret_sample = bootstrap_results['ne_regret'][b]
-                util_sample = bootstrap_results['agent_expected_utility'][b]
-                
-                # Check if RD regrets exist for this bootstrap sample
-                if 'rd_regret' in bootstrap_results and b < len(bootstrap_results['rd_regret']):
-                    rd_regret_sample = bootstrap_results['rd_regret'][b]
-                    if agent_idx < len(rd_regret_sample):
-                        agent_rd_regrets.append(float(rd_regret_sample[agent_idx]))
-                
-                # Check if samples are the right shape
-                if agent_idx < len(regret_sample):
-                    agent_ne_regrets.append(float(regret_sample[agent_idx]))
-                
-                if agent_idx < len(util_sample):
-                    agent_expected_utils.append(float(util_sample[agent_idx]))
-            except (IndexError, TypeError) as e:
-                print(f"Warning: Error processing bootstrap sample {b} for agent {agent_idx}: {e}")
-                continue
-        
-        # Calculate statistics if we have samples
-        if agent_ne_regrets:
-            # Convert to regular Python list of floats to avoid numpy type issues
-            agent_ne_regrets = [float(x) for x in agent_ne_regrets]
-            mean_regrets[agent_idx] = sum(agent_ne_regrets) / len(agent_ne_regrets)
-            # Manual std calculation to avoid numpy issues
-            if len(agent_ne_regrets) > 1:
-                variance = sum((x - mean_regrets[agent_idx])**2 for x in agent_ne_regrets) / (len(agent_ne_regrets) - 1)
-                std_regrets[agent_idx] = variance**0.5
-            else:
-                std_regrets[agent_idx] = 0.0
-            
-            # Use numpy for percentiles only
-            agent_ne_regrets_array = np.array(agent_ne_regrets)
-            lower_regrets[agent_idx] = np.percentile(agent_ne_regrets_array, lower_percentile)
-            upper_regrets[agent_idx] = np.percentile(agent_ne_regrets_array, upper_percentile)
-        
-        if agent_expected_utils:
-            # Convert to regular Python list of floats
-            agent_expected_utils = [float(x) for x in agent_expected_utils]
-            mean_expected_utils[agent_idx] = sum(agent_expected_utils) / len(agent_expected_utils)
-            # Manual std calculation
-            if len(agent_expected_utils) > 1:
-                variance = sum((x - mean_expected_utils[agent_idx])**2 for x in agent_expected_utils) / (len(agent_expected_utils) - 1)
-                std_expected_utils[agent_idx] = variance**0.5
-            else:
-                std_expected_utils[agent_idx] = 0.0
-                
-            # Use numpy for percentiles
-            agent_expected_utils_array = np.array(agent_expected_utils)
-            lower_utils[agent_idx] = np.percentile(agent_expected_utils_array, lower_percentile)
-            upper_utils[agent_idx] = np.percentile(agent_expected_utils_array, upper_percentile)
-        
-        # Calculate RD regret statistics if data is available
-        if agent_rd_regrets:
-            # Convert to regular Python list of floats
-            agent_rd_regrets = [float(x) for x in agent_rd_regrets]
-            mean_rd_regrets[agent_idx] = sum(agent_rd_regrets) / len(agent_rd_regrets)
-            # Manual std calculation
-            if len(agent_rd_regrets) > 1:
-                variance = sum((x - mean_rd_regrets[agent_idx])**2 for x in agent_rd_regrets) / (len(agent_rd_regrets) - 1)
-                std_rd_regrets[agent_idx] = variance**0.5
-            else:
-                std_rd_regrets[agent_idx] = 0.0
-            
-            # Use numpy for percentiles
-            agent_rd_regrets_array = np.array(agent_rd_regrets)
-            lower_rd_regrets[agent_idx] = np.percentile(agent_rd_regrets_array, lower_percentile)
-            upper_rd_regrets[agent_idx] = np.percentile(agent_rd_regrets_array, upper_percentile)
+    lower_ne_regrets = np.percentile(ne_regrets, lower_percentile, axis=0)
+    upper_ne_regrets = np.percentile(ne_regrets, upper_percentile, axis=0)
     
-    # Create a DataFrame with results
+    if has_rd_regrets:
+        lower_rd_regrets = np.percentile(rd_regrets, lower_percentile, axis=0)
+        upper_rd_regrets = np.percentile(rd_regrets, upper_percentile, axis=0)
+        
+    if has_me_normal_regrets:
+        lower_me_normal_regrets = np.percentile(me_normal_regrets, lower_percentile, axis=0)
+        upper_me_normal_regrets = np.percentile(me_normal_regrets, upper_percentile, axis=0)
+        
+    if has_rd_normal_regrets:
+        lower_rd_normal_regrets = np.percentile(rd_normal_regrets, lower_percentile, axis=0)
+        upper_rd_normal_regrets = np.percentile(rd_normal_regrets, upper_percentile, axis=0)
+    
+    # Check if any upper bound of the confidence interval is above 0
+    if np.any(upper_ne_regrets > epsilon):
+        warnings.warn("Some confidence intervals for NE regrets include positive values. "
+                     "This may indicate numerical instability in the Nash equilibrium calculation.")
+    
+    # Create DataFrame with results
     results = pd.DataFrame({
         'Agent': agent_names,
-        'Mean NE Regret': mean_regrets,
-        'Std NE Regret': std_regrets,
-        f'Lower {confidence*100:.0f}% CI (Regret)': lower_regrets,
-        f'Upper {confidence*100:.0f}% CI (Regret)': upper_regrets,
+        'Mean NE Regret': mean_ne_regrets,
+        'Std NE Regret': std_ne_regrets,
+        f'Lower {confidence*100:.0f}% CI (NE Regret)': lower_ne_regrets,
+        f'Upper {confidence*100:.0f}% CI (NE Regret)': upper_ne_regrets,
         'Mean Expected Utility': mean_expected_utils,
-        'Std Expected Utility': std_expected_utils,
-        f'Lower {confidence*100:.0f}% CI (Utility)': lower_utils,
-        f'Upper {confidence*100:.0f}% CI (Utility)': upper_utils,
-        'Mean RD Regret': mean_rd_regrets,
-        'Std RD Regret': std_rd_regrets,
-        f'Lower {confidence*100:.0f}% CI (RD Regret)': lower_rd_regrets,
-        f'Upper {confidence*100:.0f}% CI (RD Regret)': upper_rd_regrets
+        'Std Expected Utility': std_expected_utils
     })
     
-    # Sort by mean NE regret
-    results = results.sort_values(by='Mean NE Regret', ascending=False)
+    # Add RD regret columns if available
+    if has_rd_regrets:
+        results['Mean RD Regret'] = mean_rd_regrets
+        results['Std RD Regret'] = std_rd_regrets
+        results[f'Lower {confidence*100:.0f}% CI (RD Regret)'] = lower_rd_regrets
+        results[f'Upper {confidence*100:.0f}% CI (RD Regret)'] = upper_rd_regrets
+    
+    # Add ME normal regret columns if available
+    if has_me_normal_regrets:
+        results['Mean ME Normal Regret'] = mean_me_normal_regrets
+        results['Std ME Normal Regret'] = std_me_normal_regrets
+        results[f'Lower {confidence*100:.0f}% CI (ME Normal Regret)'] = lower_me_normal_regrets
+        results[f'Upper {confidence*100:.0f}% CI (ME Normal Regret)'] = upper_me_normal_regrets
+    
+    # Add RD normal regret columns if available
+    if has_rd_normal_regrets:
+        results['Mean RD Normal Regret'] = mean_rd_normal_regrets
+        results['Std RD Normal Regret'] = std_rd_normal_regrets
+        results[f'Lower {confidence*100:.0f}% CI (RD Normal Regret)'] = lower_rd_normal_regrets
+        results[f'Upper {confidence*100:.0f}% CI (RD Normal Regret)'] = upper_rd_normal_regrets
+    
+    # Sort by the mean expected utility (higher is better)
+    results = results.sort_values(by='Mean Expected Utility', ascending=False)
+    
+    # Print summary statistics
+    print("\nSummary of Nash Equilibrium Analysis:")
+    print(f"Average NE regret: {np.mean(mean_ne_regrets):.8f}")
+    if has_rd_regrets:
+        print(f"Average RD regret: {np.mean(mean_rd_regrets):.8f}")
+    if has_me_normal_regrets:
+        print(f"Average ME normal regret: {np.mean(mean_me_normal_regrets):.8f}")
+    if has_rd_normal_regrets:
+        print(f"Average RD normal regret: {np.mean(mean_rd_normal_regrets):.8f}")
+    
+    print(f"Maximum NE regret: {np.max(mean_ne_regrets):.8f}")
+    if has_rd_regrets:
+        print(f"Maximum RD regret: {np.max(mean_rd_regrets):.8f}")
+    if has_me_normal_regrets:
+        print(f"Maximum ME normal regret: {np.max(mean_me_normal_regrets):.8f}")
+    if has_rd_normal_regrets:
+        print(f"Maximum RD normal regret: {np.max(mean_rd_normal_regrets):.8f}")
+    
+    print("\nTop 5 agents by Expected Utility:")
+    print(results[['Agent', 'Mean Expected Utility', 'Mean NE Regret']].head(5))
     
     return results 
