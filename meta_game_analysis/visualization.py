@@ -408,19 +408,29 @@ def create_matrix_heatmap_with_rd_regret(performance_matrix, rd_regret_df, title
     regrets = regrets.dropna()
     
     if len(regrets) > 0:
-        # Ensure all regrets are at most 0 (with small tolerance)
+        # Check for any positive regrets
         epsilon = 1e-8
         if (regrets > epsilon).any():
             print(f"Warning: Some RD Nash regrets are positive: {regrets[regrets > epsilon].values}")
-            print("Setting these regrets to 0 for visualization correctness.")
-            regrets[regrets > epsilon] = 0.0
+            print("These positive regrets indicate the Nash equilibrium calculation may not have fully converged.")
+            print("Displaying actual regret values without modification.")
             
         # Sort by regret (closer to 0 is better)
         regrets = regrets.sort_values(ascending=False)
             
-        # Use a colormap that shows closer to 0 as better (green)
-        norm = plt.Normalize(regrets.min(), 0)  # 0 is the upper bound
-        colors = plt.cm.RdYlGn(norm(regrets.values))
+        # Determine the normalization range based on actual values
+        min_val = regrets.min()
+        max_val = max(0, regrets.max())  # Use 0 as upper bound if all regrets are negative
+        
+        # If we have positive regrets, adjust the colormap to show positive as worse (red)
+        if max_val > 0:
+            # Use a diverging colormap centered at 0
+            norm = plt.Normalize(min_val, max_val) 
+            colors = plt.cm.RdYlGn_r(norm(regrets.values))  # Reversed so negative (good) is green
+        else:
+            # All regrets are negative, use standard colormap
+            norm = plt.Normalize(min_val, 0)  # 0 is the upper bound
+            colors = plt.cm.RdYlGn(norm(regrets.values))
         
         # Plot bars in the same order as the heatmap rows
         for i, (agent, value) in enumerate(regrets.items()):

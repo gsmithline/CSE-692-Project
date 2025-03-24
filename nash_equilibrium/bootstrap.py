@@ -577,9 +577,10 @@ def visualize_dual_regret(bootstrap_results, agent_names, figsize=(16, 10)):
     rd_positive = dual_regret_df['RD Nash Regret'] > epsilon
     
     if me_positive.any() or rd_positive.any():
-        print(f"Warning: Some Nash regrets are positive. Capping at 0 for visualization.")
-        dual_regret_df.loc[me_positive, 'ME Nash Regret'] = 0.0
-        dual_regret_df.loc[rd_positive, 'RD Nash Regret'] = 0.0
+        print(f"Warning: Some Nash regrets are positive. Displaying actual regret values without modification.")
+        # No longer capping positive regrets at 0 as requested
+        # dual_regret_df.loc[me_positive, 'ME Nash Regret'] = 0.0
+        # dual_regret_df.loc[rd_positive, 'RD Nash Regret'] = 0.0
     
     # Sort agents by ME Nash Regret (closer to 0 is better, so descending)
     me_ne_regret_df = dual_regret_df.sort_values('ME Nash Regret', ascending=False)

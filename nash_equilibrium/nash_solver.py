@@ -168,7 +168,7 @@ def minimize_max_regret(game_matrix, strategy, max_iterations=100, epsilon=EPSIL
     
     return current_strategy
 
-def replicator_dynamics_nash(game_matrix, max_iter=10000, convergence_threshold=None):
+def replicator_dynamics_nash(game_matrix, max_iter=10, convergence_threshold=None):
     """
     Compute Nash equilibrium using replicator dynamics for 2-player games.
     

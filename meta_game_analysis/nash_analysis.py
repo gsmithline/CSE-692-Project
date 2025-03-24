@@ -263,9 +263,15 @@ def run_raw_data_nash_analysis(all_results, num_bootstrap_samples=100, confidenc
         confidence_level: Confidence level for bootstrap intervals
         
     Returns:
-        tuple: (bootstrap_results, bootstrap_stats, agent_names)
+        tuple: (bootstrap_results, bootstrap_stats, ne_strategy_df, agent_names)
     """
-    from meta_game_analysis.bootstrap_nonparametric import nonparametric_bootstrap_from_raw_data
+    from meta_game_analysis.bootstrap_nonparametric import (
+        nonparametric_bootstrap_from_raw_data, 
+        analyze_bootstrap_convergence,
+        analyze_bootstrap_results_for_convergence,
+        plot_bootstrap_iteration,
+        plot_confidence_interval_stability
+    )
     
     print(f"Running non-parametric bootstrapping with {num_bootstrap_samples} samples...")
     bootstrap_results, agent_names = nonparametric_bootstrap_from_raw_data(
@@ -275,6 +281,60 @@ def run_raw_data_nash_analysis(all_results, num_bootstrap_samples=100, confidenc
     )
     
     bootstrap_stats = bootstrap_results['statistics']
+    
+    # Create output directory for bootstrap analysis
+    output_dir = 'bootstrap_analysis'
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Perform convergence analysis and generate plots
+    try:
+        print(f"\nAnalyzing bootstrap convergence with {num_bootstrap_samples} samples...")
+        
+        # Basic convergence analysis
+        convergence_analysis = analyze_bootstrap_convergence(bootstrap_results, agent_names)
+        
+        # Create convergence_df outside the try block to ensure it's available for printing
+        convergence_df = pd.DataFrame({
+            'Metric': ['NE Regrets', 'Expected Utilities', 'RD Regrets'],
+            'Converged': [
+                convergence_analysis.get('ne_converged', False),
+                convergence_analysis.get('eu_converged', False), 
+                convergence_analysis.get('rd_converged', False)
+            ],
+            'Mean Monte Carlo Error': [
+                np.mean(convergence_analysis.get('ne_errors', [0])),
+                np.mean(convergence_analysis.get('eu_errors', [0])),
+                np.mean(convergence_analysis.get('rd_errors', [0]))
+            ]
+        })
+        
+        # Perform enhanced convergence analysis based on bootstrap paper methods
+        print("\nRunning detailed bootstrap convergence analysis following the bootstrap paper methods...")
+        print("This analysis will help determine if more bootstrap samples or simulator data are needed.")
+        print("The following convergence metrics will be generated:")
+        print("1. Bootstrap Iteration Plots - Shows how statistics stabilize with more bootstrap samples")
+        print("2. Confidence Interval Stability - Shows how CIs stabilize as bootstrap sample size increases")
+        print("3. Monte Carlo Errors - Measures uncertainty in bootstrap estimates")
+        print("4. Relative Errors - Assesses reliability relative to the magnitude of estimates")
+        
+        enhanced_convergence = analyze_bootstrap_results_for_convergence(
+            bootstrap_results, 
+            agent_names,
+            output_dir
+        )
+        
+        # Save basic convergence analysis results
+        convergence_df.to_csv(os.path.join(output_dir, 'convergence_analysis.csv'), index=False)
+    except Exception as e:
+        print(f"Error during convergence analysis: {e}")
+        print("Continuing with other analyses...")
+        
+        # Create a default convergence_df to ensure it's always available
+        convergence_df = pd.DataFrame({
+            'Metric': ['NE Regrets', 'Expected Utilities', 'RD Regrets'],
+            'Converged': [False, False, False],
+            'Mean Monte Carlo Error': [0.0, 0.0, 0.0]
+        })
     
     # Compute Max Entropy Nash equilibrium mixed strategy
     avg_ne_strategy = np.mean([s for s in bootstrap_results['ne_strategy']], axis=0)
@@ -299,6 +359,34 @@ def run_raw_data_nash_analysis(all_results, num_bootstrap_samples=100, confidenc
     
     print("\nNash Equilibrium Analysis Complete")
     print_nash_summary(bootstrap_stats, ne_strategy_df, bootstrap_results)
+    
+    # Print convergence analysis summary if available
+    try:
+        if 'convergence_analysis' in locals():
+            print("\nBasic Convergence Analysis Summary:")
+            print("-" * 50)
+            
+            # Check if convergence_df exists in the local scope
+            if 'convergence_df' in locals():
+                for metric, converged in zip(convergence_df['Metric'], convergence_df['Converged']):
+                    status = "Converged" if converged else "Not converged"
+                    print(f"{metric}: {status}")
+                
+                if not all(convergence_df['Converged']):
+                    print("\nWARNING: Some statistics have not converged. Consider increasing the number of bootstrap samples.")
+            else:
+                print("Convergence analysis data not available.")
+            
+            print("\nHow to interpret bootstrap convergence results:")
+            print("1. Check if Monte Carlo errors are small relative to the estimates")
+            print("   - Relative errors < 5% indicate good convergence")
+            print("   - Relative errors > 10% suggest more bootstrap samples are needed")
+            print("2. Examine bootstrap iteration plots to see if statistics have stabilized")
+            print("3. Review CI stability plots to see if confidence intervals have stabilized")
+            print("4. Large fluctuations in any statistics may indicate insufficient simulator data")
+            print("\nAll convergence plots and statistics have been saved to the 'bootstrap_analysis' directory.")
+    except Exception as e:
+        print(f"Error printing convergence summary: {e}")
     
     return bootstrap_results, bootstrap_stats, ne_strategy_df, agent_names
 

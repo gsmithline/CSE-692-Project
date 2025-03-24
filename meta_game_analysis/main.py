@@ -157,6 +157,67 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
             num_bootstrap_samples=num_bootstrap,
             confidence_level=confidence
         )
+        
+        # Create bootstrap analysis directory in the output dir
+        bootstrap_dir = os.path.join(output_dir, 'bootstrap_analysis')
+        os.makedirs(bootstrap_dir, exist_ok=True)
+        
+        # Generate distribution plots for non-parametric bootstrap results
+        print("\nGenerating bootstrap distribution plots...")
+        from meta_game_analysis.bootstrap_nonparametric import plot_regret_distributions
+        
+        # Extract regrets from bootstrap results
+        ne_regrets = bootstrap_results['ne_regret']
+        rd_regrets = bootstrap_results['rd_regret']
+        
+        # Create distribution plots
+        ne_dist_fig = plot_regret_distributions(ne_regrets, agent_names, 
+                                            title="Nash Equilibrium Regret Distribution")
+        if ne_dist_fig is not None:
+            ne_dist_fig.savefig(os.path.join(bootstrap_dir, 'ne_regret_distribution.png'))
+        else:
+            print("Warning: Failed to create Nash Equilibrium Regret Distribution figure")
+        
+        rd_dist_fig = plot_regret_distributions(rd_regrets, agent_names,
+                                            title="Replicator Dynamics Regret Distribution")
+        if rd_dist_fig is not None:
+            rd_dist_fig.savefig(os.path.join(bootstrap_dir, 'rd_regret_distribution.png'))
+        else:
+            print("Warning: Failed to create Replicator Dynamics Regret Distribution figure")
+        
+        # Generate box plots
+        ne_box_fig = plot_regret_distributions(ne_regrets, agent_names, 
+                                            title="Nash Equilibrium Regret Box Plot", 
+                                            plot_type="box")
+        if ne_box_fig is not None:
+            ne_box_fig.savefig(os.path.join(bootstrap_dir, 'ne_regret_boxplot.png'))
+        else:
+            print("Warning: Failed to create Nash Equilibrium Regret Box Plot figure")
+        
+        rd_box_fig = plot_regret_distributions(rd_regrets, agent_names,
+                                            title="Replicator Dynamics Regret Box Plot", 
+                                            plot_type="box")
+        if rd_box_fig is not None:
+            rd_box_fig.savefig(os.path.join(bootstrap_dir, 'rd_regret_boxplot.png'))
+        else:
+            print("Warning: Failed to create Replicator Dynamics Regret Box Plot figure")
+        
+        # Generate running mean plots
+        ne_running_fig = plot_regret_distributions(ne_regrets, agent_names, 
+                                                title="Nash Equilibrium Regret Running Mean", 
+                                                plot_type="running_mean")
+        if ne_running_fig is not None:
+            ne_running_fig.savefig(os.path.join(bootstrap_dir, 'ne_regret_running_mean.png'))
+        else:
+            print("Warning: Failed to create Nash Equilibrium Regret Running Mean figure")
+        
+        rd_running_fig = plot_regret_distributions(rd_regrets, agent_names,
+                                                title="Replicator Dynamics Regret Running Mean", 
+                                                plot_type="running_mean")
+        if rd_running_fig is not None:
+            rd_running_fig.savefig(os.path.join(bootstrap_dir, 'rd_regret_running_mean.png'))
+        else:
+            print("Warning: Failed to create Replicator Dynamics Regret Running Mean figure")
     else:
         print("\nUsing traditional bootstrapping with performance matrix...")
         bootstrap_results, bootstrap_stats, acceptance_matrix, ne_strategy_df = run_nash_analysis(
@@ -329,6 +390,121 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
         'bootstrap_stats': bootstrap_stats,
         'ne_strategy_df': ne_strategy_df
     }
+
+def main():
+    """Main function to run bootstrap analysis on a performance matrix."""
+    # Load the performance matrix
+    performance_matrix = pd.read_csv('performance_matrix.csv', index_col=0)
+    
+    # Run bootstrap analysis
+    from meta_game_analysis.bootstrap_nonparametric import run_bootstrap_analysis, analyze_bootstrap_convergence, plot_regret_distributions
+    from meta_game_analysis.nash_analysis import analyze_bootstrap_results
+    
+    # Create output directory
+    output_dir = 'bootstrap_analysis'
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Run bootstrap analysis
+    bootstrap_results = run_bootstrap_analysis(performance_matrix)
+    
+    # Analyze bootstrap results
+    agent_names = performance_matrix.index.tolist()
+    bootstrap_stats = analyze_bootstrap_results(bootstrap_results, agent_names)
+    
+    # Save bootstrap statistics
+    bootstrap_stats.to_csv(os.path.join(output_dir, 'bootstrap_statistics.csv'))
+    
+    # Generate convergence analysis and plots
+    print("\nGenerating convergence analysis plots...")
+    convergence_analysis = analyze_bootstrap_convergence(bootstrap_results, agent_names)
+    
+    # Extract regrets from bootstrap results for distribution plots
+    ne_regrets = [result['ne_regrets'] for result in bootstrap_results]
+    rd_regrets = [result['rd_regrets'] for result in bootstrap_results]
+    
+    # Create and save distribution plots
+    print("\nGenerating regret distribution plots...")
+    ne_dist_fig = plot_regret_distributions(ne_regrets, agent_names, 
+                                          title="Nash Equilibrium Regret Distribution")
+    if ne_dist_fig is not None:
+        ne_dist_fig.savefig(os.path.join(output_dir, 'ne_regret_distribution.png'))
+    else:
+        print("Warning: Failed to create Nash Equilibrium Regret Distribution figure")
+    
+    rd_dist_fig = plot_regret_distributions(rd_regrets, agent_names,
+                                          title="Replicator Dynamics Regret Distribution")
+    if rd_dist_fig is not None:
+        rd_dist_fig.savefig(os.path.join(output_dir, 'rd_regret_distribution.png'))
+    else:
+        print("Warning: Failed to create Replicator Dynamics Regret Distribution figure")
+    
+    # Generate box plots for regrets
+    print("\nGenerating regret box plots...")
+    ne_box_fig = plot_regret_distributions(ne_regrets, agent_names, 
+                                          title="Nash Equilibrium Regret Box Plot", 
+                                          plot_type="box")
+    if ne_box_fig is not None:
+        ne_box_fig.savefig(os.path.join(output_dir, 'ne_regret_boxplot.png'))
+    else:
+        print("Warning: Failed to create Nash Equilibrium Regret Box Plot figure")
+    
+    rd_box_fig = plot_regret_distributions(rd_regrets, agent_names,
+                                          title="Replicator Dynamics Regret Box Plot", 
+                                          plot_type="box")
+    if rd_box_fig is not None:
+        rd_box_fig.savefig(os.path.join(output_dir, 'rd_regret_boxplot.png'))
+    else:
+        print("Warning: Failed to create Replicator Dynamics Regret Box Plot figure")
+    
+    # Generate running mean plots
+    print("\nGenerating running mean plots...")
+    ne_running_fig = plot_regret_distributions(ne_regrets, agent_names, 
+                                             title="Nash Equilibrium Regret Running Mean", 
+                                             plot_type="running_mean")
+    if ne_running_fig is not None:
+        ne_running_fig.savefig(os.path.join(output_dir, 'ne_regret_running_mean.png'))
+    else:
+        print("Warning: Failed to create Nash Equilibrium Regret Running Mean figure")
+    
+    rd_running_fig = plot_regret_distributions(rd_regrets, agent_names,
+                                             title="Replicator Dynamics Regret Running Mean", 
+                                             plot_type="running_mean")
+    if rd_running_fig is not None:
+        rd_running_fig.savefig(os.path.join(output_dir, 'rd_regret_running_mean.png'))
+    else:
+        print("Warning: Failed to create Replicator Dynamics Regret Running Mean figure")
+    
+    # Print summary statistics
+    print("\nBootstrap Analysis Summary:")
+    print("=" * 50)
+    print("\nNash Equilibrium Statistics:")
+    print("-" * 30)
+    print(f"Mean NE Regret: {bootstrap_stats['Mean NE Regret'].mean():.6f}")
+    print(f"Std NE Regret: {bootstrap_stats['Std NE Regret'].mean():.6f}")
+    print(f"95% CI NE Regret: [{bootstrap_stats['CI Lower NE Regret'].mean():.6f}, {bootstrap_stats['CI Upper NE Regret'].mean():.6f}]")
+    
+    print("\nReplicator Dynamics Statistics:")
+    print("-" * 30)
+    print(f"Mean RD Regret: {bootstrap_stats['Mean RD Regret'].mean():.6f}")
+    print(f"Std RD Regret: {bootstrap_stats['Std RD Regret'].mean():.6f}")
+    print(f"95% CI RD Regret: [{bootstrap_stats['CI Lower RD Regret'].mean():.6f}, {bootstrap_stats['CI Upper RD Regret'].mean():.6f}]")
+    
+    print("\nExpected Utility Statistics:")
+    print("-" * 30)
+    print(f"Mean Expected Utility: {bootstrap_stats['Mean Expected Utility'].mean():.6f}")
+    print(f"Std Expected Utility: {bootstrap_stats['Std Expected Utility'].mean():.6f}")
+    print(f"95% CI Expected Utility: [{bootstrap_stats['CI Lower Expected Utility'].mean():.6f}, {bootstrap_stats['CI Upper Expected Utility'].mean():.6f}]")
+    
+    print("\nConvergence Analysis:")
+    print("-" * 30)
+    print(f"NE Regrets Converged: {'Yes' if convergence_analysis['ne_converged'] else 'No'}")
+    print(f"Expected Utilities Converged: {'Yes' if convergence_analysis['eu_converged'] else 'No'}")
+    print(f"RD Regrets Converged: {'Yes' if convergence_analysis['rd_converged'] else 'No'}")
+    
+    if not (convergence_analysis['ne_converged'] and convergence_analysis['eu_converged'] and convergence_analysis['rd_converged']):
+        print("\nWARNING: Some statistics have not converged. Consider increasing the number of bootstrap samples.")
+    
+    print("\nAll plots and statistics have been saved to the 'bootstrap_analysis' directory.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run meta-game analysis on negotiation data.")

@@ -95,8 +95,8 @@ def create_matrix_heatmap_with_nash_regret(performance_matrix, nash_regrets, reg
         epsilon = 1e-8  # Numerical tolerance
         if (regrets > epsilon).any():
             print(f"Warning: Some NE regrets are positive: {regrets[regrets > epsilon].values}")
-            print("Setting these regrets to 0 for visualization correctness.")
-            regrets[regrets > epsilon] = 0.0
+            print("These positive regrets indicate the Nash equilibrium calculation may not have fully converged.")
+            print("Displaying actual regret values without modification.")
         
         # For NE regrets, less negative is better (closer to 0)
         regrets = regrets.sort_values(ascending=False)
