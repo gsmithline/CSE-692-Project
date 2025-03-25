@@ -451,8 +451,11 @@ def create_matrix_heatmap_with_rd_regret(performance_matrix, rd_regret_df, title
         ax_regret.set_title('RD Nash Regret\n(should be ≤ 0)', fontweight='bold')
         ax_regret.axvline(x=0, color='black', linestyle='--', alpha=0.7)
         
-        # Set x-axis limits to show all bars clearly
-        ax_regret.set_xlim(min(regrets.min() * 1.1, -0.001), 0.001)  # Small buffer around 0
+        # Set x-axis limits to show all bars clearly with appropriate buffers
+        min_val = min(regrets.min() * 1.1, -0.001)  # Buffer for negative values
+        # Use the actual max value instead of a fixed limit to show all positive regrets
+        max_val = max(regrets.max() * 1.1, 0.001)  # Buffer for positive values or small default
+        ax_regret.set_xlim(min_val, max_val)
         
         # Set y-axis limits to match heatmap
         ax_regret.set_ylim(ax_heatmap.get_ylim())
@@ -583,7 +586,7 @@ def visualize_nash_comparison(comparison_df, save_dir=None):
 
 def plot_regret_distributions(regrets, agent_names, title="Nash Equilibrium Regret Distribution", figsize=(12, 8)):
     """
-    Plot distributions of Nash equilibrium regrets for each agent
+    Plot distributions of Nash equilibrium regrets for each agent with extreme memory optimization
     
     Args:
         regrets: List of regret vectors from bootstrap samples
@@ -591,116 +594,197 @@ def plot_regret_distributions(regrets, agent_names, title="Nash Equilibrium Regr
         title: Plot title
         figsize: Figure size
     """
-    try:
-        regrets = np.stack(regrets)
-    except ValueError:
-        print("Warning: Bootstrap samples have inconsistent shapes. Using a more flexible approach.")
-        first_regret = regrets[0]
-        regrets_array = np.zeros((len(regrets), len(first_regret)))
-        for i, regret in enumerate(regrets):
-            if len(regret) == len(first_regret):
-                regrets_array[i] = regret
-            else:
-                print(f"Warning: Skipping regret sample {i} due to shape mismatch")
-        regrets = regrets_array
+    # Print regret range for debugging
+    # Check regret range without loading all into memory at once
+    min_overall = float('inf')
+    max_overall = float('-inf')
     
+    # Sample a subset of regrets to estimate range
+    sample_size = min(100, len(regrets))
+    sample_indices = np.linspace(0, len(regrets)-1, sample_size, dtype=int)
+    
+    for i in sample_indices:
+        r = np.array(regrets[i], dtype=np.float32)  # Use float32 to reduce memory
+        if r.size > 0:
+            min_val = np.min(r)
+            max_val = np.max(r)
+            min_overall = min(min_overall, min_val)
+            max_overall = max(max_overall, max_val)
+    
+    print(f"Regret range for {title}: [{min_overall:.8f}, {max_overall:.8f}]")
+    
+    # Check for extreme range that might cause memory issues
+    range_magnitude = abs(min_overall - max_overall)
+    
+    # For extreme ranges, use aggressive downsampling and fewer bins
+    MAX_BOOTSTRAP_SAMPLES = 500 if range_magnitude > 100 else 1000
+    
+    # Process regrets in batches if there are many agents to reduce memory usage
     n_agents = len(agent_names)
     
-    fig, axs = plt.subplots(int(np.ceil(n_agents/3)), 3, figsize=figsize)
-    axs = axs.flatten()
+    # Use smaller batch size for extreme ranges
+    batch_size = 6 if range_magnitude > 100 else min(9, n_agents)  # Use 2x3 grid for extreme ranges
     
-    # Check for any positive regrets
-    epsilon = 1e-6  # Small threshold for numerical precision
-    positive_regrets = (regrets > epsilon)
+    # Track positive regrets across all batches
+    overall_positive_count = 0
+    overall_total_regrets = 0
     
-    if np.any(positive_regrets):
-        count_positive = np.sum(positive_regrets)
-        total_regrets = regrets.size
-        percent_positive = (count_positive / total_regrets) * 100
+    first_fig = None
+    
+    # Process one agent at a time for extreme ranges
+    for batch_start in range(0, n_agents, batch_size):
+        batch_end = min(batch_start + batch_size, n_agents)
+        batch_agent_names = agent_names[batch_start:batch_end]
+        batch_size_actual = len(batch_agent_names)
         
-        # Count regrets above epsilon by agent
-        agent_violation_counts = np.sum(positive_regrets, axis=0)
-        worst_agent_idx = np.argmax(agent_violation_counts)
-        worst_agent = agent_names[worst_agent_idx]
-        samples_per_agent = regrets.shape[0]
+        # Create figure outside the agent loop
+        fig, axs = plt.subplots(int(np.ceil(batch_size_actual/3)), 3, figsize=figsize)
+        axs = axs.flatten()
         
-        print(f"Warning: {count_positive}/{total_regrets} regret values ({percent_positive:.2f}%) are above epsilon={epsilon:.2e}.")
-        print(f"         Worst agent: '{worst_agent}' with {agent_violation_counts[worst_agent_idx]}/{samples_per_agent} samples ({(agent_violation_counts[worst_agent_idx]/samples_per_agent)*100:.2f}%) showing positive regrets.")
-    
-    # Add a note to the title about positive regrets if they exist
-    positive_note = f"\n({count_positive}/{total_regrets} samples have positive regrets)" if np.any(positive_regrets) else ""
-    fig.suptitle(f"{title}\n(Values should be ≤ 0 at equilibrium){positive_note}", 
-                fontsize=16, fontweight='bold')
-    
-    for i, agent in enumerate(agent_names):
-        if i < len(axs):
-            agent_regrets = regrets[:, i]
+        # Track positive regrets for this batch
+        batch_positive_count = 0
+        batch_total_regrets = 0
+        
+        # Process each agent separately to minimize memory usage
+        for i, agent_idx in enumerate(range(batch_start, batch_end)):
+            if agent_idx >= len(agent_names):
+                continue
+                
+            agent = agent_names[agent_idx]
             
-            # Calculate bin edges to cover the entire range of data
-            min_regret = min(agent_regrets)
-            max_regret = max(agent_regrets)
-            # Ensure we have enough bins to represent the full distribution
-            # Add a small padding to the min/max to guarantee no values are outside the range
-            bin_edges = np.linspace(min_regret - abs(min_regret)*0.01, 
-                                  max_regret + abs(max_regret)*0.01, 
-                                  40)  # Use 40 bins for higher resolution
+            # Calculate statistics in a memory-efficient way
+            agent_regrets = []
+            positive_count = 0
             
-            # Plot histogram with original (uncapped) regrets
-            axs[i].hist(agent_regrets, bins=bin_edges, alpha=0.7, color='darkgreen')
+            # Use downsampling for large datasets
+            if len(regrets) > MAX_BOOTSTRAP_SAMPLES:
+                # Select samples evenly distributed throughout the dataset
+                sample_indices = np.linspace(0, len(regrets)-1, MAX_BOOTSTRAP_SAMPLES, dtype=int)
+                regrets_to_process = [regrets[j] for j in sample_indices]
+            else:
+                regrets_to_process = regrets
+                
+            for r in regrets_to_process:
+                try:
+                    # Extract just this agent's regret
+                    if isinstance(r, np.ndarray) and agent_idx < r.shape[0]:
+                        val = r[agent_idx]
+                        agent_regrets.append(val)
+                        if val > 1e-6:  # Check for positive regrets
+                            positive_count += 1
+                except (IndexError, TypeError) as e:
+                    continue  # Skip problematic samples
+            
+            # Skip if no valid regrets
+            if not agent_regrets:
+                continue
+                
+            # Convert to numpy array for faster calculations
+            agent_regrets = np.array(agent_regrets, dtype=np.float32)  # Use float32 to reduce memory
+            total_samples = len(agent_regrets)
+            
+            # Update counts
+            batch_positive_count += positive_count
+            batch_total_regrets += total_samples
+            
+            # Calculate basic statistics
+            min_regret = np.min(agent_regrets)
+            max_regret = np.max(agent_regrets)
+            mean_regret = np.mean(agent_regrets)
+            
+            # Calculate percentiles directly
+            lower_ci = np.percentile(agent_regrets, 2.5)
+            upper_ci = np.percentile(agent_regrets, 97.5)
+            
+            # Determine bin count based on range magnitude - more aggressive reduction
+            regret_range = max_regret - min_regret
+            if regret_range > 100:
+                bin_count = 10  # Very few bins for extreme ranges
+            elif regret_range > 50:
+                bin_count = 15  # Fewer bins for large ranges
+            elif regret_range > 10:
+                bin_count = 20  # Medium bins for medium ranges
+            else:
+                bin_count = 30  # More bins for small ranges
+            
+            # Calculate histogram in memory-efficient way
+            hist, bin_edges = np.histogram(agent_regrets, bins=bin_count)
+            
+            # Plot histogram
+            axs[i].bar(bin_edges[:-1], hist, width=bin_edges[1]-bin_edges[0], alpha=0.7, color='darkgreen')
             axs[i].set_title(agent)
             axs[i].set_xlabel('Nash Equilibrium Regret')
             axs[i].set_ylabel('Frequency')
             
             # Add mean line
-            mean_regret = np.mean(agent_regrets)
             axs[i].axvline(mean_regret, color='r', linestyle='--', 
-                          label=f'Mean: {mean_regret:.6f}')
+                         label=f'Mean: {mean_regret:.2f}')  # Further reduce precision
             
             # Add 95% CI
-            lower_ci = np.percentile(agent_regrets, 2.5)
-            upper_ci = np.percentile(agent_regrets, 97.5)
             axs[i].axvline(lower_ci, color='orange', linestyle=':')
             axs[i].axvline(upper_ci, color='orange', linestyle=':', 
-                          label=f'95% CI: [{lower_ci:.6f}, {upper_ci:.6f}]')
+                         label=f'95% CI: [{lower_ci:.2f}, {upper_ci:.2f}]')  # Further reduce precision
             
-            # Add a reference line at 0 with explicit label
+            # Add a reference line at 0
             axs[i].axvline(0, color='black', linestyle='-', alpha=0.7, 
-                          label='Zero regret (equilibrium)')
+                         label='Zero (equilibrium)')
             
-            # Set x-axis limit to ensure all data points are visible
-            left_buffer = abs(min_regret) * 0.1  # Add 10% buffer on left side
-            right_buffer = abs(max_regret) * 0.1  # Add 10% buffer on right side
+            # Set x-axis limit with smaller buffer for extreme ranges
+            buffer_factor = 0.05 if regret_range > 50 else 0.1
+            left_buffer = abs(min_regret) * buffer_factor
+            right_buffer = abs(max_regret) * buffer_factor
             axs[i].set_xlim(min_regret - left_buffer, max_regret + right_buffer)
             
-            # Add a text annotation explaining what the plot shows
-            axs[i].text(0.5, 0.97, "Regret must be ≤ 0 at equilibrium", 
+            # Add text with key statistics
+            axs[i].text(0.5, 0.97, "Regret ≤ 0 at equilibrium", 
                       transform=axs[i].transAxes, ha='center', va='top',
                       bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'),
                       fontsize=8)
             
-            # Add text showing the full range of regret values
-            axs[i].text(0.5, 0.89, f"Full range: [{min_regret:.2f}, {max_regret:.2f}]", 
+            axs[i].text(0.5, 0.89, f"Range: [{min_regret:.1f}, {max_regret:.1f}]", 
                       transform=axs[i].transAxes, ha='center', va='top',
                       bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'),
                       fontsize=8)
             
             # If there are positive regrets for this agent, add info
-            agent_pos_count = np.sum(agent_regrets > epsilon)
-            if agent_pos_count > 0:
+            if positive_count > 0:
                 axs[i].text(0.5, 0.82, 
-                          f"{agent_pos_count}/{len(agent_regrets)} samples ({(agent_pos_count/len(agent_regrets))*100:.1f}%) above epsilon", 
+                          f"{positive_count}/{total_samples} samples > 0", 
                           transform=axs[i].transAxes, ha='center', va='top',
                           color='red', bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'),
                           fontsize=8)
             
-            # Move legend to bottom left to avoid blocking data
-            axs[i].legend(fontsize='small', loc='lower left')
+            # Add legend but with fewer items for memory efficiency
+            axs[i].legend(fontsize='x-small', loc='lower left')
+            
+            # Explicit garbage collection to free memory
+            del agent_regrets
+            del hist
+        
+        # Update overall counts
+        overall_positive_count += batch_positive_count
+        overall_total_regrets += batch_total_regrets
+        
+        # Add batch summary title
+        positive_note = f"\n({batch_positive_count}/{batch_total_regrets} samples have positive regrets)" if batch_positive_count > 0 else ""
+        fig.suptitle(f"{title} (Agents {batch_start+1}-{batch_end})\n(Values should be ≤ 0 at equilibrium){positive_note}", 
+                    fontsize=14, fontweight='bold')
+        
+        # Hide any unused subplots
+        for j in range(batch_size_actual, len(axs)):
+            axs[j].axis('off')
+        
+        plt.tight_layout()
+        plt.subplots_adjust(top=0.9)  # Make room for the suptitle
+        
+        # Save the first figure for return
+        if batch_start == 0:
+            first_fig = fig
+        
+        # Force garbage collection after each batch
+        import gc
+        gc.collect()
     
-    # Hide any unused subplots
-    for j in range(i+1, len(axs)):
-        axs[j].axis('off')
+    print(f"Summary for {title}: {overall_positive_count}/{overall_total_regrets} samples had positive regrets")
     
-    plt.tight_layout()
-    plt.subplots_adjust(top=0.9)  # Make room for the suptitle
-    
-    return fig 
+    return first_fig if first_fig is not None else None 

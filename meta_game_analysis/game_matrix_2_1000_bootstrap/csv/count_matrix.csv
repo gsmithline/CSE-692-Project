@@ -1,0 +1,10 @@
+,anthropic_3.7_sonnet_circle_5,anthropic_3.7_sonnet_circle_6,anthropic_sonnet_3.7_reasoning_circle_0,gemini_2.0_flash_circle_2,gemini_2.0_flash_circle_5,openai_4o_circle_4,openai_4o_circle_5,openai_4o_circle_6,openai_o3_mini_circle_0
+anthropic_3.7_sonnet_circle_5,40,40,39,20,40,39,40,39,38
+anthropic_3.7_sonnet_circle_6,40,40,40,20,20,39,37,40,39
+anthropic_sonnet_3.7_reasoning_circle_0,39,40,40,39,40,38,36,37,40
+gemini_2.0_flash_circle_2,20,20,39,40,40,36,40,39,39
+gemini_2.0_flash_circle_5,40,20,40,40,40,39,39,38,37
+openai_4o_circle_4,39,39,38,36,39,34,40,39,38
+openai_4o_circle_5,40,37,36,40,39,40,40,36,38
+openai_4o_circle_6,39,40,37,39,38,39,36,36,37
+openai_o3_mini_circle_0,38,39,40,39,37,38,38,37,36

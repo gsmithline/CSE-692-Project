@@ -25,9 +25,9 @@ def _simplex_projection(x):
     theta = cssv[rho] / (rho + 1)
     return np.maximum(x - theta, 0)
 
-def milp_max_sym_ent_2p(game_matrix, discrete_factors=20):
+def milp_max_sym_ent_2p(game_matrix, discrete_factors=100):
     """
-    Compute maximum entropy Nash equilibrium for 2-player games following the paper's implementation.
+    Compute maximum entropy Nash equilibrium for 2-player games following the Zun's implementation.
     Uses CVXPY with ECOS_BB solver to handle boolean variables and mixed integer constraints.
     
     Args:
@@ -65,10 +65,10 @@ def milp_max_sym_ent_2p(game_matrix, discrete_factors=20):
     z = cp.Variable(M)
     b = cp.Variable(M, boolean=True)
     
-    # Objective: minimize sum of z (which approximates -entropy)
+    #objective: minimize sum of z (which approximates -entropy)
     obj = cp.Minimize(cp.sum(z))
     
-    # Nash equilibrium constraints
+    #nash equilibrium constraints
     a_mat = np.ones(M).reshape((1, M))
     u_m = game_matrix_np @ x
     
@@ -80,12 +80,12 @@ def milp_max_sym_ent_2p(game_matrix, discrete_factors=20):
         x <= 1 - b
     ]
     
-    # Entropy approximation constraints
+    #entropy approximation constraints
     for k in range(discrete_factors):
         if k == 0:
             constraints.append(np.log(1/discrete_factors) * x <= z)
         else:
-            # Linear approximation of entropy at k/discrete_factors
+            #linear approximation of entropy at k/discrete_factors
             slope = ((k+1)*np.log((k+1)/discrete_factors) - k*np.log(k/discrete_factors))
             intercept = k/discrete_factors * np.log(k/discrete_factors)
             constraints.append(intercept + slope * (x - k/discrete_factors) <= z)
@@ -171,12 +171,10 @@ def minimize_max_regret(game_matrix, strategy, max_iterations=100, epsilon=EPSIL
 def replicator_dynamics_nash(game_matrix, max_iter=10, convergence_threshold=None):
     """
     Compute Nash equilibrium using replicator dynamics for 2-player games.
-    
     Args:
         game_matrix: numpy array of payoffs
         max_iter: maximum iterations
         convergence_threshold: convergence criterion
-        
     Returns:
         nash_strategy: equilibrium strategy (probability distribution over actions)
     """
@@ -184,7 +182,7 @@ def replicator_dynamics_nash(game_matrix, max_iter=10, convergence_threshold=Non
         convergence_threshold = EPSILON
     
     game_matrix_np = np.array(game_matrix, dtype=np.float64)
-    
+    trace = []
     # Handle missing values
     if np.isnan(game_matrix_np).any():
         for j in range(game_matrix_np.shape[1]):
@@ -204,16 +202,13 @@ def replicator_dynamics_nash(game_matrix, max_iter=10, convergence_threshold=Non
         np.ones(n) / n,
     ]
     
-    # Add some random initial points
     num_random_points = 10
     for _ in range(num_random_points):
         random_point = np.random.random(n)
         random_point = random_point / np.sum(random_point)
         initial_points.append(random_point)
     
-    # Try each initial point
     for initial_strategy in initial_points:
-        # Initialize with the given strategy
         strategy = initial_strategy.copy()
         
         for iteration in range(max_iter):
@@ -237,5 +232,6 @@ def replicator_dynamics_nash(game_matrix, max_iter=10, convergence_threshold=Non
         if regret < best_regret:
             best_strategy = strategy.copy()
             best_regret = regret
-    
+    #simplex projection
+    best_strategy = _simplex_projection(best_strategy)
     return best_strategy

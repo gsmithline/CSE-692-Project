@@ -120,7 +120,6 @@ def bootstrap_performance_metrics(performance_matrix, num_bootstrap=1000, data_m
                                 for i in range(len(me_nash_strategy)))
             
             # 5. ME NE: Compute Nash Equilibrium regret (expected_utils - nash_value)
-            # At equilibrium, this should be exactly 0 for all agents, or about 0
             me_ne_regrets = me_expected_utils - me_nash_value
             
             me_normal_regrets = np.zeros(len(all_agents))
