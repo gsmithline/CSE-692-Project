@@ -765,18 +765,16 @@ def plot_confidence_interval_stability(bootstrap_results, statistic_key, agent_n
     
     print(f"Creating confidence interval stability plot for {statistic_key}")
     
-    # Plot confidence interval bounds as sample size increases
     fig, axes = plt.subplots(n_agents, 1, figsize=(12, 4 * n_agents), sharex=True)
     
     # Handle case with single agent
     if n_agents == 1:
         axes = [axes]
     
-    # Define confidence levels to check stability across
+    
     confidence_levels = [0.90, 0.95, 0.99]
     colors = ['blue', 'green', 'red']
     
-    # Start after accumulating at least 10 samples
     start_idx = min(10, n_samples - 1)
     
     for agent_idx in range(n_agents):
@@ -947,66 +945,128 @@ def analyze_bootstrap_results_for_convergence(bootstrap_results, agent_names, ou
             bootstrap_results, stat_key, agent_names, output_dir
         )
         
-        # Calculate final Monte Carlo errors and convergence assessment
-        data = bootstrap_results[stat_key]
-        data_array = np.array(data)
-        n_samples = len(data)
-        n_agents = data_array.shape[1]
-        
-        # Calculate final Monte Carlo errors (SE = std / sqrt(n))
-        final_means = np.mean(data_array, axis=0)
-        final_stds = np.std(data_array, axis=0, ddof=1)
-        final_errors = final_stds / np.sqrt(n_samples)
-        
-        # Calculate relative Monte Carlo errors (error / |mean|)
-        # For very small means close to zero, use the std instead to avoid division by zero
-        relative_errors = np.zeros(n_agents)
-        for i in range(n_agents):
-            if abs(final_means[i]) > 1e-8:
-                relative_errors[i] = abs(final_errors[i] / final_means[i])
-            else:
-                relative_errors[i] = final_errors[i] / max(final_stds[i], 1e-8)
-        
-        # Assess convergence based on relative errors and CI stability
-        # Rule of thumb: relative error < 0.05 (5%) is good, < 0.01 (1%) is excellent
-        convergence_assessment = [""] * n_agents
-        for i in range(n_agents):
-            if relative_errors[i] < 0.01:
-                convergence_assessment[i] = "Excellent"
-            elif relative_errors[i] < 0.05:
-                convergence_assessment[i] = "Good"
-            elif relative_errors[i] < 0.10:
-                convergence_assessment[i] = "Fair"
-            else:
-                convergence_assessment[i] = "Poor - More samples needed"
-        
-        # Store results
-        convergence_results[stat_key] = {
-            'final_means': final_means,
-            'final_stds': final_stds,
-            'monte_carlo_errors': final_errors,
-            'relative_errors': relative_errors,
-            'convergence_assessment': convergence_assessment
-        }
-        
-        # Print summary
-        print(f"\n{stat_name} Monte Carlo Errors:")
-        for i in range(n_agents):
-            agent_name = agent_names[i] if i < len(agent_names) else f"Agent {i}"
-            print(f"  {agent_name}: {final_errors[i]:.6f} (Relative: {relative_errors[i]:.2%}) - {convergence_assessment[i]}")
-        
-        # Save detailed convergence results to CSV
-        results_df = pd.DataFrame({
-            'Agent': agent_names[:n_agents],
-            'Mean': final_means,
-            'Std Dev': final_stds,
-            'Monte Carlo Error': final_errors,
-            'Relative Error': relative_errors,
-            'Assessment': convergence_assessment
-        })
-        
-        results_df.to_csv(os.path.join(output_dir, f"{stat_key}_convergence.csv"), index=False)
-        print(f"Saved detailed convergence results to {os.path.join(output_dir, f'{stat_key}_convergence.csv')}")
+        # Calculate final Monte Carlo errors and convergence assessment with proper error handling
+        try:
+            data = bootstrap_results[stat_key]
+            
+            # Convert data to numpy array with proper error handling
+            try:
+                data_array = np.array(data, dtype=np.float64)
+                # Handle single-dimensional data
+                if len(data_array.shape) == 1:
+                    data_array = data_array.reshape(-1, 1)
+            except Exception as e:
+                print(f"Warning: Error converting {stat_key} data to array: {e}")
+                # As a fallback, create array of consistent shape
+                n_agents = len(agent_names)
+                n_samples = len(data)
+                data_array = np.zeros((n_samples, n_agents), dtype=np.float64)
+                for i, sample in enumerate(data):
+                    try:
+                        if isinstance(sample, (list, np.ndarray)) and len(sample) == n_agents:
+                            data_array[i, :] = sample
+                        elif isinstance(sample, (int, float, np.number)):
+                            data_array[i, 0] = float(sample)
+                        else:
+                            # Skip invalid data
+                            data_array[i, :] = np.nan
+                    except Exception as inner_e:
+                        print(f"Error processing sample {i}: {inner_e}")
+                        data_array[i, :] = np.nan
+            
+            n_samples = data_array.shape[0]
+            n_agents = data_array.shape[1]
+            
+            # Calculate final statistics safely
+            try:
+                final_means = np.nanmean(data_array, axis=0)
+                final_stds = np.nanstd(data_array, axis=0, ddof=1)
+                final_errors = np.zeros_like(final_stds)
+                
+                # Calculate standard error safely (SE = std / sqrt(n))
+                for i in range(n_agents):
+                    try:
+                        # Count valid (non-NaN) samples for this agent
+                        valid_samples = np.sum(~np.isnan(data_array[:, i]))
+                        if valid_samples > 1:  # Need at least 2 samples for std
+                            # Use float() to ensure we get a scalar value for sqrt
+                            sqrt_n = float(np.sqrt(valid_samples))
+                            final_errors[i] = final_stds[i] / sqrt_n
+                        else:
+                            final_errors[i] = 0.0
+                    except Exception as calc_err:
+                        print(f"Warning: Error calculating standard error for agent {i}: {calc_err}")
+                        final_errors[i] = 0.0
+                
+                # Calculate relative errors safely
+                relative_errors = np.zeros(n_agents)
+                for i in range(n_agents):
+                    try:
+                        if abs(final_means[i]) > 1e-8:
+                            relative_errors[i] = abs(final_errors[i] / final_means[i])
+                        else:
+                            relative_errors[i] = final_errors[i] / max(final_stds[i], 1e-8)
+                    except Exception as rel_err:
+                        print(f"Warning: Error calculating relative error for agent {i}: {rel_err}")
+                        relative_errors[i] = 0.0
+                
+                # Assess convergence
+                convergence_assessment = [""] * n_agents
+                for i in range(n_agents):
+                    if relative_errors[i] < 0.01:
+                        convergence_assessment[i] = "Excellent"
+                    elif relative_errors[i] < 0.05:
+                        convergence_assessment[i] = "Good"
+                    elif relative_errors[i] < 0.10:
+                        convergence_assessment[i] = "Fair"
+                    else:
+                        convergence_assessment[i] = "Poor - More samples needed"
+                
+                # Store results
+                convergence_results[stat_key] = {
+                    'final_means': final_means,
+                    'final_stds': final_stds,
+                    'monte_carlo_errors': final_errors,
+                    'relative_errors': relative_errors,
+                    'convergence_assessment': convergence_assessment
+                }
+                
+                # Print summary
+                print(f"\n{stat_name} Monte Carlo Errors:")
+                for i in range(min(n_agents, len(agent_names))):
+                    agent_name = agent_names[i] if i < len(agent_names) else f"Agent {i}"
+                    print(f"  {agent_name}: {final_errors[i]:.6f} (Relative: {relative_errors[i]:.2%}) - {convergence_assessment[i]}")
+                
+                # Save detailed convergence results to CSV
+                results_df = pd.DataFrame({
+                    'Agent': agent_names[:n_agents],
+                    'Mean': final_means,
+                    'Std Dev': final_stds,
+                    'Monte Carlo Error': final_errors,
+                    'Relative Error': relative_errors,
+                    'Assessment': convergence_assessment
+                })
+                
+                results_df.to_csv(os.path.join(output_dir, f"{stat_key}_convergence.csv"), index=False)
+                print(f"Saved detailed convergence results to {os.path.join(output_dir, f'{stat_key}_convergence.csv')}")
+                
+            except Exception as stats_err:
+                print(f"Error calculating statistics for {stat_key}: {stats_err}")
+                # Create placeholder results
+                convergence_results[stat_key] = {
+                    'final_means': np.zeros(n_agents),
+                    'final_stds': np.zeros(n_agents),
+                    'monte_carlo_errors': np.zeros(n_agents),
+                    'relative_errors': np.zeros(n_agents),
+                    'convergence_assessment': ["Error in calculation"] * n_agents
+                }
+                
+        except Exception as e:
+            print(f"Error analyzing {stat_key}: {e}")
+            # Create placeholder results
+            convergence_results[stat_key] = {
+                'error': str(e)
+            }
     
     return convergence_results
 
