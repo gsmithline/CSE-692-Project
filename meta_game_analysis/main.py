@@ -151,6 +151,7 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
     print(me_strategy_df)
     
     if use_raw_bootstrap:
+
         print("\nUsing non-parametric bootstrapping with raw game data...")
         bootstrap_results, bootstrap_stats, ne_strategy_df, agent_names = run_raw_data_nash_analysis(
             all_results,

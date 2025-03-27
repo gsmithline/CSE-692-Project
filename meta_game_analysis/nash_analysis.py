@@ -6,6 +6,7 @@ import pandas as pd
 import sys
 import os
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -32,15 +33,14 @@ def run_nash_analysis(performance_matrix, num_bootstrap_samples=100, confidence_
         tuple: (bootstrap_results, bootstrap_stats, acceptance_matrix, ne_strategy_df)
     """
     agents = performance_matrix.index.tolist()
-    
-    print(f"Running bootstrapping with {num_bootstrap_samples} samples...")
+    tqdm.write(f"Running bootstrapping with {num_bootstrap_samples} samples...")
     bootstrap_results = bootstrap_performance_metrics(
         performance_matrix, 
         num_bootstrap=num_bootstrap_samples, 
         data_matrix={} 
     )
 
-    print(f"\nComputing {confidence_level*100:.0f}% confidence intervals...")
+    tqdm.write(f"\nComputing {confidence_level*100:.0f}% confidence intervals...")
     bootstrap_stats = analyze_bootstrap_results(
         bootstrap_results, 
         agents, 
