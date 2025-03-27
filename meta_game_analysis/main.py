@@ -164,60 +164,119 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
         
         # Generate distribution plots for non-parametric bootstrap results
         print("\nGenerating bootstrap distribution plots...")
-        from meta_game_analysis.bootstrap_nonparametric import plot_regret_distributions
+        from meta_game_analysis.bootstrap_nonparametric import plot_regret_distributions, plot_ci_size_evolution
         
         # Extract regrets from bootstrap results
         ne_regrets = bootstrap_results['ne_regret']
         rd_regrets = bootstrap_results['rd_regret']
+        agent_expected_utils = bootstrap_results.get('agent_expected_utility', [])
+
+        # Add explicit calls to generate CI evolution plots
+        print("\nGenerating confidence interval evolution plots...")
+        try:
+            # Create CI evolution plots for NE regrets
+            if ne_regrets:
+                ne_ci_plot = plot_ci_size_evolution(
+                    {'ne_regret': ne_regrets}, 'ne_regret', agent_names, bootstrap_dir
+                )
+                print(f"Created NE regret CI evolution plot in {bootstrap_dir}")
+            
+            # Create CI evolution plots for RD regrets
+            if rd_regrets:
+                rd_ci_plot = plot_ci_size_evolution(
+                    {'rd_regret': rd_regrets}, 'rd_regret', agent_names, bootstrap_dir
+                )
+                print(f"Created RD regret CI evolution plot in {bootstrap_dir}")
+            
+            # Create CI evolution plots for expected utilities
+            if agent_expected_utils:
+                eu_ci_plot = plot_ci_size_evolution(
+                    {'agent_expected_utility': agent_expected_utils}, 
+                    'agent_expected_utility', agent_names, bootstrap_dir
+                )
+                print(f"Created expected utility CI evolution plot in {bootstrap_dir}")
+        except Exception as e:
+            print(f"Error generating CI evolution plots: {str(e)}")
+            import traceback
+            traceback.print_exc()
         
         # Create distribution plots
-        ne_dist_fig = plot_regret_distributions(ne_regrets, agent_names, 
-                                            title="Nash Equilibrium Regret Distribution")
-        if ne_dist_fig is not None:
-            ne_dist_fig.savefig(os.path.join(bootstrap_dir, 'ne_regret_distribution.png'))
-        else:
-            print("Warning: Failed to create Nash Equilibrium Regret Distribution figure")
+        try:
+            ne_dist_fig = plot_regret_distributions(ne_regrets, agent_names, 
+                                                title="Nash Equilibrium Regret Distribution")
+            if ne_dist_fig is not None:
+                ne_dist_fig.savefig(os.path.join(bootstrap_dir, 'ne_regret_distribution.png'))
+            else:
+                print("Warning: Failed to create Nash Equilibrium Regret Distribution figure")
+        except Exception as e:
+            print(f"Error creating regret distribution plot: {str(e)}")
         
-        rd_dist_fig = plot_regret_distributions(rd_regrets, agent_names,
-                                            title="Replicator Dynamics Regret Distribution")
-        if rd_dist_fig is not None:
-            rd_dist_fig.savefig(os.path.join(bootstrap_dir, 'rd_regret_distribution.png'))
-        else:
-            print("Warning: Failed to create Replicator Dynamics Regret Distribution figure")
-        
+        try:
+            rd_dist_fig = plot_regret_distributions(rd_regrets, agent_names,
+                                                title="Replicator Dynamics Regret Distribution")
+            if rd_dist_fig is not None:
+                rd_dist_fig.savefig(os.path.join(bootstrap_dir, 'rd_regret_distribution.png'))
+            else:
+                print("Warning: Failed to create Replicator Dynamics Regret Distribution figure")
+        except Exception as e:
+            print(f"Error creating RD regret distribution plot: {str(e)}")
+                
         # Generate box plots
-        ne_box_fig = plot_regret_distributions(ne_regrets, agent_names, 
-                                            title="Nash Equilibrium Regret Box Plot", 
-                                            plot_type="box")
-        if ne_box_fig is not None:
-            ne_box_fig.savefig(os.path.join(bootstrap_dir, 'ne_regret_boxplot.png'))
-        else:
-            print("Warning: Failed to create Nash Equilibrium Regret Box Plot figure")
-        
-        rd_box_fig = plot_regret_distributions(rd_regrets, agent_names,
-                                            title="Replicator Dynamics Regret Box Plot", 
-                                            plot_type="box")
-        if rd_box_fig is not None:
-            rd_box_fig.savefig(os.path.join(bootstrap_dir, 'rd_regret_boxplot.png'))
-        else:
-            print("Warning: Failed to create Replicator Dynamics Regret Box Plot figure")
-        
+        try:
+            ne_box_fig = plot_regret_distributions(ne_regrets, agent_names, 
+                                                title="Nash Equilibrium Regret Box Plot", 
+                                                plot_type="box")
+            if ne_box_fig is not None:
+                ne_box_fig.savefig(os.path.join(bootstrap_dir, 'ne_regret_boxplot.png'))
+            else:
+                print("Warning: Failed to create Nash Equilibrium Regret Box Plot figure")
+        except Exception as e:
+            print(f"Error creating NE regret box plot: {str(e)}")
+            
+        try:
+            rd_box_fig = plot_regret_distributions(rd_regrets, agent_names,
+                                                title="Replicator Dynamics Regret Box Plot", 
+                                                plot_type="box")
+            if rd_box_fig is not None:
+                rd_box_fig.savefig(os.path.join(bootstrap_dir, 'rd_regret_boxplot.png'))
+            else:
+                print("Warning: Failed to create Replicator Dynamics Regret Box Plot figure")
+        except Exception as e:
+            print(f"Error creating RD regret box plot: {str(e)}")
+            
         # Generate running mean plots
-        ne_running_fig = plot_regret_distributions(ne_regrets, agent_names, 
-                                                title="Nash Equilibrium Regret Running Mean", 
-                                                plot_type="running_mean")
-        if ne_running_fig is not None:
-            ne_running_fig.savefig(os.path.join(bootstrap_dir, 'ne_regret_running_mean.png'))
-        else:
-            print("Warning: Failed to create Nash Equilibrium Regret Running Mean figure")
-        
-        rd_running_fig = plot_regret_distributions(rd_regrets, agent_names,
-                                                title="Replicator Dynamics Regret Running Mean", 
-                                                plot_type="running_mean")
-        if rd_running_fig is not None:
-            rd_running_fig.savefig(os.path.join(bootstrap_dir, 'rd_regret_running_mean.png'))
-        else:
-            print("Warning: Failed to create Replicator Dynamics Regret Running Mean figure")
+        try:
+            ne_running_fig = plot_regret_distributions(ne_regrets, agent_names, 
+                                                    title="Nash Equilibrium Regret Running Mean", 
+                                                    plot_type="running_mean")
+            if ne_running_fig is not None:
+                ne_running_fig.savefig(os.path.join(bootstrap_dir, 'ne_regret_running_mean.png'))
+            else:
+                print("Warning: Failed to create Nash Equilibrium Regret Running Mean figure")
+        except Exception as e:
+            print(f"Error creating NE regret running mean plot: {str(e)}")
+            
+        try:
+            rd_running_fig = plot_regret_distributions(rd_regrets, agent_names,
+                                                    title="Replicator Dynamics Regret Running Mean", 
+                                                    plot_type="running_mean")
+            if rd_running_fig is not None:
+                rd_running_fig.savefig(os.path.join(bootstrap_dir, 'rd_regret_running_mean.png'))
+            else:
+                print("Warning: Failed to create Replicator Dynamics Regret Running Mean figure")
+        except Exception as e:
+            print(f"Error creating RD regret running mean plot: {str(e)}")
+            
+        # Additionally run the explicit convergence analysis to ensure all plots are created
+        print("\nRunning explicit bootstrap convergence analysis to generate all plots...")
+        try:
+            from meta_game_analysis.bootstrap_nonparametric import analyze_bootstrap_results_for_convergence
+            analyze_bootstrap_results_for_convergence(bootstrap_results, agent_names, bootstrap_dir)
+            print(f"Completed explicit convergence analysis, check {bootstrap_dir} for all plots")
+        except Exception as e:
+            print(f"Error in explicit convergence analysis: {str(e)}")
+            import traceback
+            traceback.print_exc()
     else:
         print("\nUsing traditional bootstrapping with performance matrix...")
         bootstrap_results, bootstrap_stats, acceptance_matrix, ne_strategy_df = run_nash_analysis(
@@ -352,7 +411,6 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
     
     # Step 9: Save results to CSV files
     print("\nStep 9: Saving results to CSV files...")
-    # Save regular matrices
     save_results_to_csv(
         filtered_matrices, 
         bootstrap_stats, 
@@ -367,7 +425,6 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
     rd_regret_df.to_csv(os.path.join(csv_dir, 'rd_nash_regret.csv'), index=False)
     comparison_df.to_csv(os.path.join(csv_dir, 'nash_comparison.csv'), index=False)
     
-    # Step 10: Print summary statistics
     print("\nStep 10: Summary of results:")
     print(f"Total games analyzed: {len(all_results)}")
     print(f"Unique agent types: {len(performance_matrices['overall_agent_performance'])}")
@@ -376,7 +433,6 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
     for agent, avg_round in sorted(performance_matrices['average_final_rounds'].items()):
         print(f"{get_display_name(agent)}: {avg_round:.2f}")
     
-    # Print Nash equilibrium summary
     print_nash_summary(bootstrap_stats, ne_strategy_df, bootstrap_results)
     
     print("\nAnalysis complete. Results saved to:", output_dir)

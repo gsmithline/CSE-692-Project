@@ -2,15 +2,23 @@
 Non-parametric bootstrapping implementation for game theoretic analysis.
 """
 
+import os
+import re
+import sys
+import json
+import glob
 import numpy as np
 import pandas as pd
-from collections import defaultdict
 import matplotlib.pyplot as plt
 import seaborn as sns
+from collections import defaultdict
 from scipy import stats
 import warnings
-import os
-import sys
+from tqdm import tqdm
+
+# Set plotting style
+plt.style.use('ggplot')
+sns.set_theme(style="whitegrid")
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -593,13 +601,16 @@ def run_bootstrap_analysis(performance_matrix, num_bootstrap=1000, confidence=0.
 
 def plot_bootstrap_iteration(bootstrap_results, statistic_key, agent_names, output_dir='bootstrap_analysis'):
     """
-    Plot running bootstrap statistics to examine convergence as bootstrap sample size increases.
+    Create bootstrap iteration plots to visualize how statistics stabilize with more bootstrap samples.
     
     Args:
         bootstrap_results: Dictionary containing bootstrap results
         statistic_key: Key in bootstrap_results for the statistic to analyze ('ne_regret', 'rd_regret', etc.)
         agent_names: Names of agents for labeling
         output_dir: Directory to save output plots
+        
+    Returns:
+        tuple: (running_means, running_stds, running_errors, running_ci_width)
     """
     os.makedirs(output_dir, exist_ok=True)
     
@@ -608,111 +619,124 @@ def plot_bootstrap_iteration(bootstrap_results, statistic_key, agent_names, outp
         data = bootstrap_results[statistic_key]
     else:
         print(f"Error: couldn't find {statistic_key} in bootstrap results")
-        return
-        
-    data_array = np.array(data)
-    n_samples = len(data)
+        return None, None, None, None
+    
+    # Convert data to numpy array
+    try:
+        data_array = np.array(data, dtype=np.float64)
+        # Handle single-dimensional data
+        if len(data_array.shape) == 1:
+            data_array = data_array.reshape(-1, 1)
+    except Exception as e:
+        print(f"Error converting {statistic_key} data to array: {e}")
+        # As a fallback, try creating an array of consistent shape
+        n_agents = len(agent_names)
+        n_samples = len(data)
+        data_array = np.zeros((n_samples, n_agents), dtype=np.float64)
+        for i, sample in enumerate(data):
+            try:
+                if isinstance(sample, (list, np.ndarray)) and len(sample) == n_agents:
+                    data_array[i, :] = sample
+                elif isinstance(sample, (int, float, np.number)):
+                    data_array[i, 0] = float(sample)
+                else:
+                    # Skip invalid data
+                    data_array[i, :] = np.nan
+            except Exception as inner_e:
+                print(f"Error processing sample {i}: {inner_e}")
+                data_array[i, :] = np.nan
+    
+    n_samples = data_array.shape[0]
+    if n_samples < 2:
+        print(f"Not enough samples to create bootstrap iteration plot for {statistic_key}")
+        return None, None, None, None
+    
     n_agents = data_array.shape[1]
+    agent_subset = agent_names[:n_agents]
     
-    print(f"Creating bootstrap iteration plot for {statistic_key} with {n_samples} samples and {n_agents} agents")
+    # Arrays to store running statistics
+    running_means = np.zeros((n_samples-1, n_agents))
+    running_stds = np.zeros((n_samples-1, n_agents))
+    running_errors = np.zeros((n_samples-1, n_agents))
+    running_ci_width = np.zeros((n_samples-1, n_agents))
     
-    # Plotting setup
-    fig, axes = plt.subplots(2, 2, figsize=(16, 10))
-    axes = axes.flatten()
-    
-    # Plot 1: Running mean
-    ax = axes[0]
-    running_means = np.zeros((n_samples, n_agents))
-    for i in range(1, n_samples + 1):
-        running_means[i-1] = np.mean(data_array[:i], axis=0)
-    
-    for agent_idx in range(n_agents):
-        ax.plot(range(1, n_samples + 1), running_means[:, agent_idx], 
-                label=agent_names[agent_idx] if agent_idx < len(agent_names) else f"Agent {agent_idx}")
-    
-    ax.set_title(f"Running Mean - {statistic_key}")
-    ax.set_xlabel("Number of Bootstrap Samples")
-    ax.set_ylabel("Mean Value")
-    ax.grid(True, alpha=0.3)
-    
-    # Plot 2: Running standard deviation
-    ax = axes[1]
-    running_stds = np.zeros((n_samples, n_agents))
-    for i in range(2, n_samples + 1):  # Start at 2 to avoid std with single sample
-        running_stds[i-1] = np.std(data_array[:i], axis=0, ddof=1)
-    
-    for agent_idx in range(n_agents):
-        ax.plot(range(2, n_samples + 1), running_stds[1:, agent_idx], 
-                label=agent_names[agent_idx] if agent_idx < len(agent_names) else f"Agent {agent_idx}")
-    
-    ax.set_title(f"Running Standard Deviation - {statistic_key}")
-    ax.set_xlabel("Number of Bootstrap Samples")
-    ax.set_ylabel("Standard Deviation")
-    ax.grid(True, alpha=0.3)
-    
-    # Plot 3: Running Monte Carlo error (SE = std / sqrt(n))
-    ax = axes[2]
-    running_errors = np.zeros((n_samples, n_agents))
-    for i in range(2, n_samples + 1):
+    # Calculate running statistics
+    # Start from i=1 since we need at least 2 samples for std
+    for i in range(2, n_samples+1):
+        running_means[i-2] = np.nanmean(data_array[:i], axis=0)
+        
+        # Calculate std with ddof=1 for unbiased estimation
+        # For small samples, use try-except to handle potential issues
         try:
-            std_values = np.std(data_array[:i], axis=0, ddof=1)
-            # Use float conversion to ensure we get a float sqrt result
-            sqrt_i = float(np.sqrt(i))
-            running_errors[i-1] = std_values / sqrt_i
+            std_values = np.nanstd(data_array[:i], axis=0, ddof=1)
+            running_stds[i-2] = std_values
+            
+            # Calculate standard error (SE = std / sqrt(n))
+            # Ensure proper handling of scalar vs array operations
+            n_samples_i = np.sum(~np.isnan(data_array[:i]), axis=0)
+            n_samples_i = np.maximum(n_samples_i, 1)  # Ensure at least 1 to avoid division by zero
+            
+            # Use np.sqrt directly on array elements
+            sqrt_n = np.sqrt(n_samples_i)
+            running_errors[i-2] = std_values / sqrt_n
+            
+            # Calculate CI width (assuming normal distribution)
+            z_value = 1.96  # 95% confidence
+            running_ci_width[i-2] = 2 * z_value * running_errors[i-2]
         except Exception as e:
-            print(f"Error processing window data: {e}")
-            print(f"                            Window data shape: {data_array[:i].shape}")
-            running_errors[i-1] = np.zeros(n_agents)
+            print(f"Warning: Error calculating statistics for sample {i}: {e}")
+            running_stds[i-2] = np.nan
+            running_errors[i-2] = np.nan
+            running_ci_width[i-2] = np.nan
     
-    for agent_idx in range(n_agents):
-        # Use actual agent name instead of generic "Agent {agent_idx}"
-        agent_label = agent_names[agent_idx] if agent_idx < len(agent_names) else f"Agent {agent_idx}"
-        ax.plot(range(2, n_samples + 1), running_errors[1:, agent_idx], label=agent_label)
+    # Create plots
+    print(f"Creating bootstrap iteration plot for {statistic_key}")
     
-    ax.set_title(f"Running Monte Carlo Error - {statistic_key}")
-    ax.set_xlabel("Number of Bootstrap Samples")
-    ax.set_ylabel("Monte Carlo Error")
-    ax.grid(True, alpha=0.3)
+    # Different plot types: means, std, errors, CI width
+    plot_titles = {
+        'means': 'Running Mean',
+        'stds': 'Running Standard Deviation',
+        'errors': 'Running Standard Error',
+        'ci_width': 'Running CI Width'
+    }
     
-    # Plot 4: Running 95% confidence intervals (using percentiles)
-    ax = axes[3]
-    lower_percentile = 2.5
-    upper_percentile = 97.5
-    
-    # Only calculate after we have at least 10 samples
-    start_idx = min(10, n_samples - 1)
-    
-    running_lower_ci = np.zeros((n_samples - start_idx, n_agents))
-    running_upper_ci = np.zeros((n_samples - start_idx, n_agents))
-    running_ci_width = np.zeros((n_samples - start_idx, n_agents))
-    
-    for i in range(start_idx, n_samples):
-        running_lower_ci[i-start_idx] = np.percentile(data_array[:i+1], lower_percentile, axis=0)
-        running_upper_ci[i-start_idx] = np.percentile(data_array[:i+1], upper_percentile, axis=0)
-        running_ci_width[i-start_idx] = running_upper_ci[i-start_idx] - running_lower_ci[i-start_idx]
-    
-    for agent_idx in range(n_agents):
-        ax.plot(range(start_idx, n_samples), running_ci_width[:, agent_idx], 
-                label=agent_names[agent_idx] if agent_idx < len(agent_names) else f"Agent {agent_idx}")
-    
-    ax.set_title(f"Running CI Width - {statistic_key}")
-    ax.set_xlabel("Number of Bootstrap Samples")
-    ax.set_ylabel("95% CI Width")
-    ax.grid(True, alpha=0.3)
-    
-    # Add a legend - shared for all subplots to save space
-    handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc='lower center', ncol=min(5, n_agents), bbox_to_anchor=(0.5, 0))
-    
-    plt.tight_layout()
-    plt.subplots_adjust(bottom=0.2)  # Make room for the legend
-    
-    # Save the figure
-    filename = f"{statistic_key}_bootstrap_iteration.png"
-    plt.savefig(os.path.join(output_dir, filename), dpi=300, bbox_inches='tight')
-    plt.close(fig)
-    
-    print(f"Saved bootstrap iteration plot to {os.path.join(output_dir, filename)}")
+    for plot_type, plot_title_suffix in plot_titles.items():
+        fig, ax = plt.subplots(figsize=(12, 6))
+        
+        # Get the data for this plot type
+        if plot_type == 'means':
+            plot_data = running_means
+        elif plot_type == 'stds':
+            plot_data = running_stds
+        elif plot_type == 'errors':
+            plot_data = running_errors
+        else:  # ci_width
+            plot_data = running_ci_width
+        
+        # Plot each agent
+        for agent_idx, agent_name in enumerate(agent_subset):
+            if agent_idx < plot_data.shape[1]:
+                # Extract non-NaN values
+                agent_data = plot_data[:, agent_idx]
+                valid_mask = ~np.isnan(agent_data)
+                if np.any(valid_mask):
+                    x_vals = np.arange(2, n_samples+1)[valid_mask]
+                    ax.plot(x_vals, agent_data[valid_mask], label=agent_name)
+        
+        ax.set_title(f"{statistic_key.replace('_', ' ').title()} - {plot_title_suffix}")
+        ax.set_xlabel('Number of Bootstrap Samples')
+        ax.set_ylabel('Value')
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc='best')
+        
+        plt.tight_layout()
+        
+        # Save the figure
+        filename = f"{statistic_key}_{plot_type.lower()}_iteration.png"
+        plt.savefig(os.path.join(output_dir, filename), dpi=300, bbox_inches='tight')
+        plt.close(fig)
+        
+        print(f"Saved {plot_type} iteration plot to {os.path.join(output_dir, filename)}")
     
     return running_means, running_stds, running_errors, running_ci_width
 
@@ -802,6 +826,73 @@ def plot_confidence_interval_stability(bootstrap_results, statistic_key, agent_n
     
     print(f"Saved confidence interval stability plot to {os.path.join(output_dir, filename)}")
 
+def plot_ci_size_evolution(bootstrap_results, statistic_key, agent_names, output_dir='bootstrap_analysis'):
+    """
+    Plot the evolution of confidence interval sizes during bootstrapping for all agents.
+    
+    Args:
+        bootstrap_results: Dictionary containing bootstrap results
+        statistic_key: Key in bootstrap_results for the statistic to analyze ('ne_regret', 'rd_regret', etc.)
+        agent_names: Names of agents for labeling
+        output_dir: Directory to save output plots
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Extract data based on dictionary format
+    if isinstance(bootstrap_results, dict) and statistic_key in bootstrap_results:
+        data = bootstrap_results[statistic_key]
+    else:
+        print(f"Error: couldn't find {statistic_key} in bootstrap results")
+        return
+        
+    data_array = np.array(data)
+    n_samples = len(data)
+    n_agents = data_array.shape[1]
+    
+    print(f"Creating confidence interval size evolution plot for {statistic_key}")
+    
+    # Create figure
+    plt.figure(figsize=(12, 8))
+    
+    # Calculate CI sizes for each agent as sample size increases
+    # Start after accumulating at least 10 samples
+    start_idx = min(10, n_samples - 1)
+    x_vals = range(start_idx, n_samples)
+    
+    # Use a colormap for distinct colors
+    colors = plt.cm.Set3(np.linspace(0, 1, n_agents))
+    
+    for agent_idx in range(n_agents):
+        agent_name = agent_names[agent_idx] if agent_idx < len(agent_names) else f"Agent {agent_idx}"
+        
+        # Calculate running CI sizes
+        ci_sizes = np.zeros(n_samples - start_idx)
+        for i in range(start_idx, n_samples):
+            lower_ci = np.percentile(data_array[:i+1, agent_idx], 2.5)
+            upper_ci = np.percentile(data_array[:i+1, agent_idx], 97.5)
+            ci_sizes[i-start_idx] = abs(upper_ci - lower_ci)
+        
+        # Plot the CI size evolution
+        plt.plot(x_vals, ci_sizes, color=colors[agent_idx], label=agent_name, linewidth=2)
+    
+    plt.title(f"Evolution of 95% Confidence Interval Sizes\nfor {statistic_key.replace('_', ' ').title()}")
+    plt.xlabel("Number of Bootstrap Samples")
+    plt.ylabel("Confidence Interval Size")
+    plt.grid(True, alpha=0.3)
+    
+    # Add legend
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    
+    # Adjust layout to prevent label cutoff
+    plt.tight_layout()
+    
+    # Save the figure
+    filename = f"{statistic_key}_ci_size_evolution.png"
+    plt.savefig(os.path.join(output_dir, filename), dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    print(f"Saved confidence interval size evolution plot to {os.path.join(output_dir, filename)}")
+
 def analyze_bootstrap_results_for_convergence(bootstrap_results, agent_names, output_dir='bootstrap_analysis'):
     """
     Analyze bootstrap results for convergence based on the bootstrap paper methods.
@@ -848,6 +939,11 @@ def analyze_bootstrap_results_for_convergence(bootstrap_results, agent_names, ou
         
         # Generate confidence interval stability plots
         plot_confidence_interval_stability(
+            bootstrap_results, stat_key, agent_names, output_dir
+        )
+        
+        # Generate CI size evolution plot
+        plot_ci_size_evolution(
             bootstrap_results, stat_key, agent_names, output_dir
         )
         
@@ -1155,46 +1251,99 @@ def plot_regret_distributions(regrets_list, agent_names, title="Regret Distribut
             random.seed(42)  # For reproducibility
             regrets_list = random.sample(regrets_list, max_samples)
         
-        # Safely convert regrets to numpy array
-        try:
-            regrets_array = np.array(regrets_list, dtype=np.float64)
-        except ValueError:
-            print("Warning: Bootstrap samples have inconsistent shapes. Using a more flexible approach.")
-            first_shape = np.shape(regrets_list[0])
-            if len(first_shape) == 0:  # Handle scalar values
-                regrets_array = np.array(regrets_list, dtype=np.float64).reshape(-1, 1)
-            else:
-                # Create array with the right shape and fill it as much as possible
-                regrets_array = np.zeros((len(regrets_list), len(agent_names)), dtype=np.float64)
-                for i, regret in enumerate(regrets_list):
-                    try:
-                        if np.array(regret).size == len(agent_names):
-                            regrets_array[i] = np.array(regret).flatten()[:len(agent_names)]
-                        else:
-                            print(f"Warning: Skipping regret sample {i} due to shape mismatch")
-                    except:
-                        print(f"Warning: Error processing regret sample {i}")
+        # Get the number of agents to ensure we don't go out of bounds
+        n_agents = len(agent_names)
         
-        # Ensure axes reflect the full data range, including any positive values
-        min_regret = np.nanmin(regrets_array)
-        max_regret = np.nanmax(regrets_array)
+        # Memory-efficient approach: avoid creating a single massive array
+        # Instead, process each agent separately
         
-        # Print range information for debugging (without showing on plot)
+        # First, calculate the min and max values across all data to set plot limits
+        min_regret = float('inf')
+        max_regret = float('-inf')
+        
+        # Process in chunks to avoid memory issues
+        chunk_size = 100  # Process 100 samples at a time
+        for i in range(0, len(regrets_list), chunk_size):
+            chunk = regrets_list[i:i+chunk_size]
+            for sample in chunk:
+                # Convert sample to a numpy array if it isn't already
+                if not isinstance(sample, np.ndarray):
+                    sample = np.array(sample, dtype=np.float64)
+                
+                # Flatten if needed
+                if len(sample.shape) == 0:
+                    sample = np.array([sample])
+                    
+                # Make sure we don't go out of bounds
+                valid_len = min(len(sample), n_agents)
+                sample = sample[:valid_len]
+                
+                # Update min and max
+                sample_min = np.nanmin(sample) if sample.size > 0 else 0
+                sample_max = np.nanmax(sample) if sample.size > 0 else 0
+                min_regret = min(min_regret, sample_min)
+                max_regret = max(max_regret, sample_max)
+        
+        # Print range information for debugging
         print(f"\nRegret range for {title}: [{min_regret:.8f}, {max_regret:.8f}]")
         
-        # Check for positive regrets (just log it, don't annotate)
+        # Check for positive regrets
         if max_regret > 0:
             print(f"WARNING: Detected positive regret values (max: {max_regret:.8f}) in {title}")
         
         # Create different types of plots based on plot_type
         if plot_type == "histogram":
-            # Create a histogram style distribution plot
-            for i, agent_name in enumerate(agent_names):
-                if i < regrets_array.shape[1]:  # Ensure we're not out of bounds
-                    agent_data = regrets_array[:, i]
-                    # Remove any NaN values
-                    agent_data = agent_data[~np.isnan(agent_data)]
-                    sns.histplot(agent_data, label=agent_name, kde=True, alpha=0.6, ax=ax)
+            # For histograms, set a fixed number of bins to control memory usage
+            n_bins = 50  # Fixed number of bins to avoid memory issues
+            
+            # Compute bin edges in advance to avoid array overallocation
+            bin_edges = np.linspace(min_regret, max_regret, n_bins + 1)
+            
+            # Create histogram for each agent separately
+            for agent_idx, agent_name in enumerate(agent_names):
+                if agent_idx >= n_agents:
+                    continue
+                    
+                # Collect data for this agent in a memory-efficient way
+                agent_data = []
+                
+                for i in range(0, len(regrets_list), chunk_size):
+                    chunk = regrets_list[i:i+chunk_size]
+                    for sample in chunk:
+                        # Convert sample to numpy array if needed
+                        if not isinstance(sample, np.ndarray):
+                            sample = np.array(sample, dtype=np.float64)
+                        
+                        # Flatten if needed
+                        if len(sample.shape) == 0:
+                            sample = np.array([sample])
+                            
+                        # Get this agent's value if available
+                        if agent_idx < len(sample):
+                            val = sample[agent_idx]
+                            if not np.isnan(val):
+                                agent_data.append(val)
+                
+                # Only plot if we have data
+                if agent_data:
+                    # Use numpy histogram directly instead of seaborn to have more control
+                    # This avoids memory issues in seaborn when creating bins
+                    hist, _ = np.histogram(agent_data, bins=bin_edges)
+                    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+                    
+                    # Plot the histogram manually
+                    width = (bin_edges[1] - bin_edges[0]) * 0.8
+                    ax.bar(bin_centers, hist, width=width, alpha=0.6, label=agent_name)
+                    
+                    # Add density curve (KDE) if requested
+                    try:
+                        if len(agent_data) > 1:
+                            kde_x = np.linspace(min_regret, max_regret, 1000)
+                            kde = stats.gaussian_kde(agent_data)
+                            kde_y = kde(kde_x) * len(agent_data) * (bin_edges[1] - bin_edges[0])
+                            ax.plot(kde_x, kde_y, label=f"{agent_name} KDE")
+                    except Exception as kde_error:
+                        print(f"Warning: Could not create KDE for {agent_name}: {kde_error}")
             
             plt.xlabel('Regret Value')
             plt.ylabel('Frequency')
@@ -1204,50 +1353,99 @@ def plot_regret_distributions(regrets_list, agent_names, title="Regret Distribut
             ax.set_xlim(min_regret - buffer, max_regret + buffer)
             
         elif plot_type == "box":
-            # Create a box plot with data validation
-            valid_data = {}
-            for i, agent_name in enumerate(agent_names):
-                if i < regrets_array.shape[1]:  # Ensure we're not out of bounds
-                    agent_data = regrets_array[:, i]
-                    # Remove any NaN values
-                    agent_data = agent_data[~np.isnan(agent_data)]
-                    valid_data[agent_name] = agent_data
+            # Create data for box plot in a memory-efficient way
+            valid_data = {agent_name: [] for agent_name in agent_names[:n_agents]}
             
+            for i in range(0, len(regrets_list), chunk_size):
+                chunk = regrets_list[i:i+chunk_size]
+                for sample in chunk:
+                    # Convert sample to numpy array if needed
+                    if not isinstance(sample, np.ndarray):
+                        sample = np.array(sample, dtype=np.float64)
+                    
+                    # Flatten if needed
+                    if len(sample.shape) == 0:
+                        sample = np.array([sample])
+                        
+                    # Add each agent's value to its list
+                    for agent_idx, agent_name in enumerate(agent_names):
+                        if agent_idx < len(sample):
+                            val = sample[agent_idx]
+                            if not np.isnan(val):
+                                valid_data[agent_name].append(val)
+            
+            # Create DataFrame for the box plot
             df = pd.DataFrame(valid_data)
-            sns.boxplot(data=df, ax=ax)
             
-            plt.xlabel('Agent')
-            plt.ylabel('Regret Value')
-            plt.xticks(rotation=45, ha='right')
-            
-            # Set y-axis range based on actual data
-            buffer = (max_regret - min_regret) * 0.05 if max_regret > min_regret else abs(min_regret) * 0.05
-            ax.set_ylim(min_regret - buffer, max_regret + buffer)
+            # Check if we have valid data before plotting
+            if not df.empty and not df.isna().all().all():
+                sns.boxplot(data=df, ax=ax)
+                plt.xlabel('Agent')
+                plt.ylabel('Regret Value')
+                plt.xticks(rotation=45, ha='right')
+                
+                # Set y-axis range based on actual data
+                buffer = (max_regret - min_regret) * 0.05 if max_regret > min_regret else abs(min_regret) * 0.05
+                ax.set_ylim(min_regret - buffer, max_regret + buffer)
+            else:
+                print(f"Warning: No valid data for boxplot in {title}")
+                ax.text(0.5, 0.5, "No valid data for boxplot", 
+                        horizontalalignment='center', verticalalignment='center',
+                        transform=ax.transAxes)
         
         elif plot_type == "running_mean":
             # Create a running mean plot to show convergence
-            window_size = max(1, len(regrets_list) // 10)  # Use 1/10 of samples for window
+            window_size = max(1, min(len(regrets_list) // 10, 100))  # Use smaller window for efficiency
             
             running_mean_min = float('inf')
             running_mean_max = float('-inf')
             
-            for i, agent_name in enumerate(agent_names):
-                # Calculate running mean
-                running_means = []
-                for j in range(window_size, len(regrets_list) + 1):
-                    mean_value = np.mean(regrets_array[j-window_size:j, i])
-                    running_means.append(mean_value)
-                    running_mean_min = min(running_mean_min, mean_value)
-                    running_mean_max = max(running_mean_max, mean_value)
+            for agent_idx, agent_name in enumerate(agent_names):
+                if agent_idx >= n_agents:
+                    continue
+                    
+                # Calculate running means for this agent
+                all_values = []
                 
-                plt.plot(range(window_size, len(regrets_list) + 1), running_means, label=agent_name)
+                # First collect all values for this agent
+                for sample in regrets_list:
+                    # Convert sample to numpy array if needed
+                    if not isinstance(sample, np.ndarray):
+                        sample = np.array(sample, dtype=np.float64)
+                    
+                    # Flatten if needed
+                    if len(sample.shape) == 0:
+                        sample = np.array([sample])
+                        
+                    # Get this agent's value if available
+                    if agent_idx < len(sample):
+                        val = sample[agent_idx]
+                        if not np.isnan(val):
+                            all_values.append(val)
+                
+                # Calculate running means
+                if len(all_values) > window_size:
+                    running_means = []
+                    for j in range(window_size, len(all_values) + 1, max(1, (len(all_values) - window_size) // 500)):
+                        # Use this stride to limit points for large datasets
+                        mean_value = np.mean(all_values[j-window_size:j])
+                        running_means.append(mean_value)
+                        running_mean_min = min(running_mean_min, mean_value)
+                        running_mean_max = max(running_mean_max, mean_value)
+                    
+                    x_vals = list(range(window_size, len(all_values) + 1, max(1, (len(all_values) - window_size) // 500)))
+                    if len(x_vals) == len(running_means):
+                        plt.plot(x_vals, running_means, label=agent_name)
+                    else:
+                        print(f"Warning: x_vals and running_means have different lengths for {agent_name}")
             
             plt.xlabel('Number of Bootstrap Samples')
             plt.ylabel('Running Mean Regret')
             
             # Set y-axis range for running mean plots
             buffer = (running_mean_max - running_mean_min) * 0.05 if running_mean_max > running_mean_min else abs(running_mean_min) * 0.05
-            ax.set_ylim(running_mean_min - buffer, running_mean_max + buffer)
+            if running_mean_min != float('inf') and running_mean_max != float('-inf'):
+                ax.set_ylim(running_mean_min - buffer, running_mean_max + buffer)
         
         else:
             raise ValueError(f"Unsupported plot_type: {plot_type}. Use 'histogram', 'box', or 'running_mean'.")
@@ -1275,4 +1473,7 @@ def plot_regret_distributions(regrets_list, agent_names, title="Regret Distribut
         return fig
     except Exception as e:
         print(f"Error creating regret distribution plot: {e}")
+        # Print traceback for debugging
+        import traceback
+        traceback.print_exc()
         return None 
