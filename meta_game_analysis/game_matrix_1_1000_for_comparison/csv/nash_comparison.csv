@@ -1,0 +1,10 @@
+Agent,ME Nash Probability,RD Nash Probability,ME Nash Regret,RD Nash Regret,Probability Difference,Regret Difference
+anthropic_3.7_sonnet_circle_5,0.0,-0.0,,-67.23051282051279,0.0,
+anthropic_3.7_sonnet_circle_6,0.0,-0.0,,47.06574999999998,0.0,
+anthropic_sonnet_3.7_reasoning_circle_0,0.0,-0.0,,37.04410256410256,0.0,
+gemini_2.0_flash_circle_2,0.09817677254249722,-0.0,-2.5011104298755527e-12,-32.598717948717876,0.09817677254249722,32.598717948715375
+gemini_2.0_flash_circle_5,1.4219494097731625e-14,-0.0,-9.475671486559607,101.30124999999998,1.4219494097731625e-14,110.77692148655959
+openai_4o_circle_4,0.0,-0.0,,30.06342105263161,0.0,
+openai_4o_circle_5,0.0,-0.0,,-122.50424999999996,0.0,
+openai_4o_circle_6,0.0,-0.0,,-72.02230769230766,0.0,
+openai_o3_mini_circle_0,0.0,1.0,,0.0,1.0,

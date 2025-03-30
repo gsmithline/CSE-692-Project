@@ -8,6 +8,7 @@ import warnings
 import scipy.sparse as sp
 from scipy.special import entr
 import cvxpy as cp
+import nashpy as nash
 EPSILON = .05
 def _simplex_projection(x):
     """
@@ -204,8 +205,12 @@ def replicator_dynamics_nash(game_matrix, max_iter=2000, epsilon=0.05, step_size
     
     # Normalize payoffs to prevent overflow
     payoff_range = np.max(game_matrix_np) - np.min(game_matrix_np)
-    if payoff_range > 20:  # If range is large, normalize to prevent exp overflow
+    if payoff_range > 20: 
         game_matrix_np = (game_matrix_np - np.min(game_matrix_np)) / payoff_range * 10
+
+    game = nash.Game(game_matrix_np)
+    equilibria = game.replicator_dynamics()
+    print(equilibria)
     
     n = game_matrix_np.shape[0]
     
@@ -360,7 +365,7 @@ def replicator_dynamics_nash(game_matrix, max_iter=2000, epsilon=0.05, step_size
                 'nash_value': nash_value
             }
         else:
-            return best_strategy
+            return best_strategy, iteration
     else:
         print(f"Best regret found: {np.max(regret):.6f}")
         if return_trace:
@@ -372,7 +377,7 @@ def replicator_dynamics_nash(game_matrix, max_iter=2000, epsilon=0.05, step_size
                 'nash_value': nash_value
             }
         else:
-            return best_strategy
+            return best_strategy, iteration
 
 def compute_regret(strategy, payoff_matrix):
     """

@@ -7,6 +7,14 @@ import sys
 import os
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from nash_equilibrium.nash_solver import (
+    milp_max_sym_ent_2p,
+    replicator_dynamics_nash,
+    calculate_max_regret,
+    minimize_max_regret,
+    compute_regret,
+    _simplex_projection
+)
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -463,62 +471,6 @@ def print_pure_nash_info(performance_matrix):
     else:
         print("\nNo valid self-play values found.")
 
-def replicator_dynamics(payoff_matrix, num_iterations=1000, convergence_threshold=1e-8, verbose=False, initial_strategy=None):
-    """
-    Find Nash equilibrium using replicator dynamics.
-    
-    Args:
-        payoff_matrix: 2D numpy array representing payoff matrix
-        num_iterations: Maximum number of iterations
-        convergence_threshold: Convergence threshold for stopping condition
-        verbose: Whether to print progress
-        initial_strategy: Optional initial strategy (if None, use uniform)
-        
-    Returns:
-        tuple: (nash_strategy, is_converged, iterations)
-    """
-    n = payoff_matrix.shape[0]
-    
-    # Initialize strategy with uniform distribution if not provided
-    if initial_strategy is None:
-        strategy = np.ones(n) / n
-    else:
-        strategy = initial_strategy.copy()
-        strategy = strategy / np.sum(strategy)  # Normalize
-    
-    is_converged = False
-    iterations = 0
-    
-    for i in range(num_iterations):
-        iterations = i + 1
-        
-        # Calculate expected payoffs for each strategy
-        expected_payoffs = np.dot(payoff_matrix, strategy)
-        
-        # Calculate average payoff
-        average_payoff = np.dot(strategy, expected_payoffs)
-        
-        # Update strategy using replicator dynamics equation
-        new_strategy = strategy * expected_payoffs / average_payoff
-        
-        # Normalize to ensure valid probability distribution
-        new_strategy = new_strategy / np.sum(new_strategy)
-        
-        # Check convergence
-        strategy_change = np.max(np.abs(new_strategy - strategy))
-        if strategy_change < convergence_threshold:
-            is_converged = True
-            if verbose:
-                print(f"Converged after {iterations} iterations")
-            break
-        
-        strategy = new_strategy
-    
-    if not is_converged and verbose:
-        print(f"Did not converge after {iterations} iterations")
-    
-    return strategy, is_converged, iterations
-
 def find_nash_with_replicator_dynamics(performance_matrix, num_restarts=10, num_iterations=2000, 
                                       convergence_threshold=1e-8, verbose=False, return_all=False):
     """
@@ -536,6 +488,7 @@ def find_nash_with_replicator_dynamics(performance_matrix, num_restarts=10, num_
         tuple: (best_nash_strategy, all_strategies, all_convergence_info)
     """
     # Convert DataFrame to numpy array if needed
+
     if isinstance(performance_matrix, pd.DataFrame):
         agent_names = performance_matrix.index.tolist()
         payoff_matrix = performance_matrix.to_numpy()
@@ -553,10 +506,12 @@ def find_nash_with_replicator_dynamics(performance_matrix, num_restarts=10, num_
                 payoff_matrix[i, j] = col_mean if not np.isnan(col_mean) else 0
     
     # Start with uniform distribution
-    uniform_strategy = np.ones(n) / n
-    best_strategy, best_converged, best_iter = replicator_dynamics(
-        payoff_matrix, num_iterations, convergence_threshold, verbose, uniform_strategy
+    best_strategy, best_iter = replicator_dynamics_nash(
+        payoff_matrix,
+        max_iter=num_iterations,
+        epsilon=convergence_threshold
     )
+    best_converged = max(compute_regret(best_strategy, payoff_matrix)[0]) <= convergence_threshold
     
     # Record all results
     all_strategies = [best_strategy]
@@ -572,11 +527,15 @@ def find_nash_with_replicator_dynamics(performance_matrix, num_restarts=10, num_
         # Initialize with random strategy (Dirichlet distribution)
         random_strategy = np.random.dirichlet(np.ones(n))
         
-        strategy, converged, iterations = replicator_dynamics(
-            payoff_matrix, num_iterations, convergence_threshold, verbose, random_strategy
+        strategy, iterations = replicator_dynamics_nash(
+            payoff_matrix,
+            max_iter=num_iterations,
+            epsilon=convergence_threshold
         )
-        
+         
         all_strategies.append(strategy)
+        converged = max(compute_regret(strategy, payoff_matrix)[0]) <= convergence_threshold
+
         all_convergence.append((converged, iterations))
         
         # Calculate expected payoff for current strategy
@@ -620,7 +579,7 @@ def find_nash_with_replicator_dynamics(performance_matrix, num_restarts=10, num_
         'Nash Probability': best_strategy
     }).sort_values(by='Nash Probability', ascending=False)
     
-    return best_nash_df 
+    return best_nash_df
 
 def calculate_regrets_against_replicator_nash(performance_matrix, rd_nash_strategy):
     """

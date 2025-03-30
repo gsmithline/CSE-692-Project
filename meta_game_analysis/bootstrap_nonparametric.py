@@ -130,7 +130,7 @@ def nonparametric_bootstrap_from_raw_data(all_results, num_bootstrap=1000, confi
             nash_strategy = milp_max_sym_ent_2p(game_matrix_np, 2000)
             
             # Calculate Replicator Dynamics Nash Equilibrium
-            rd_strategy = replicator_dynamics_nash(game_matrix_np, 3000)
+            rd_strategy, _ = replicator_dynamics_nash(game_matrix_np, 3000)
             
             # Calculate expected utilities against the ME Nash mixture
             expected_utils = np.dot(game_matrix_np, nash_strategy)
@@ -393,7 +393,8 @@ def analyze_bootstrap_results(bootstrap_results, agent_names, confidence=0.95):
             worst_agent_rd_normal = agent_names[worst_idx_rd_normal]
             error_msg.append(f"RD Normal: {max_rd_normal:.10f} for agent {worst_agent_rd_normal}")
             
-        print(f"WARNING: Large positive mean regret detected:\n{', '.join(error_msg)}")
+        print(f"NOTE: Large positive mean regret detected:\n{', '.join(error_msg)}")
+        print("Continuing analysis with positive regrets. Results may indicate non-equilibrium strategies.")
     elif np.any(mean_ne_regrets > 0) or (has_rd_regrets and np.any(mean_rd_regrets > 0)) or \
          (has_me_normal_regrets and np.any(mean_me_normal_regrets > 0)) or \
          (has_rd_normal_regrets and np.any(mean_rd_normal_regrets > 0)):
@@ -402,25 +403,25 @@ def analyze_bootstrap_results(bootstrap_results, agent_names, confidence=0.95):
             max_ne_regret = np.max(mean_ne_regrets)
             worst_idx_ne = np.argmax(mean_ne_regrets)
             worst_agent_ne = agent_names[worst_idx_ne]
-            print(f"WARNING: Small positive mean ME Nash regret detected: {max_ne_regret:.10f} for agent {worst_agent_ne}")
+            print(f"NOTE: Small positive mean ME Nash regret detected: {max_ne_regret:.10f} for agent {worst_agent_ne}")
         
         if has_rd_regrets and np.any(mean_rd_regrets > 0):
             max_rd_regret = np.max(mean_rd_regrets)
             worst_idx_rd = np.argmax(mean_rd_regrets)
             worst_agent_rd = agent_names[worst_idx_rd]
-            print(f"WARNING: Small positive mean RD Nash regret detected: {max_rd_regret:.10f} for agent {worst_agent_rd}")
+            print(f"NOTE: Small positive mean RD Nash regret detected: {max_rd_regret:.10f} for agent {worst_agent_rd}")
             
         if has_me_normal_regrets and np.any(mean_me_normal_regrets > 0):
             max_me_normal = np.max(mean_me_normal_regrets)
             worst_idx_me_normal = np.argmax(mean_me_normal_regrets)
             worst_agent_me_normal = agent_names[worst_idx_me_normal]
-            print(f"WARNING: Small positive mean ME normal regret detected: {max_me_normal:.10f} for agent {worst_agent_me_normal}")
+            print(f"NOTE: Small positive mean ME normal regret detected: {max_me_normal:.10f} for agent {worst_agent_me_normal}")
             
         if has_rd_normal_regrets and np.any(mean_rd_normal_regrets > 0):
             max_rd_normal = np.max(mean_rd_normal_regrets)
             worst_idx_rd_normal = np.argmax(mean_rd_normal_regrets)
             worst_agent_rd_normal = agent_names[worst_idx_rd_normal]
-            print(f"WARNING: Small positive mean RD normal regret detected: {max_rd_normal:.10f} for agent {worst_agent_rd_normal}")
+            print(f"NOTE: Small positive mean RD normal regret detected: {max_rd_normal:.10f} for agent {worst_agent_rd_normal}")
     
     # Calculate percentile-based confidence intervals
     alpha = 1 - confidence
@@ -561,7 +562,7 @@ def run_bootstrap_analysis(performance_matrix, num_bootstrap=1000, confidence=0.
             nash_strategy = milp_max_sym_ent_2p(bootstrap_game_matrix, 2000)
             
             # Calculate Replicator Dynamics Nash Equilibrium
-            rd_strategy = replicator_dynamics_nash(bootstrap_game_matrix, 1000)
+            rd_strategy, _ = replicator_dynamics_nash(bootstrap_game_matrix, 1000)
             
             # Calculate expected utilities against the ME Nash mixture
             expected_utils = np.dot(bootstrap_game_matrix, nash_strategy)

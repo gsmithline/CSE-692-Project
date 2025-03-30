@@ -1,0 +1,23 @@
+// NW Response Graph
+digraph {
+	bgcolor=white dpi=300 rankdir=LR size="12,8"
+	node [fillcolor=lightblue fontname=Arial fontsize=14 margin="0.4,0.3" shape=box style="filled,rounded"]
+	"anthropic_3.7_sonnet_2025-02-19_circle_5" [label="anthropic_3.7_sonnet_2025-02-19_circle_5" height=0.8 width=2.5]
+	"anthropic_3.7_sonnet_2025-02-19_circle_6" [label="anthropic_3.7_sonnet_2025-02-19_circle_6" height=0.8 width=2.5]
+	"anthropic_sonnet_3.7_reasoning_2025-02-19_circle_0" [label="anthropic_sonnet_3.7_reasoning_2025-02-19_circle_0" height=0.8 width=2.5]
+	"gemini_2.0_flash_circle_2" [label="gemini_2.0_flash_circle_2" height=0.8 width=2.5]
+	"gemini_2.0_flash_circle_5" [label="gemini_2.0_flash_circle_5" height=0.8 width=2.5]
+	"openai_4o_2024-08-06_circle_4" [label="openai_4o_2024-08-06_circle_4" height=0.8 width=2.5]
+	"openai_4o_2024-08-06_circle_5" [label="openai_4o_2024-08-06_circle_5" height=0.8 width=2.5]
+	"openai_4o_2024-08-06_circle_6" [label="openai_4o_2024-08-06_circle_6" height=0.8 width=2.5]
+	"openai_o3_mini_2025-01-31_circle_0" [label="openai_o3_mini_2025-01-31_circle_0" height=0.8 width=2.5]
+	"anthropic_3.7_sonnet_2025-02-19_circle_5" -> "openai_4o_2024-08-06_circle_6" [label=" 646.40" color="#3366FF"]
+	"anthropic_3.7_sonnet_2025-02-19_circle_6" -> "gemini_2.0_flash_circle_2" [label=" 592.21" color="#3366FF"]
+	"anthropic_sonnet_3.7_reasoning_2025-02-19_circle_0" -> "openai_4o_2024-08-06_circle_5" [label=" 577.08" color="#3366FF"]
+	"gemini_2.0_flash_circle_2" -> "openai_4o_2024-08-06_circle_4" [label=" 662.15" color="#3366FF"]
+	"gemini_2.0_flash_circle_5" -> "openai_4o_2024-08-06_circle_4" [label=" 552.73" color="#3366FF"]
+	"openai_4o_2024-08-06_circle_4" -> "anthropic_sonnet_3.7_reasoning_2025-02-19_circle_0" [label=" 672.62" color="#3366FF"]
+	"openai_4o_2024-08-06_circle_5" -> "openai_o3_mini_2025-01-31_circle_0" [label=" 793.04" color="#3366FF"]
+	"openai_4o_2024-08-06_circle_6" -> "openai_4o_2024-08-06_circle_4" [label=" 701.95" color="#3366FF"]
+	"openai_o3_mini_2025-01-31_circle_0" -> "openai_4o_2024-08-06_circle_6" [label=" 597.43" color="#3366FF"]
+}
