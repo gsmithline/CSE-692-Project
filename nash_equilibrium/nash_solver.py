@@ -405,7 +405,6 @@ def replicator_dynamics_nash(game_matrix, max_iter=2000, epsilon=0.05, step_size
     if nashpy_best_strategy is None and custom_best_strategy is None:
         raise RuntimeError("Failed to find Nash equilibrium with either method")
     
-    # Choose the best strategy between the two methods
     if nashpy_best_strategy is None or (custom_best_strategy is not None and custom_best_regret < nashpy_best_regret):
         best_strategy = custom_best_strategy
         best_regret = custom_best_regret
@@ -424,6 +423,13 @@ def replicator_dynamics_nash(game_matrix, max_iter=2000, epsilon=0.05, step_size
         print(f"Found epsilon-Nash equilibrium with regret {np.max(regret):.6f}")
     else:
         print(f"Best regret found: {np.max(regret):.6f} (above epsilon threshold)")
+        print("Falling back to plain MILP")
+        best_strategy = milp_nash_2p(game_matrix_np, epsilon)
+        regret, nash_value, expected_utils = compute_regret(best_strategy, game_matrix_np)
+        if np.max(regret) <= epsilon:
+            print(f"Found epsilon-Nash equilibrium with regret {np.max(regret):.6f}")
+        else:
+            print(f"Best regret found: {np.max(regret):.6f} (above epsilon threshold)")
         
     if return_trace:
         return best_strategy, {
@@ -434,7 +440,6 @@ def replicator_dynamics_nash(game_matrix, max_iter=2000, epsilon=0.05, step_size
             'nash_value': nash_value
         }
     else:
-        # Return best strategy (make sure it's a proper numpy array)
         return np.array(best_strategy), iteration
 
 def compute_regret(strategy, payoff_matrix):
@@ -459,91 +464,6 @@ def compute_regret(strategy, payoff_matrix):
     regret = expected_utils - nash_value
     
     return regret, nash_value, expected_utils
-
-
-
-def milp_sym_ent_2p(game_matrix, discrete_factors=100):
-    """
-    Compute maximum entropy Nash equilibrium for 2-player games following the Zun's implementation.
-    Uses CVXPY with ECOS_BB solver to handle boolean variables and mixed integer constraints.
-    
-    Args:
-        game_matrix: numpy array of payoffs
-        discrete_factors: number of discrete factors for entropy approximation
-        
-    Returns:
-        nash_strategy: equilibrium strategy (probability distribution over actions)
-        
-    Raises:
-        RuntimeError: If both ECOS_BB and GLPK_MI solvers fail to find an optimal solution
-    """
-    shape = game_matrix.shape
-    assert len(shape) == 2
-    assert shape[0] == shape[1]
-    
-    game_matrix_np = np.array(game_matrix, dtype=np.float64)
-    
-    # Handle missing values
-    if np.isnan(game_matrix_np).any():
-        for j in range(game_matrix_np.shape[1]):
-            col = game_matrix_np[:, j]
-            if np.isnan(col).any():
-                col_mean = np.nanmean(col)
-                if np.isnan(col_mean):
-                    col_mean = 0
-                game_matrix_np[np.isnan(col), j] = col_mean
-    
-    M = shape[0]
-    U = np.max(game_matrix_np) - np.min(game_matrix_np)
-    
-    # Variables
-    x = cp.Variable(M)
-    u = cp.Variable(1)
-    z = cp.Variable(M)
-    b = cp.Variable(M, boolean=True)
-    
-    #objective: minimize sum of z (which approximates -entropy)
-    
-    
-    #nash equilibrium constraints
-    a_mat = np.ones(M).reshape((1, M))
-    u_m = game_matrix_np @ x
-    
-    constraints = [
-        u_m <= u,
-        a_mat @ x == 1,
-        x >= 0,
-        u - u_m <= U * b,
-        x <= 1 - b
-    ]
-    
-    # Create and solve the problem
-    prob = cp.Problem(obj, constraints)
-    
-    try:
-        # Try ECOS_BB first
-        prob.solve(solver='ECOS_BB')
-        if prob.status != 'optimal':
-            raise ValueError(f"ECOS_BB solver failed with status: {prob.status}")
-    except Exception as e:
-        warnings.warn(f"Failed to solve with ECOS_BB: {e}")
-        try:
-            # Try GLPK_MI as fallback
-            prob.solve(solver='GLPK_MI')
-            if prob.status != 'optimal':
-                raise ValueError(f"GLPK_MI solver failed with status: {prob.status}")
-        except Exception as e:
-            raise RuntimeError(f"Both ECOS_BB and GLPK_MI solvers failed. ECOS_BB error: {e}")
-    
-    # Extract and project solution
-    ne_strategy = _simplex_projection(x.value.reshape(-1))
-
-    regret, nash_value, expected_utils = compute_regret(ne_strategy, game_matrix_np)
-    max_regret = np.max(regret)
-    if max_regret < EPSILON:
-        return ne_strategy
-    else:
-        raise RuntimeError(f"Failed to find Nash equilibrium within {EPSILON} regret")
 
 def milp_nash_2p(game_matrix, regret_threshold=EPSILON):
     """

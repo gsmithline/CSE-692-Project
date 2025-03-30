@@ -114,17 +114,15 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
     print("\nChecking for pure Nash equilibria in the performance matrix:")
     print_pure_nash_info(performance_matrix)
     
-    #print("\nFinding Nash equilibrium using replicator dynamics with multiple restarts:")
-    #rd_nash_df = find_nash_with_replicator_dynamics(
-    #    performance_matrix, 
-    #    num_restarts=10,
-    #    num_iterations=2000,
-    #    verbose=True
-    #)
-    print("\nFinding Nash equilibrium using MILP:")
-    rd_nash_df = milp_nash_2p(performance_matrix, 0.05)
-    print("\nNash Equilibrium from Replicator Dynamics:")
+    print("\nFinding Nash equilibrium using replicator dynamics with multiple restarts:")
+    rd_nash_df = find_nash_with_replicator_dynamics(
+        performance_matrix, 
+        num_restarts=10,
+        num_iterations=2000,
+        verbose=True
+    )
     print(rd_nash_df)
+
     
     print("\nCalculating Max Entropy Nash Equilibrium for the plain performance matrix...")
     from nash_equilibrium.nash_solver import milp_max_sym_ent_2p
