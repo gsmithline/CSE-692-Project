@@ -6,7 +6,9 @@ from nash_equilibrium.nash_solver import (
     milp_max_sym_ent_2p,
     replicator_dynamics_nash,
     calculate_max_regret,
-    minimize_max_regret
+    minimize_max_regret, 
+    milp_nash_2p, 
+    compute_regret
 )
 
 from nash_equilibrium.nash_regret_viz import (
@@ -47,5 +49,7 @@ __all__ = [
     'plot_nash_distributions',
     'visualize_nash_mixture_with_ci',
     'plot_normal_regret_distributions',
-    'visualize_normal_regret_comparison'
+    'visualize_normal_regret_comparison',
+    'milp_nash_2p',
+    'compute_regret'
 ] 

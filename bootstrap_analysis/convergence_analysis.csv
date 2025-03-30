@@ -1,4 +1,4 @@
 Metric,Converged,Mean Monte Carlo Error
-NE Regrets,False,8.651725990427591
-Expected Utilities,False,8.27584961093852
-RD Regrets,False,21.31792867498497
+NE Regrets,False,1.4532321972823266
+Expected Utilities,True,1.1492070277052162
+RD Regrets,False,1.9339535724654187

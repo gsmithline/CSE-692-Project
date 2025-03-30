@@ -114,13 +114,15 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
     print("\nChecking for pure Nash equilibria in the performance matrix:")
     print_pure_nash_info(performance_matrix)
     
-    print("\nFinding Nash equilibrium using replicator dynamics with multiple restarts:")
-    rd_nash_df = find_nash_with_replicator_dynamics(
-        performance_matrix, 
-        num_restarts=10,
-        num_iterations=2000,
-        verbose=True
-    )
+    #print("\nFinding Nash equilibrium using replicator dynamics with multiple restarts:")
+    #rd_nash_df = find_nash_with_replicator_dynamics(
+    #    performance_matrix, 
+    #    num_restarts=10,
+    #    num_iterations=2000,
+    #    verbose=True
+    #)
+    print("\nFinding Nash equilibrium using MILP:")
+    rd_nash_df = milp_nash_2p(performance_matrix, 0.05)
     print("\nNash Equilibrium from Replicator Dynamics:")
     print(rd_nash_df)
     
@@ -419,7 +421,6 @@ def run_analysis(input_dir="crossplay/game_matrix_2", output_dir="meta_game_anal
         os.path.join(output_dir, 'csv')
     )
     
-    # Save RD Nash results and comparison
     csv_dir = os.path.join(output_dir, 'csv')
     os.makedirs(csv_dir, exist_ok=True)
     
@@ -495,7 +496,6 @@ def main():
     else:
         print("Warning: Failed to create Replicator Dynamics Regret Distribution figure")
     
-    # Generate box plots for regrets
     print("\nGenerating regret box plots...")
     ne_box_fig = plot_regret_distributions(ne_regrets, agent_names, 
                                           title="Nash Equilibrium Regret Box Plot", 

@@ -13,7 +13,8 @@ from nash_equilibrium.nash_solver import (
     calculate_max_regret,
     minimize_max_regret,
     compute_regret,
-    _simplex_projection
+    _simplex_projection,
+    milp_nash_2p
 )
 
 # Add parent directory to path for imports
