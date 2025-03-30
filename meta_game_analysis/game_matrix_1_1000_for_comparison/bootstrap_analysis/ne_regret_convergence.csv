@@ -1,0 +1,10 @@
+Agent,Mean,Std Dev,Monte Carlo Error,Relative Error,Assessment
+anthropic_3.7_sonnet_2025-02-19_circle_5,-2.3874235921539366e-12,0.0,0.0,0.0,Excellent
+anthropic_3.7_sonnet_2025-02-19_circle_6,1.4779288903810084e-12,0.0,0.0,0.0,Excellent
+anthropic_sonnet_3.7_reasoning_2025-02-19_circle_0,1.4779288903810084e-12,0.0,0.0,0.0,Excellent
+gemini_2.0_flash_circle_2,-2.5011104298755527e-12,0.0,0.0,0.0,Excellent
+gemini_2.0_flash_circle_5,-9.475671486559607,2.5770062425385765e-13,8.149209270894197e-15,8.600139085080273e-16,Excellent
+openai_4o_2024-08-06_circle_4,5.684341886080801e-13,0.0,0.0,0.0,Excellent
+openai_4o_2024-08-06_circle_5,1.5916157281026244e-12,0.0,0.0,0.0,Excellent
+openai_4o_2024-08-06_circle_6,1.4779288903810084e-12,0.0,0.0,0.0,Excellent
+openai_o3_mini_2025-01-31_circle_0,-12.659175600545495,0.0,0.0,0.0,Excellent

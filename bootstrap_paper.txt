@@ -1,0 +1,1259 @@
+Bootstrap Statistics for Empirical Games
+Bootstrap Statistics for Empirical Games
+Bryce Wiedenbeck
+University of Michigan
+btwied@umich.edu
+Bryce Wiedenbeck
+University of Michigan
+btwied@umich.edu
+Ben-Alexander Cassell
+University of Michigan
+bcassell@umich.edu
+Ben-Alexander Cassell
+University of Michigan
+bcassell@umich.edu
+Michael P. Wellman
+University of Michigan
+P. Wellman
+University of Michigan
+wellman@umich.edu
+wellman@umich.edu
+ABSTRACT
+Researchers often use normal-form games to model multi-
+ABSTRACT
+Researchers often use normal-form games to model multi-
+agent interactions. When a game model is based on obser-
+vational or simulated data about agent payoﬀs, we call
+agent interactions. When
+game model is based on obser-
+vational or simulated data about agent payoffs, we call it
+it
+an empirical game. The payoff matrix of
+an empirical game. The payoﬀ matrix of an empirical game
+can be analyzed like any normal-form game, for example,
+by identifying Nash equilibria or instances of other solution
+concepts. Given the game model’s basis in sampled data,
+however, empirical game analysis must also consider sam-
+pling error and distributional properties of candidate solu-
+tions. Toward this end, we introduce bootstrap techniques
+that support statistical reasoning as part of the empirical
+game-theoretic analysis process. First, we show how the
+bootstrap can be applied to compute conﬁdence bounds on
+the regret of reported approximate equilibria. Second, we
+experimentally demonstrate that applying bootstrapped re-
+gret conﬁdence intervals can improve sampling decisions in
+simulation-based game modeling.
+empirical game
+can be analyzed like any normal-form game, for example,
+by identifying Nash equilibria or instances of other solution
+concepts.
+Given the game model’s basis
+sampled data,
+however, empirical game analysis must also consider sam-
+pling error and distributional properties of candidate solu-
+tions. Toward this end, we introduce bootstrap techniques
+that support statistical reasoning as part of the empirical
+game-theoretic analysis process.
+bootstrap can be applied
+First, we show how the
+compute confidence bounds on
+the regret of reported approximate equilibria.
+Second, we
+experimentally demonstrate that applying bootstrapped
+gret confidence intervals can improve sampling decisions in
+simulation-based game modeling.
+1. MOTIVATION
+Traditional game-theoretic analysis is often confined to
+1. MOTIVATION
+Traditional game-theoretic analysis is often conﬁned to
+what is mathematically tractable for the game theorist, and
+as such is often restricted in scale (numbers ofplayers, strate-
+gies) and complexity (dynamics, strategic interaction, infor-
+mation structures). When the extremes of abstraction re-
+quired for analytic solution are too constraining, we may
+instead describe a strategic scenario in terms of an agent-
+based model (ABM), and attempt to build a game form by
+simulating that ABM [5, 6, 12, 18]. Alternatively, we may
+wish to build game models by observing real world play [4,
+10]. In either case, payoff observations may be noisy, lead-
+ing to uncertainty as to whether the game model accurately
+describes the true game. As such, we would like to quantify
+this uncertainty when conducting game-theoretic analysis on
+such games.
+The approach ofbuilding and analyzing game models from
+data
+known as empirical game-theoretic analysis (EGTA)
+[17].
+Though some EGTA studies report statistical infor-
+what is mathematically tractable for the game theorist, and
+as such is often restricted in scale (numbers of players, strate-
+gies) and complexity (dynamics, strategic interaction, infor-
+mation structures). When the extremes of abstraction re-
+quired for analytic solution are too constraining, we may
+instead describe a strategic scenario in terms of an agent-
+based model (ABM), and attempt to build a game form by
+simulating that ABM [5, 6, 12, 18]. Alternatively, we may
+wish to build game models by observing real world play [4,
+10]. In either case, payoﬀ observations may be noisy, lead-
+ing to uncertainty as to whether the game model accurately
+describes the true game. As such, we would like to quantify
+this uncertainty when conducting game-theoretic analysis on
+such games.
+The approach of building and analyzing game models from
+data is known as empirical game-theoretic analysis (EGTA)
+[17]. Though some EGTA studies report statistical infor-
+mation (e.g., error bars on payoﬀ estimates or signiﬁcance
+of particular comparisons), there has been limited work to
+date on general methods for statistical reasoning about con-
+clusions from empirical games. Instead, studies rely on ex-
+‘>
+© > cror bars on payoff estimates or significance
+*sul-~ c--aparisons), there has been limited work to
+date on general methods for statistical reasoning about con-
+clusions from -mnirical games. Instead, studies rely on ex-
+Appears in: Alessio Lomuscio, Paul Scerri, Ana Bazzan,
+and Michael Huhns (eds.), Proceedings of the 13th Inter-
+national Conference on Autonomous Agents and Multiagent
+Systems (AAMAS 2014), May 5-9, 2014, Paris, France.
+Copyright c
+:io Lomuscio, Paul Scerri, Ana Bazzan,
+> (eds.), Proceedings of the 13th Inter-
+-: on Autonomous Agents and Multiagent
+2014), May 5-9, 2014, Paris, France.
+ 2014, International Foundation for Autonomous Agents and
+‘a-cmational Foundation
+~-w.ifaamas.org).
+rights reserved.
+Multiagent Systems (www.ifaamas.org). All rights reserved.
+Agents
+tremely large sample size [18], or variance reduction tech-
+niques [12], to bolster conﬁdence in results. Whereas more
+samples and less variance does increase conﬁdence, we must
+quantify this conﬁdence if results from EGTA studies are to
+be taken as serious scientiﬁc evidence for propositions of in-
+terest. In the absence of statistical guidance, we cannot tell
+whether practitioners are taking insuﬃcient or excessive ob-
+servations, or whether complex variance reduction measures
+are worth their cost, or most importantly, whether published
+results reﬂect fundamental properties of the games studied
+or artifacts of sampling variation.
+tremely large sample size
+niques [12],
+[18], or variance reduction tech-
+bolster confidence
+results. Whereas more
+samples and less variance does increase confidence, we must
+quantify this confidence if results from EGTA studies
+be taken as serious scientific evidence
+to
+propositions of in-
+terest. In the absence of statistical guidance, we cannot tell
+whether practitioners are taking insufficient or excessive ob-
+servations, or whether complex variance reduction measures
+are worth their cost, or most importantly, whether published
+results reflect fundamental properties of the games studied
+or artifacts of sampling variation.
+The general dearth of statistical analysis
+The general dearth of statistical analysis in EGTA is un-
+EGTA
+un-
+derstandable, given the difficulty ofevaluating complex game-
+solution hypotheses in a traditional statistical framework.
+Little is typically known about payoff distributions prior to
+observing play, rendering parametric approaches inapplica-
+ble. Moreover, determining whether a profile satisfies a so-
+lution concept such as Nash equilibrium generally requires
+evaluating multiple statistical hypotheses about comparison
+of corresponding payoffs across potential deviations.
+derstandable, given the diﬃculty of evaluating complex game-
+solution hypotheses in a traditional statistical framework.
+Little is typically known about payoﬀ distributions prior to
+observing play, rendering parametric approaches inapplica-
+ble. Moreover, determining whether a proﬁle satisﬁes a so-
+lution concept such as Nash equilibrium generally requires
+evaluating multiple statistical hypotheses about comparison
+of corresponding payoﬀs across potential deviations. This
+raises multiple-testing concerns [3], as well as other complex-
+ities due to the interdependencies among these comparisons.
+This paper represents a ﬁrst systematic eﬀort to develop
+This
+raises multiple-testing concerns [3], as well as other complex-
+ities due to the interdependencies among these comparisons.
+This paper represents a first systematic effort to develop
+statistical methods generally applicable to game models de-
+rived from empirical data. Our approach is based on boot-
+strap techniques, which leverage the additional information
+statistical methods generally applicable to game models de-
+rived from empirical data. Our approach is based on boot-
+strap techniques, which leverage the additional information
+available in observation data to characterize distributions
+over game-theoretic conclusions. We apply this approach
+to two problems. First, we present a bootstrap method to
+calculate statistical conﬁdence bounds on reported equilib-
+ria. Second, we exploit this statistical information in an
+algorithm to improve sampling decisions.
+available in observation data to characterize distributions
+over game-theoretic conclusions. We apply this approach
+to two problems.
+First, we present a bootstrap method to
+calculate statistical confidence bounds on reported equilib-
+ria.
+Second, we exploit this statistical information in an
+algorithm to improve sampling decisions.
+2. BACKGROUND
+2. BACKGROUND
+2.1
+Simulation-Based Games
+In most applications of EGTA, a simulator acts as an or-
+acle for player utility functions, taking as input a strategy
+proﬁle—an assignment of one strategy to every player—and
+returning an observation of the payoﬀ each player accrued
+from that proﬁle in simulation. Since ABMs typically incor-
+porate stochastic factors (uncertainty in environment and
+agent private information), the payoﬀ-vector observation is
+actually a sample from some underlying distribution of pay-
+oﬀ outcomes. Using the ABM simulator, we collect an ob-
+servation set Θ by repeatedly sampling each strategy proﬁle.
+We can then construct a game model M(Θ) from the ob-
+servation set. The most common way to construct a game
+In most applications of EGTA,
+simulator acts as an
+acle for player utility functions, taking as input
+strategy
+profile—an assignment of one strategy to every player—and
+returning an observation of the payoff each player accrued
+from that profile in simulation. Since ABMs typically incor-
+porate stochastic factors (uncertainty in environment and
+agent private information), the payoff-vector observation
+actually
+sample from some underlying distribution of pay-
+off outcomes. Using the ABM simulator, we collect an ob-
+servation set O by repeatedly sampling each strategy profile.
+We can then construct
+game model M(Q@) from the ob-
+servation set. The most common way
+construct
+game
+
+model from simulation data is to build a normal-form payoﬀ
+matrix, where each entry in the matrix corresponds to the
+mean of payoﬀ observations of the corresponding proﬁle. Re-
+searchers adopting the EGTA approach have used such mod-
+els to perform standard game-theoretic calculations, such as
+derivation of Nash equilibria or ﬁnding dominant strategies
+[2, 12, 14]. They have also employed results of these game
+computations to estimate features of ABM outcomes in equi-
+librium, such as the average price of a security in a ﬁnancial
+market [5].
+Due to its statistical nature, it may be costly or impossi-
+ble to identify exact Nash equilibria of the game underlying
+the simulator (hereafter referred to as the true game). In-
+stead, it is often helpful to identify proﬁles that are close
+approximations to Nash equilibria. Quality of an approx-
+imate equilibrium is measured by regret, the largest gain
+any player can achieve through unilateral deviation. For-
+mally, regret of a (potentially mixed-strategy) proﬁle σ in a
+symmetric game is given by:
+(σ) = max
+σ∈σ
+max
+s∈S
+u(s,σ−σ) − u(σ, σ),
+where S is the set of pure strategies available to each player,1
+u(·) is the utility function, σ ∈ σ indicates that in proﬁle σ
+some player is playing strategy σ and σ−σ is the partial
+proﬁle where the player using σ has been removed. By def-
+inition, a proﬁle is a Nash equilibrium if and only if it has
+zero regret. We say a proﬁle approximates Nash equilibrium
+at the level  if the proﬁle has regret less than or equal to .
+Since empirical games are constructed from limited sam-
+pling of a noisy payoﬀ-generating process, even exact equi-
+libria of the empirical game may have non-negligible regret
+in the true game. Therefore, in order to draw conclusions
+about the true game, we wish to estimate the regret of a
+proﬁle in the true game from payoﬀ sample data. More
+speciﬁcally, we would like to state with statistical conﬁdence
+whether or not a proﬁle is an -Nash equilibrium of the true
+game through limited sampling of the simulator.
+2.2 Bootstrap Statistics
+The bootstrap is a computational method for estimat-
+ing distributional information about a statistic computed
+on sample data [7]. Unlike classical statistical tests, it does
+not rest on explicit assumptions about the shape of the dis-
+tribution. This feature is useful in reasoning about game
+solutions derived from sample data since nothing is initially
+known about the true payoﬀ distributions. Furthermore,
+since the primary measure of interest, regret, is computed
+through taking a maximum rather than a sum or average, we
+cannot rely on the central limit theorem to ﬁt a parametric
+statistical model to our sampling distribution.
+The bootstrap treats a sample set as representative of the
+population and resamples the sample set to simulate drawing
+many samples from the population. If the original sample
+has size n, then each resample is a set of size n drawn with
+replacement from that sample. The statistic is then com-
+puted on each resample set, giving a bootstrap distribution
+for the statistic that can be used in place of a sampling distri-
+bution for the statistic. Of particular interest, the bootstrap
+1We describe and test our methods using symmetric games
+to simplify exposition and because most EGTA studies have
+been on symmetric games. However, none of the techniques
+we describe depend on symmetry and all should be more
+broadly applicable.
+distribution can be used to estimate conﬁdence intervals for
+the statistic: the interval between the 2.5th and 97.5th per-
+centile of the bootstrap distribution gives a two-sided 95%
+conﬁdence interval, while the 5th
+or 95th percentiles give
+one-sided 95% conﬁdence bounds.
+2.3 Related Work
+There has been limited work using bootstrapped statistics
+to analyze an agent-based model, let alone to analyze games.
+In contrast, discrete-event systems modeling has seen adop-
+tion of the bootstrap to analyze the output of simulation
+[8]. Axtell, et al. [1] suggested that a bootstrap approach
+may be necessary for determining if two agent-based mod-
+els are equivalent, due to the complicated nature of such a
+hypothesis.
+While the bootstrap has not previously been used in an-
+alyzing games, two methods for estimating true game re-
+gret from payoﬀ sample data have been introduced. Reeves
+[15] proposed estimating the empirical distribution of regret
+of a proﬁle by sampling game matrices from the space of
+possible matrices induced by assuming every payoﬀ is inde-
+pendent and distributed normally with mean and variance
+equal to its sample mean and sample variance respectively.
+He recommended using the probability that a proﬁle’s re-
+gret is zero from the estimated empirical distribution of re-
+gret as a measure of the conﬁdence that a proﬁle is a Nash
+equilibrium. However, it is easy to demonstrate that mixed-
+strategy proﬁles, even true-game Nash equilibria, will have
+estimated regret of zero with negligible probability. Vorob-
+eychik [16] presented a Bayesian framework for determining
+the posterior probability that a proﬁle is an -Nash equilib-
+rium of the true game from payoﬀ sample data. The author
+proved tight probability bounds under the assumption that
+payoﬀ observations are independent draws with Gaussian
+noise, and much weaker distribution-free bounds. Both of
+these works ignore the possibility that payoﬀs within a single
+observation of a proﬁle may be correlated, and rely on dis-
+tributional assumptions that cannot be guaranteed for small
+samples. No empirical evaluations have been presented for
+these methods, leaving open the question of their usefulness
+under more varied simulators and sampling designs.
+3. METHODS
+We propose two methods that apply bootstrapping to im-
+prove empirical game-theoretic analysis. First, we show how
+to estimate conﬁdence intervals for the regret of strategy
+proﬁles, and in particular approximate Nash equilibria. We
+then show how such conﬁdence intervals can be used to im-
+prove sample control decisions in simulation-based games.
+3.1 Bootstrap Regret Estimates
+Because empirical games are constructed from data, it is
+often unclear whether approximate Nash equilibria calcu-
+lated in an empirical game correspond to Nash equilibria of
+the true game. Vorobeychik [16] proved that in the inﬁnite-
+sample limit, empirical-game and true-game equilibria are
+identical, however, this does not rule out reporting spurious
+equilibria in empirical games. The bootstrap estimate of
+regret allows us to report conﬁdence intervals for the true-
+game regret of empirical-game equilibria.
+To compute a bootstrap distribution for the regret of a
+(mixed- or pure-strategy) proﬁle σ, we construct a large
+number of bootstrap games by simultaneously resampling
+
+the observations of every entry in the payoﬀ matrix. For
+each bootstrap game, we construct a resampled observation
+set ˆΘ where for each payoﬀ, we draw with replacement from
+its samples a resample set of equal size. We then construct
+a bootstrap game model M( ˆΘ) by applying the same proce-
+dure used to construct the empirical game (usually setting
+payoﬀs equal to sample averages).
+Frequently, the payoﬀs for all strategies in a proﬁle are
+observed in a single simulation. In this case, correlation
+between samples can be preserved by applying common in-
+dexing, where the resample is computed over indices i ∈
+{1, . . . , n}. If i is drawn, then the ith observation of each
+payoﬀ is included in
+Θ.ˆ
+In the event that all payoﬀs in a
+game were sampled with common random numbers, correla-
+tions can similarly be preserved by common indexing across
+all payoﬀs in the game.
+In each bootstrap game, we compute the regret of proﬁle
+σ, and across many bootstrap games, these values consti-
+tute a bootstrap distribution for the regret statistic. If σ
+is an equilibrium of the empirical game, we are generally
+interested in an upper bound on its true-game regret. The
+95th percentile of the bootstrap distribution gives us a 95%-
+conﬁdence upper bound for (σ). In Algorithm 1, we will
+also be interested in a two-sided conﬁdence interval for (σ),
+which is estimated by the 2.5th and 97.5th percentiles of the
+bootstrap distribution.
+3.2 Sampling Control
+When game data is generated by a simulator, the prac-
+titioner may exert control over how many observations to
+gather of each proﬁle. Historically, researchers have inter-
+woven sampling and interim game-theoretic analysis to min-
+imize the number of observations gathered in unproductive
+regions of proﬁle space [13]. Similarly, it may be possible
+to reduce the number of observations taken even of rele-
+vant proﬁles while still delivering a baseline of statistical
+conﬁdence by interweaving evaluation of regret conﬁdence
+intervals with sampling. At the conclusion of a stage of sam-
+pling, a γ-level two-sided conﬁdence interval on the regret of
+a proﬁle expresses with greater than γ conﬁdence that the
+proﬁle is an -Nash equilibrium of the true game when the
+interval falls below ; however, when the interval includes
+, we are unable to distinguish between having insuﬃcient
+evidence that the claim is true and having suﬃcient evi-
+dence that the claim is false. Rather than report that we
+are uncertain whether or not a proﬁle is an -equilibrium,
+we would often prefer to continue sampling until we have
+suﬃcient conﬁdence to make a determination. To address
+this issue, we propose the Conﬁdence-Interval-Based Stop-
+ping Rule (CIBSR) presented in Algorithm 1.
+CIBSR is similar to the repeated conﬁdence interval ap-
+proach to terminating clinical trials proposed by Jennison
+and Turnbull [11], but utilizes the bootstrap to construct
+conﬁdence intervals in place of parametric assumptions. The
+algorithm takes as arguments a candidate proﬁle σ, and any
+observations taken thus far Θinit, and samples sequentially
+until there is suﬃcient evidence to decide whether or not
+the candidate proﬁle is an -equilibrium of the true game.
+CIBSR is parameterized by the acceptable regret threshold
+, the conﬁdence interval level γ, and the number of ob-
+servations to gather of each relevant proﬁle in each step x.
+CIBSR decides if a candidate is an -equilibrium by com-
+Algorithm 1 Conﬁdence-Interval-Based Stopping Rule
+(σ, Θinit, , γ, x)
+Require: σ, the proﬁle to evaluate
+Require: Θinit, the observations used to identify σ as a
+candidate
+Require: , the acceptable approximation threshold
+Require: γ, the conﬁdence level to use
+Require: x, the number of observations to take of each
+proﬁle in each step
+Θseq ← Θinit
+[left, right] ← two-sided-regret-CI(σ, Θseq, γ)
+while left <  and right >  do
+Append x observations of each proﬁle s ∈ S(σ) ∪
+(
+S
+ˆσ∈D(σ) S(ˆσ)) to Θseq
+[left, right] ← two-sided-regret-CI(σ, Θseq, γ)
+end while
+return right ≤ 
+paring the boundaries of a two-sided conﬁdence interval2 to
+, accepting the hypothesis that σ is an -equilibrium when
+the interval falls entirely within [0, ], rejecting it when the
+interval falls entirely within (,∞), and otherwise requesting
+further observations. Sampling under CIBSR is restricted to
+proﬁles that can aﬀect the estimated regret distribution of
+the candidate. These proﬁles belong to either S(σ), the set
+of pure-strategy proﬁles that are realized with positive prob-
+ability under the proﬁle σ, or
+S
+ˆσ∈D(σ) S(ˆσ), the set of pure-
+strategy proﬁles that are realized with positive probability
+under some proﬁle reachable from σ through a unilateral
+deviation to a pure strategy.
+Rather than simply wishing to determine if a particular
+proﬁle is an equilibrium, practitioners may begin with no
+speciﬁc candidates, but sample from a simulator with the
+purpose of ﬁnding one or more equilibria of the true game.
+At any point in the sampling process, equilibria may be com-
+puted in the empirical game induced from the observations
+gathered thus far. As nothing is known about the payoﬀ
+distributions prior to sampling, nor even which payoﬀ dis-
+tributions will be relevant for identifying equilibria of the
+game, practitioners typically sample sequentially according
+to rules of thumb, such as taking observations until the set
+of equilibria of the empirical game does not change with
+further sampling. Existing rules of thumb may reduce un-
+certainty in an indirect manner, but when such procedures
+terminate, no direct evidence can be provided of the regret
+of playing equilibria of the empirical game in the true game.
+Furthermore, since these stopping rules are typically very
+coarse heuristics, they may actually require more sampling
+than is necessary to have suﬃcient conﬁdence that a proﬁle
+is an -Nash equilibrium of the true game. We propose in-
+corporating bootstrap conﬁdence intervals into a sequential
+equilibrium ﬁnding procedure as in the Conﬁdence-Interval-
+Based Equilibrium Finding (CIBEF) algorithm, presented
+in Algorithm 2.
+At each step, CIBEF requests x additional observations
+of each proﬁle and ﬁnds equilibria of the updated empirical
+game. For each equilibrium of the empirical game, a one-
+sided regret conﬁdence interval at the γ-level is constructed,
+2For all experiments we present, one-sided-regret-CI and
+two-sided-regret-CI implement the conﬁdence interval
+methods described in Section 3.1.
+
+Algorithm 2 Conﬁdence-Interval-Based Equilibrium Find-
+ing (, γ, x)
+Require: , the acceptable approximation threshold
+Require: γ, the conﬁdence level to use
+Require: x, the number of observations to take of each
+proﬁle in each step
+Θseq ← {}
+E ← {}
+while E = {} do
+Append x observations of each proﬁle to Θseq
+for σ ∈ Equilibria(Θseq) do
+if one-sided-regret-CI(σ, Θseq, γ) ≤  then
+Append σ to E
+end if
+end for
+end while
+return E
+and if the right-hand side of this interval is not greater than
+, the proﬁle is appended to the set of equilibria. When
+one or more equilibria of the empirical game meet this cri-
+terion, sampling is terminated and the candidates meeting
+the criterion are returned.
+4. EXPERIMENTS
+4.1 Regret Bootstrap Experiments
+For our bootstrap regret conﬁdence intervals to be useful,
+we need to show that they are well-calibrated. We hypoth-
+esize that the 95th percentile of the sample-game bootstrap
+distribution of the regret of a candidate equilibrium pro-
+vides an accurate 95% conﬁdence bound for the true-game
+regret of that candidate. We are not aware of suﬃcient the-
+oretical foundations to prove this hypothesis, so we test it
+experimentally.
+4.1.1 Experimental Setup
+Our hypothesis yields several testable predictions: most
+importantly, the conﬁdence bound should be well-calibrated,
+namely the true-game regret of an equilibrium candidate
+should fall below the 95th percentile of the bootstrap dis-
+tribution 95% of the time. We would also expect the other
+quantiles of the bootstrap distribution to be well-calibrated.
+In addition, conﬁdence bounds should grow tighter as data
+is acquired, so the 95th percentile of the bootstrap distri-
+bution should shrink as the number of payoﬀ observations
+grows. We also expect conﬁdence bounds to be wider when
+data are more noisy, so the 95th percentile should grow as
+the variance of payoﬀ samples grows.
+We test these hypotheses by artiﬁcially generating true
+games and drawing samples from known noise distributions
+centered around each true game payoﬀ. We then compute
+pure-strategy Nash equilibria and symmetric mixed-strategy
+Nash equilibria in the resulting empirical games3, and use
+our bootstrap method to estimate the distribution of each
+candidate equilibrium’s regret. These bootstrap estimates
+estimates are compared against the true-game regrets of the
+equilibrium candidates. Across a large number of randomly
+generated true games, our hypothesis predicts that k% of
+3In all of our experiments, mixed-strategy equilibria are
+computed using replicator dynamics [9].
+Game, Noise
+z¯ = 100
+uSym, normal
+uSym, normal
+uSym, bimodal
+Size .95 Frac.
+pure
+10
+100
+10
+uSym, bimodal 100
+Cgst, normal
+10
+Cgst, normal
+CredNet, agg.
+CredNet, agg.
+100
+10
+100
+0.924
+0.947
+0.949
+0.935
+0.928
+0.972
+0.981
+0.971
+.95  .95 Frac.
+pure mixed
+34.4
+1.5
+71.6
+13.5
+20.6
+0
+1.51
+0
+0.951
+0.955
+0.957
+0.949
+0.966
+0.941
+0.997
+0.927
+.95 
+mixed
+25.9
+6.3
+50.1
+12.7
+18.1
+1.8
+1.04
+0.23
+Table 1: Bootstrap conﬁdence intervals for regret.
+true-game regret values will fall below the kth percentile
+of the empirical game’s bootstrap regret distribution, espe-
+cially when k = 95.
+Our experiments employ two classes of synthetic games:
+uniform symmetric games (uSym) and congestion games
+(Cgst), as well as one class of simulated game: credit net-
+work games (CredNet). To generate a true game from the
+uSym class, we draw a value from the distribution U[0, 100]
+for each unique payoﬀ in a symmetric game with p ∈ {2, 4}
+players and s ∈ {2, 4, 6} strategies. All results presented
+here use uSym games with 4 players and 4 strategies; re-
+sults for other combinations of players and strategies are
+similar. To generate a true game from the Cgst class, we
+use 5 players and 3 strategies; each strategy s has a base
+value vb(s) ∼ U[0, 3], a linear congestion cost vl(s) ∼ U[0, 1],
+and a quadratic congestion cost vq(s) ∼ [0, 1]. The pay-
+oﬀ to a player choosing strategy s is a function of the to-
+tal number n(s) of players choosing that strategy: u(s) =
+vb(s) − vl(s)n(s) − vq(s)(n(s))2. CredNet games are gener-
+ated based on data from a simulator described by Dandekar,
+et al. [6]. In our initial experiments, we generated a Cred-
+Net game with 6 players, 6 strategies, and 2644 samples of
+each payoﬀ, but found that it had particularly high vari-
+ance; therefore we also generated a second data set with
+the same players and strategies called CredNet agg., where
+each of 1000 samples comes from 20 pre-aggregated runs of
+the simulator. The true game in our CredNet experiments
+is always the empirical game constructed using the full set
+of samples. To facilitate comparison of regret values across
+classes, we applied an aﬃne transformation to rescale each
+uSym and Cgst payoﬀ matrix to match range [0, 100], which
+closely matches the payoﬀ range of the CredNet true game.
+Given a true game from the uSym or Cgst classes, we
+created noisy samples of each payoﬀ by drawing from a
+known distribution centered at the true-game payoﬀ and
+constructed empirical games from these sample sets. For
+Cgst, we added only normally distributed noise, but across
+uSym experiments we varied the noise distribution among
+normal, uniform, bimodal Gaussian mixture, and Gumbel.
+For both synthetic game classes, we varied the maximum-
+width parameter ¯z ∈ {0.1, 1, 10, 100} over four orders of
+magnitude. For all experiments, we drew z ∼ U[0, ¯z] in-
+dependently for every true-game payoﬀ. For normally dis-
+tributed noise, observations of each payoﬀ are drawn from a
+normal distribution with variance z; for bimodal Gaussian,
+the z parameter controls the variance of the two Gaussians,
+which are spread apart by a random draw from N(0, ¯z); for
+uniform noise, z is equal to the half-width of the distribu-
+tion; for Gumbel noise, z is the scale parameter. We also
+tested drawing noise from diﬀerent models for diﬀerent pay-
+oﬀs in the same game, and found similar results (not shown).
+
+1.0
+σ ∼100.0
+0.8
+0.6
+0.4
+0.2
+0.0
+perfect calibration
+5 samples
+10 samples
+20 samples
+50 samples
+100 samples
+200 samples
+500 samples
+0
+20
+40
+60
+80
+bootstrap regret distribution percentile
+Figure 1: Bootstrap distribution calibration relative
+to the true game regret distribution in uSym games.
+To create each sample game for the CredNet class, we se-
+lected a subsample without replacement out of the full set
+of simulator observations.
+4.1.2 Experimental Results
+For each combination of synthetic game class, number of
+players/strategies, and noise model, we generated 1000 true
+games. For each synthetic and simulated true game, we gen-
+erated empirical games with sample sizes ranging from 5 to
+500, and in each empirical game, we computed pure- and
+mixed-strategy Nash equilibria. We then computed boot-
+strap distributions for the regret of each equilibrium, which
+we compared to that equilibrium’s true-game regret. Table 1
+shows, in the “.95 Frac.” columns, the fraction of true-game
+regrets that fell below the 95th percentile of the bootstrap
+distribution for a subset of game settings, noise models, and
+sample sizes. The data indicates that the 95th percentile of
+the regret bootstrap distribution provides a well-calibrated
+95% conﬁdence interval for true-game regret of equilibria
+computed in empirical games, especially in our synthetic
+games. Note that the 95th percentile of regret is sometimes
+very high, demonstrating the danger of reporting empirical
+game equilibria without statistical testing.
+Table 1 also helps to support some of our secondary hy-
+potheses: the “.95 ” columns show the regret threshold
+growing tighter as the bootstrap gets more samples. Ad-
+ditional data (not shown) also demonstrates that the boot-
+strap conﬁdence intervals are wider when variance is higher.
+Results for the other synthetic games, other noise magni-
+tudes, and other numbers of samples are broadly similar.
+While Table 1 shows good calibration for the 95% boot-
+strap conﬁdence bound, we would hope that the whole boot-
+strap regret distribution, and not just the 95th percentile is
+well-calibrated. Figure 1 shows that for 4-player, 4-strategy
+uSym games with normal noise this is indeed the case: each
+curve shows the cumulative fractions of empirical game equi-
+libria for which the true-game regret fell below each succes-
+sive percentile of the bootstrap distribution. Because the
+curves closely track the 45◦ line, we conclude that on average
+the shape of the bootstrap distribution closely matches that
+of the sampling distribution for regret. Such plots for other
+synthetic games (not shown) appear similar: except with
+very small sample sizes or noise that completely swamps
+payoﬀ variation (we ran one experiment with ¯z = 1000), cal-
+100
+ibration is consistently good. In our CredNet experiments,
+on the other hand, the cumulative fraction curves do not
+match the 45◦ line as closely and do not improve as much
+as the sample set grows. It is possible that this happens
+because we have only one true game for the CredNet class,
+from which each empirical game is a subsample. Unfortu-
+nately, within a reasonable sampling budget, we have no way
+to test this possibility. We show in Section 4.2.2 that we can
+still use the regret conﬁdence interval from the bootstrap to
+make reasonable sampling decisions in CredNet games.
+4.2 Bootstrap in Sample Control
+Frequently, rules of thumb are used to decide when to
+terminate sampling in iterative applications of EGTA, such
+as sampling until the uncertainty in payoﬀ estimates is be-
+low some threshold; however, the theoretical underpinnings
+of the bootstrap assume a ﬁxed-sample statistical experi-
+ment, and as such may not deliver reliable inference when
+applied to EGTA applications where the sampling process
+is terminated based upon a feature of the gathered data. To
+empirically evaluate the usefulness of bootstrapping regret
+for iterative EGTA approaches, including its use in sam-
+ple control, we conduct two sets of experiments. In the
+ﬁrst set of experiments, we evaluate the accuracy of using
+bootstrapped regret conﬁdence intervals to decide whether a
+mixed-strategy proﬁle is an approximate equilibrium in the
+algorithm CIBSR. In the second set, we test the accuracy of
+bootstrapped regret conﬁdence intervals at the termination
+of sampling with CIBEF and two commonly-applied rules of
+thumb to determine (i) whether the bootstrap approach is
+reliable when working with sequentially gathered data and
+(ii) whether CIBEF provides any reduction in sample costs
+or expected regret of candidate proﬁles when compared to
+existing rules of thumb.
+4.2.1 Labeling Equilibria
+To test the eﬃcacy of CIBSR at labeling proﬁles as either
+-Nash equilibria (hereafter referred to as Eq) or not (here-
+after referred to as Not-Eq), we measure the frequencies at
+which the algorithm correctly labels candidate proﬁles from
+synthetic or simulated game data, as in Section 4.1. For each
+game type considered, 1000 trials were run, where each trial
+consisted of labeling a single candidate proﬁle, which may be
+either Eq or Not-Eq with respect to the true game. Similar
+to the experiments in Section 4.1, for synthetic games, each
+trial corresponds to a diﬀerent randomly generated game,
+while a trial with simulation game data corresponds to a
+diﬀerent random ordering of observations of a ﬁxed data
+set, due to the cost of gathering additional simulation data.
+This means that for the simulated game trials, the set of ap-
+proximate equilibria of the true game remains ﬁxed across
+trials.
+Selecting proﬁles randomly for evaluation would be an in-
+suﬃciently stringent test for the algorithm, since Not-Eq
+proﬁles with high regret can be labeled with conﬁdence with
+very few observations. Furthermore, such proﬁles would not
+merit application of statistical tools in practice, as a mixed-
+strategy proﬁle is typically only of interest if it is believed
+to be a close approximation of equilibrium. We therefore
+construct candidate proﬁles by taking a small number of
+observations of each proﬁle and computing an equilibrium
+of the current empirical game. These observations are then
+passed to the algorithm as Θinit. With this procedure we are
+cumulative fraction of true game regrets
+
+able to generate candidate proﬁles of either type, and Not-
+Eq instances will frequently be low regret, making correct
+labeling appropriately diﬃcult.
+For the synthetic games, candidates are selected after tak-
+ing 5 observations of each proﬁle. On each trial the algo-
+rithm is parameterized with a regret threshold  = 0.05 and
+step size of x = 5 observations. Each trial also has an obser-
+vation cap of 1000 observations per proﬁle, at which point,
+if the algorithm has not terminated, it labels the point as Eq
+if the median of the bootstrap distribution is below . For
+the credit network simulator, we explored both the unag-
+gregated and aggregated data sets described in Section 4.1.
+Due to relatively high level of noise in the credit network
+data, candidates were chosen after 100 observations for the
+unaggregated data, and after 5 observations for the aggre-
+gated data.4 Similarly, the algorithm is parameterized with
+x = 100 for the unaggregated data and x = 5 for the ag-
+gregated data, with observation caps set at the size of the
+full data set, 2644 and 1000 respectively. Experiments on
+these games were conducted for  ∈ 0.05, 0.2, 0.5, as diﬀer-
+ent settings of  lead to a diﬀerent distribution of Eq and
+Not-Eq instances, and potentially change the diﬃculty of
+correct labeling. For all experiments presented here, the al-
+gorithm is parameterized with γ = 0.95. As the algorithm
+uses a two-sided γ-conﬁdence interval and the ﬁnal decision
+only depends on one of the boundaries of the interval, the
+algorithm terminates with a conﬁdence level of 0.975.
+Table 2 presents selected ﬁndings from these experiments.
+With the exception CredNet instances which use simula-
+tion data, all experiments reported here used normally dis-
+tributed noise, with standard deviation given by σ in the
+table, to generate payoﬀ observations. As in the prior exper-
+iments, for synthetic games σ ∈ {0.1, 1, 10, 100} were eval-
+uated, but only σ = 1 and σ = 100 are presented due to
+the similarity of the results. “Inst. Type” speciﬁes whether
+the row refers to instances where the ground truth is Eq or
+Not-Eq. “#” speciﬁes the number of instances out of the
+1000 trials that were of the named type, while “Und. #”
+gives the number of trails for that type where the algorithm
+was undecided after reaching the observation cap imposed
+in the experiment. “Accuracy” lists ﬁrst the fraction of la-
+belings that were correct for the trials where the algorithm
+terminated with a conﬁdent decision, and second the frac-
+tion correct when the algorithm was forced to decide at the
+observation cap. “Agg. Acc.” speciﬁes the the fraction of
+labelings that were correct across all 1000 trials, including
+both Eq and Not-Eq instances.
+Despite our speciﬁc choice of instances that were diﬃcult
+to correctly label, CIBSR using the bootstrap method to
+construct conﬁdence intervals delivered high levels of accu-
+racy across all game types and parameter settings, with the
+lowest accuracy observed over a full set of trials being 0.922.
+On synthetic data, CIBSR delivered accuracy of at least 0.97
+across all games and instance types. The credit network data
+proved more diﬃcult, and despite overall high levels of accu-
+racy, accuracy varied considerably between experiments and
+instance types. In particular, low regret thresholds made the
+algorithm less likely to label candidates as equilibria; this is
+reﬂected in the high accuracy for Non-Eq, low accuracy for
+Eq instances, and higher incidence of inconclusive results
+4Since each aggregated observation averages 20 observa-
+tions, the candidate proﬁles for both experiments are con-
+structed after the same number of simulations.
+Game
+
+Inst. # Und. Acc- Agg.
+Type
+# uracy Acc.
+uSym .05 Eq 624
+Not 376
+σ = 1
+σ = 100
+uSym .05 Eq 240
+Not 760
+Cgst
+σ = 1
+Cgst
+σ = 100
+.05 Eq 911
+Not
+89
+.05 Eq 610
+Not 390
+CredNet .05 Eq
+96
+22
+21
+7
+11
+6
+1
+4
+6
+84
+Not 904 250
+CredNet .2
+CredNet .5
+CredNet,
+agg.
+CredNet,
+agg.
+CredNet,
+agg.
+.99, .77 .978
+.98, .76
+.97, 1
+.972
+.98 .36
+1, .67
+.98, 1
+.99, .25 .984
+.98, .83
+0, .83
+1, 1
+.974
+Eq 642 558 .75, .90 .922
+Not 358 152
+1, .99
+Eq 910 512 .99, .99 .985
+Not
+90
+56
+.91, 1
+.05 Eq 428 122 .86, .98 .953
+Not 572
+64
+.99, 1
+.2
+.5
+Eq 774 156 .96, .95 .965
+Not 226
+18
+Eq 997 128
+Not
+3
+1
+.98, 1
+.98, 1
+1, 1
+.983
+Table 2: Sequential classiﬁcation performance.
+for Eq instances. The observation that the entire data set
+for the credit network game was frequently insuﬃcient to
+have high conﬁdence in declaring that a candidate proﬁle
+was an -equilibrium reaﬃrms the diﬃculty of working with
+the CredNet data set.
+4.2.2 Sequential Equilibria Finding
+The previous experiment demonstrated that the bootstrap
+method of constructing conﬁdence intervals can successfully
+be used as terminating condition for a sequential statistical
+experiment without drastically biasing inferences drawn at
+the conclusion of the experiment. In contrast to the rules
+of thumb typically used to terminate iterative applications
+of EGTA, using a conﬁdence-interval-based stopping rule
+yields statements about the likely values of the underly-
+ing regret; however, nothing precludes using the bootstrap
+method to estimate the regret distribution at the conclu-
+sion of an application of EGTA that used a rule of thumb
+to determine when to terminate sampling. In this section
+we conduct an experiment to evaluate the accuracy of the
+bootstrap method applied to the conclusion of sampling us-
+ing two common rules of thumb, as well as CIBEF. Further-
+more, we compare the performance of these rules in terms
+of average regret and number of observations requested.
+The ﬁrst rule of thumb considered is to cease sampling
+when all relevant payoﬀ estimates demonstrate low variabil-
+ity; speciﬁcally, the stopping rule labeled SEM will request
+x further observations be made of each proﬁle in each step
+until the estimated standard error in mean of each payoﬀ
+is below a speciﬁed threshold ξ. The intuition behind this
+stopping rule is that reliable estimates of payoﬀs should lead
+to reliable inferences about the true game. The second rule
+we consider ceases sampling when the set of equilibria of
+the empirical game does not change with additional obser-
+vations. This stopping rule, labeled EQC (for equilibrium
+comparison), will request x further observations be made
+for each proﬁle until the sets of empirical game equilibria
+found in successive steps are equivalent. Distributions used
+.995
+
+Game
+uSym
+σ = 1
+uSym
+σ = 100
+Cgst
+σ = 1
+Cgst
+σ = 100
+Rule Mean Mean Median .95
+Obs. Regret Regret Frac.
+EQC 17.07
+SEM
+5.02
+CIBEF 5.08
+EQC 78.66
+SEM 1000.0
+CIBEF 94.10
+EQC 10.04
+SEM
+5.01
+CIBEF 5.01
+EQC 20.06
+.0807
+.0073
+.0081
+2.641
+.5176
+.0107
+.0014
+.0018
+.6669
+.1168
+.9257 1.98e–6
+.0006 1.15e–7
+2.26e–7
+.009
+.008
+.89
+2.31e–7
+1.44e–6
+SEM 1000.00 .0771 2.71e–6
+CIBEF 26.94
+.1703 1.58e–6
+CredNet, EQC 66.71
+SEM 116.05
+agg.
+CIBEF 11.10
+.0468 1.03e–7
+.0386 1.96e–7
+.0295 1.70e–7
+Table 3: Stopping rule performance.
+in mixed-strategy equilibria are considered to be equivalent
+if their Euclidean distance is below some threshold ∆. Both
+rules of thumb prescribe a stopping point at which equilibria
+of the empirical game are considered approximate equilibria
+of the true game, but provide no guarantee that the proﬁles
+that they identify are -equilibria for any particular .
+In this experiment, a trial consists of the speciﬁed algo-
+rithm requesting observations from a synthetic or simulation-
+based game model until its stopping condition is triggered
+or an observation cap is reached, at which point it returns
+one or more equilibrium candidates. If the observation cap
+is reached, CIBEF returns the equilibrium of the empiri-
+cal game with the lowest right-hand one-sided conﬁdence
+bound, while SEM and EQC return all equilibria of the em-
+pirical game. For each candidate we record the regret of each
+candidate proﬁle in the true game, as well as the number of
+observations taken of each proﬁle prior to terminating the
+sampling procedure.5 For each game model and algorithm,
+we ran 1000 trials, with each trial corresponding to a new
+random game for the synthetic game data, and new random
+reordering of the data for the simulated game data. In addi-
+tion to metrics about the number of observations and regret
+of the selected proﬁles, we measure the average fraction of
+regret of the true games captured by the 95th-percentiles of
+bootstrapped regret distributions calculated at the termi-
+nation of each trial, similar to Section 4.1. This measure
+gives an indication of the accuracy of using the bootstrap
+approach to give a conﬁdence interval at the termination of
+sampling, when sampling is guided by these sample control
+algorithms.
+Table 3 shows selected results from these experiments.
+“Mean Obs.” refers to the average number of observations
+taken of each proﬁle when the algorithm terminated. All
+trials were conducted with the same step sizes and observa-
+tion caps as in Section 4.2.1. For the SEM stopping rule,
+the threshold ξ was set to 1.0, while for the EQC rule, a
+distance less than ∆ = 0.01 was considered suﬃcient to call
+two equilibrium candidates identical. For all experiments
+conducted with the CIBEF stopping rule,  was set to 0.5
+and γ was set to 0.95.
+These results emphasize the general applicability of the
+5All algorithms considered here sample evenly from all pro-
+ﬁles in a game’s proﬁle space, so “10 observations” refers to
+10 observations taken of every value in the payoﬀ matrix.
+.94
+.90
+.90
+.96
+.96
+.90
+.92
+.89
+.90
+.98
+.94
+.97
+.98
+.95
+.99
+bootstrap method of generating conﬁdence intervals, even
+for sequential sampling experiments. The only experiments
+that resulted in substantial overconﬁdence on average, that
+is experiments in which the fraction of true game regrets
+captured by 95th percentile of the bootstrap regret distribu-
+tion is less than 95%, were those settings in which sampling
+typically halted at the ﬁrst opportunity. This outcome mir-
+rors the results from Section 4.1, where we noted that for
+very small numbers of observations, the bootstrap method
+could be poorly calibrated. In contrast, some combinations
+of game models and stopping rules led to overly large conﬁ-
+dence intervals, with greater than 95% of true game regrets
+being captured by the conﬁdence interval method. In such
+cases the bootstrap method may be conservative in declar-
+ing candidates as equilibria, occasionally ruling out more
+proﬁle candidates than is warranted by the expressed conﬁ-
+dence level; however, using CIBEF an equilibrium meeting
+the conﬁdence requirements will eventually be found.
+In comparing the equilibrium-ﬁnding characteristics of the
+three stopping rules, our experiments show that CIBEF is
+typically comparable to and often an improvement over ex-
+isting rules of thumb. For every game model considered,
+the median regret of the proﬁles returned by CIBEF was
+considerably below the approximation threshold of  = 0.5.
+Similarly, the mean regret was below the threshold for all
+but the uniform symmetric game model with the highest
+variance. Our data suggests that in most scenarios when
+CIBEF misidentiﬁes a proﬁle as an approximate Nash equi-
+librium it is still likely to have regret close to the thresh-
+old, but for high noise settings, proﬁles that are incorrectly
+returned may have signiﬁcant regret. EQC nearly always
+yielded higher regret proﬁles than CIBEF, and performed
+particularly poorly in the synthetic game models with high
+variance. SEM frequently performed at the same level or
+better than CIBEF in terms of regret, but almost always
+terminated either immediately or at the observation cap. In
+terms of the number of observations taken prior to stopping,
+CIBEF was similar to SEM for low noise settings, but re-
+quired many fewer observations for high noise settings. In
+contrast, CIBEF required fewer observations than EQC in
+low noise settings, in part due to EQC requiring two sam-
+pling steps prior to terminating, but required slightly more
+samples in noisier settings.
+CIBEF outperformed EQC and SEM in terms of mean
+regret of returned candidates and the average number of ob-
+servations taken prior to stopping on the aggregated credit
+network data. All rules performed excellently in terms of
+median regret, meaning that either CIBEF returned fewer
+non-equilibrium candidates or that the non-equilibrium can-
+didates that it returned were closer approximations to equi-
+librium than the other two stopping rules. Here, CIBEF may
+beneﬁt from often returning one candidate that is highly
+likely to be an equilibrium, rather than returning multiple
+candidates that may vary greatly in how well they approxi-
+mate equilibria, as in EQC or SEM. As such, CIBEF can de-
+liver signiﬁcant savings in terms of sampling costs when ﬁnd-
+ing only one equilibrium is acceptable. We were, however,
+unable to present results for the credit network game with
+unaggregated data, as this experiment proved too costly,
+particularly for CIBEF, as it must ﬁnd equilibria and cal-
+culate conﬁdence intervals for them in every sampling step.
+Though a potential detriment to CIBEF, in real applica-
+tions of EGTA the cost of sampling will typically outweigh
+
+the cost of calculating conﬁdence intervals, thus making the
+overhead of using CIBEF over EQC negligible.
+5. CONCLUSION
+Our experimental evidence demonstrates that the boot-
+strap method of conﬁdence interval generation is approxi-
+mately accurate for bounding the true-game regret of can-
+didate equilibria in empirical games. Despite possible re-
+peated testing concerns, our bootstrap method also proves
+approximately accurate in constructing conﬁdence intervals
+on regret at the conclusion of sequential sampling proce-
+dures. Accuracy is lower in our experiments on credit net-
+work games than on randomly-generated games, but we be-
+lieve that our the random game experiments may be more
+representative of EGTA in practice, due to limitations of
+conducting experiments with costly simulation data. Be-
+cause our experiments show bootstrap conﬁdence intervals
+to be accurate across multiple synthetic game classes, as
+well as across noise distributions and magnitudes, we rec-
+ommend that practitioners of empirical game theory employ
+bootstrap methods to give regret bounds for reported equi-
+libria. This recommendation stands even if bootstrap regret
+estimates are used to determine when to conclude sampling.
+In addition, we provide evidence that the Conﬁdence-
+Interval-Based Equilibrium Finding algorithm improves over
+previous EGTA experiment designs. Relative to rules of
+thumb for sample control, CIBEF can more consistently
+identify low regret equilibrium candidates, and often re-
+quires fewer observations. However, in games with particu-
+larly noisy payoﬀs, where misclassiﬁcations can be particu-
+larly egregious in terms of regret, we recommend that prac-
+titioners err on the side of caution and collect extra obser-
+vations. Given the savings in observations CIBEF demon-
+strated, we believe that using bootstrapped conﬁdence in-
+tervals on regret is a promising tool for sample control in
+this domain.
+This work constitutes a ﬁrst systematic eﬀort to develop
+practical statistical methods for EGTA; future work could
+focus on developing theoretical foundations of applying the
+bootstrap to empirical games, and characterizing games for
+which the bootstrap approach is reliable. Additionally, there
+are other measures of interest to EGTA practitioners, such
+as social welfare, that may also beneﬁt from using the boot-
+strap for statistical analysis. Other avenues of research in-
+clude evaluating diﬀerent bootstrap designs, and using in-
+formation obtained through the bootstrap to guide more
+sophisticated sampling, such as proﬁle exploration [13].
+6. REFERENCES
+[1] R. Axtell, R. Axelrod, J. M. Epstein, and M. D.
+Cohen. Aligning simulation models: A case study and
+results. Computational and Mathematical Organization
+Theory, 1(2):123–141, 1996.
+[2] T. Baarslag, K. Fujita, E. H. Gerding, K. Hindriks,
+T. Ito, N. R. Jennings, C. Jonker, S. Kraus, R. Lin,
+V. Robu, and C. R. Williams. Evaluating practical
+negotiating agents: Results and analysis of the 2011
+international competition. Artiﬁcial Intelligence,
+198:73–103, 2013.
+[3] R. Bender and S. Lange. Adjusting for multiple
+testing: When and how? Journal of Clinical
+Epidemiology, 54(4):343–349, 2001.
+[4] T. F. Bresnahan and P. C. Reiss. Empirical models of
+discrete games. Journal of Econometrics,
+48(1-2):57–81, 1991.
+[5] B.-A. Cassell and M. P. Wellman. Asset pricing under
+ambiguous information: An empirical game-theoretic
+analysis. Computational and Mathematical
+Organization Theory, 18(4):445–462, 2012.
+[6] P. Dandekar, A. Goel, M. P. Wellman, and
+B. Wiedenbeck. Strategic formation of credit
+networks. In 21st international conference on World
+Wide Web, pages 559–568, 2012.
+[7] A. C. Davison and D. V. Hinkley. Bootstrap Methods
+and their Application. Cambridge University Press,
+1997.
+[8] L. W. Friedman and H. H. Friedman. Analyzing
+simulation output using the bootstrap method.
+Simulation, 64(2):95–100, 1995.
+[9] D. Fudenberg and D. K. Levine. The Theory of
+Learning in Games. MIT Press, 1998.
+[10] X. A. Gao and A. Pfeﬀer. Learning game
+representations from data using rationality
+constraints. In 26th Conference on Uncertainty in
+Artiﬁcal Intelligence, pages 185–192, Catalina Island,
+CA, 2010.
+[11] C. Jennison and B. W. Turnbull. Repeated conﬁdence
+intervals for group sequential clinical trials. Controlled
+Clinical Trials, 5(1):33–45, 1984.
+[12] P. R. Jordan, C. Kiekintveld, and M. P. Wellman.
+Empirical game-theoretic analysis of the TAC supply
+chain game. In Sixth International Joint Conference
+on Autonomous Agents and Multi-Agent Systems,
+pages 1188–1195, Honolulu, Hawaii, 2007.
+[13] P. R. Jordan, Y. Vorobeychik, and M. P. Wellman.
+Searching for approximate equilibria in empirical
+games. In Seventh International Conference on
+Autonomous Agents and Multi-Agent Systems, pages
+1063–1070, Estoril, Portugal, 2008.
+[14] S. Phelps, P. McBurney, and S. Parsons. A novel
+method for automatic strategy acquisition and its
+application to a double-auction market game. IEEE
+Transactions on Systems, Man, and Cybernetics: Part
+B, 40:668–674, 2010.
+[15] D. M. Reeves. Generating Trading Agent Strategies:
+Analytic and Empirical Methods for Inﬁnite and Large
+Games. PhD thesis, University of Michigan, 2005.
+[16] Y. Vorobeychik. Probabilistic analysis of
+simulation-based games. ACMTransactions on
+Modeling and Computer Simulation, 20(3), September
+2010.
+[17] M. P. Wellman. Methods for empirical game-theoretic
+analysis. In 21st National Conference on Artiﬁcial
+Intelligence, pages 1552–1555, Boston, Massachusetts,
+2006.
+[18] M. P. Wellman, A. Osepayshvili, J. K. MacKie-Mason,
+and D. M. Reeves. Bidding strategies for simultaneous
+ascending auctions. B. E. Journal of Theoretical
+Economics (Topics), 8(1), 2008.
