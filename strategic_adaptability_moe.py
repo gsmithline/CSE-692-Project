@@ -18,6 +18,7 @@ from collections import defaultdict
 import time
 from datetime import timedelta
 from torch.optim import *
+import torch.optim.lr_scheduler as lr_scheduler
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -45,7 +46,7 @@ REASONING_STYLES = {
         "sonnet_3.7_reasoning"
     ],
     "non_reasoning": [
-        # This will catch all other models by default
+       
     ]
 }
 
@@ -92,29 +93,23 @@ class ExploitabilityExpert(GNNExpert):
         super().__init__(num_node_features, hidden_channels)
         self.name = "Exploitability"
         
-        # Add specific layers for exploitability patterns
         self.exploit_specific = nn.Linear(hidden_channels, hidden_channels)
         self.exploit_norm = nn.LayerNorm(hidden_channels)
     
     def forward(self, x, edge_index, edge_attr):
-        # Process edge attributes to get scalar weights
         edge_weight = self.edge_nn(edge_attr).view(-1)
         
-        # Process through GNN layers with scalar edge weights
         x = self.conv1(x, edge_index, edge_weight=edge_weight)
         x = F.relu(x)
         x = F.dropout(x, p=0.1, training=self.training)
         
-        # Exploitability-specific processing
         x = self.exploit_specific(x)
         x = self.exploit_norm(x)
         x = F.relu(x)
         
-        # Second convolutional layer
         x = self.conv2(x, edge_index, edge_weight=edge_weight)
         x = F.relu(x)
         
-        # Global pooling and score
         batch = torch.zeros(x.size(0), dtype=torch.long, device=x.device)
         x = self.global_pool(x, batch)
         score = self.score(x)
@@ -603,32 +598,27 @@ def train_moe_model(graph_data, reasoning_styles, num_epochs=100, lr=0.001):
     train_mask[train_idx] = True
     val_mask[~train_mask] = True
     
-    # Create target based on reasoning style
     # reasoning = 1, non_reasoning = 0
     y = torch.zeros(num_nodes, 1)
     for i, agent in enumerate(graph_data.agent_names):
-        # Add a fallback for agents not in reasoning_styles
         if agent in reasoning_styles:
             style = reasoning_styles[agent]
         else:
-            # Determine style based on name patterns
             if any(pattern in agent for pattern in REASONING_STYLES["reasoning"]):
                 style = "reasoning"
             else:
                 style = "non_reasoning"
-            # Add to the dictionary for future use
             reasoning_styles[agent] = style
             print(f"Added missing agent {agent} with style {style}")
             
         if style == "reasoning":
             y[i] = 1.0
     
-    # Create model
     model = MixtureOfExpertsGNN(graph_data.x.shape[1])
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    scheduler = lr_scheduler.StepLR(optimizer=optimizer, step_size=5, gamma=.01)
     criterion = nn.BCEWithLogitsLoss()
     
-    # Training loop with tqdm
     model.train()
     progress_bar = tqdm(range(num_epochs), desc="Training epochs")
     for epoch in progress_bar:
@@ -640,8 +630,8 @@ def train_moe_model(graph_data, reasoning_styles, num_epochs=100, lr=0.001):
         loss = criterion(combined_score[train_mask], y[train_mask])
         loss.backward()
         optimizer.step()
+        scheduler.step()
         
-        # Validation
         if epoch % 10 == 0:
             model.eval()
             with torch.no_grad():
@@ -650,7 +640,6 @@ def train_moe_model(graph_data, reasoning_styles, num_epochs=100, lr=0.001):
                 )
                 val_loss = criterion(val_score[val_mask], y[val_mask])
                 
-                # Convert scores to binary predictions
                 train_preds = (torch.sigmoid(combined_score[train_mask]) > 0.5).float()
                 train_acc = (train_preds == y[train_mask]).float().mean()
                 
@@ -671,13 +660,11 @@ def evaluate_strategic_adaptability(model, graph_data, reasoning_styles, perform
     """Evaluate strategic adaptability and test hypothesis"""
     model.eval()
     
-    # Get model outputs
     with torch.no_grad():
         combined_score, expert_weights, expert_scores = model(
             graph_data.x, graph_data.edge_index, graph_data.edge_attr
         )
     
-    # Organize results by reasoning style
     results = {
         "reasoning": {
             "agents": [],
@@ -695,18 +682,15 @@ def evaluate_strategic_adaptability(model, graph_data, reasoning_styles, perform
         }
     }
     
-    # Group results by reasoning style
     for i, agent in enumerate(tqdm(graph_data.agent_names, desc="Evaluating agents")):
         style = reasoning_styles[agent]
         results[style]["agents"].append(agent)
         results[style]["combined_scores"].append(combined_score[i].item())
         
-        # Handle expert weights and scores - ensuring they're available for each agent
-        if i < expert_weights.shape[0]:  # Make sure index is in bounds
+        if i < expert_weights.shape[0]:  
             weights = expert_weights[i].detach().cpu().numpy()
             scores = expert_scores[i].detach().cpu().numpy()
         else:
-            # Use means if individual values aren't available
             weights = expert_weights.mean(dim=0).detach().cpu().numpy()
             scores = expert_scores.mean(dim=0).detach().cpu().numpy()
             
@@ -853,7 +837,7 @@ def load_or_create_bootstrap_results(performance_matrix):
         # Try to run the regular bootstrap analysis
         bootstrap_results, bootstrap_stats, _, ne_strategy_df = run_nash_analysis(
             performance_matrix,
-            num_bootstrap_samples=100,
+            num_bootstrap_samples=1000,
             confidence_level=0.95
         )
         return bootstrap_results, bootstrap_stats, ne_strategy_df
@@ -872,7 +856,6 @@ def load_or_create_bootstrap_results(performance_matrix):
         })
         bootstrap_stats.set_index('Agent', inplace=True)
         
-        # Create simplified bootstrap results dictionary
         bootstrap_results = {
             'ne_regret': [[0.01] * len(agents)] * 10,  # 10 bootstrap samples with dummy values
             'ne_strategy': [np.ones(len(agents)) / len(agents)] * 10,  # Uniform strategy
