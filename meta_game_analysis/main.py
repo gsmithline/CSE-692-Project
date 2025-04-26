@@ -563,13 +563,13 @@ def main():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run meta-game analysis on negotiation data.")
-    parser.add_argument("--input", default="crossplay/game_matrix_2", help="Input directory containing game data")
+    parser.add_argument("--input", default="crossplay/game_matrix_1", help="Input directory containing game data")
     parser.add_argument("--output", default="meta_game_analysis/results", help="Output directory for results")
-    parser.add_argument("--bootstrap", type=int, default=100, help="Number of bootstrap samples")
+    parser.add_argument("--bootstrap", type=int, default=10, help="Number of bootstrap samples")
     parser.add_argument("--confidence", type=float, default=0.95, help="Confidence level for intervals")
     parser.add_argument("--global-samples", type=int, default=1000, help="Number of samples for global max values")
     parser.add_argument("--raw-bootstrap", action="store_true", help="Use raw game data for non-parametric bootstrapping")
-    parser.add_argument("--discount", type=float, default=0.98, help="Discount factor (gamma) for utilities")
+    parser.add_argument("--discount", type=float, default=0.9, help="Discount factor (gamma) for utilities")
     
     args = parser.parse_args()
     

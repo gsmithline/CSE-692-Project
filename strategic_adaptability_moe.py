@@ -18,6 +18,7 @@ from collections import defaultdict
 import time
 from datetime import timedelta
 from torch.optim import *
+import torch.optim.lr_scheduler as lr_scheduler
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -45,7 +46,7 @@ REASONING_STYLES = {
         "sonnet_3.7_reasoning"
     ],
     "non_reasoning": [
-        # This will catch all other models by default
+       
     ]
 }
 
@@ -92,29 +93,23 @@ class ExploitabilityExpert(GNNExpert):
         super().__init__(num_node_features, hidden_channels)
         self.name = "Exploitability"
         
-        # Add specific layers for exploitability patterns
         self.exploit_specific = nn.Linear(hidden_channels, hidden_channels)
         self.exploit_norm = nn.LayerNorm(hidden_channels)
     
     def forward(self, x, edge_index, edge_attr):
-        # Process edge attributes to get scalar weights
         edge_weight = self.edge_nn(edge_attr).view(-1)
         
-        # Process through GNN layers with scalar edge weights
         x = self.conv1(x, edge_index, edge_weight=edge_weight)
         x = F.relu(x)
         x = F.dropout(x, p=0.1, training=self.training)
         
-        # Exploitability-specific processing
         x = self.exploit_specific(x)
         x = self.exploit_norm(x)
         x = F.relu(x)
         
-        # Second convolutional layer
         x = self.conv2(x, edge_index, edge_weight=edge_weight)
         x = F.relu(x)
         
-        # Global pooling and score
         batch = torch.zeros(x.size(0), dtype=torch.long, device=x.device)
         x = self.global_pool(x, batch)
         score = self.score(x)
@@ -591,152 +586,255 @@ def classify_agent_reasoning_style(agent_name):
     # Default to non-reasoning
     return "non_reasoning"
 
-def train_moe_model(graph_data, reasoning_styles, num_epochs=100, lr=0.001):
+
+def train_moe_model(graph_data, reasoning_styles, num_epochs=100, lr=0.001, train_idx=None, val_idx=None):
     """Train the MoE model using supervised learning"""
-    # Split data into train/val
     num_nodes = graph_data.x.shape[0]
-    train_mask = torch.zeros(num_nodes, dtype=torch.bool)
-    val_mask = torch.zeros(num_nodes, dtype=torch.bool)
-    
-    # Simple 80/20 split
-    train_idx = np.random.choice(num_nodes, int(0.8 * num_nodes), replace=False)
-    train_mask[train_idx] = True
-    val_mask[~train_mask] = True
-    
-    # Create target based on reasoning style
-    # reasoning = 1, non_reasoning = 0
-    y = torch.zeros(num_nodes, 1)
+
+
+    if train_idx is None or val_idx is None:
+        train_mask= torch.zeros(num_nodes, dtype=torch.bool)
+        val_mask = torch.zeros(num_nodes, dtype=torch.bool)
+        indices = np.arange(num_nodes)
+        np.random.shuffle(indices)
+        train_split_idx = int(.8 * num_nodes)
+
+        train_idx = indices[:train_split_idx]
+        val_idx = indices[train_split_idx:]
+        train_mask[train_idx] = True
+        val_mask[val_idx] = True
+    else: #use the mask that is provided
+        train_mask = torch.zeros(num_nodes, dtype=torch.bool)
+        val_mask = torch.zeros(num_nodes, dtype=torch.bool)
+        train_mask[train_idx] = True
+        val_mask[val_idx] = True
+
+    y = torch.zeros(num_nodes, 1, device=graph_data.x.device) # Ensure labels are on the correct device
     for i, agent in enumerate(graph_data.agent_names):
-        # Add a fallback for agents not in reasoning_styles
-        if agent in reasoning_styles:
-            style = reasoning_styles[agent]
-        else:
-            # Determine style based on name patterns
-            if any(pattern in agent for pattern in REASONING_STYLES["reasoning"]):
-                style = "reasoning"
-            else:
-                style = "non_reasoning"
-            # Add to the dictionary for future use
-            reasoning_styles[agent] = style
-            print(f"Added missing agent {agent} with style {style}")
-            
+        style = reasoning_styles.get(agent, classify_agent_reasoning_style(agent))
         if style == "reasoning":
             y[i] = 1.0
-    
-    # Create model
-    model = MixtureOfExpertsGNN(graph_data.x.shape[1])
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+    '''
+    just running on cpu
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    graph_data = graph_data.to(device)
+    y = y.to(device)
+    train_mask = train_mask.to(device)
+    val_mask = val_mask.to(device)
+    '''
+    device = "cpu"
+    model = MixtureOfExpertsGNN(graph_data.x.shape[1]).to(device=device)
+    model = MixtureOfExpertsGNN(graph_data.x.shape[1]).to(device) # Move model to device
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=5e-4) # Added weight decay
+    scheduler = lr_scheduler.StepLR(optimizer=optimizer, step_size=max(1, num_epochs // 10), gamma=0.5) # Adjusted scheduler
     criterion = nn.BCEWithLogitsLoss()
-    
-    # Training loop with tqdm
+
+    best_val_acc = 0
+    patience_counter = 0
+    patience = 20 # Early stopping patience
+
     model.train()
-    progress_bar = tqdm(range(num_epochs), desc="Training epochs")
+    progress_bar = tqdm(range(num_epochs), desc="Training epochs", leave=False)
+
     for epoch in progress_bar:
         optimizer.zero_grad()
         combined_score, expert_weights, expert_scores = model(
             graph_data.x, graph_data.edge_index, graph_data.edge_attr
         )
-        
+    
         loss = criterion(combined_score[train_mask], y[train_mask])
         loss.backward()
         optimizer.step()
-        
-        # Validation
-        if epoch % 10 == 0:
-            model.eval()
-            with torch.no_grad():
-                val_score, _, _ = model(
-                    graph_data.x, graph_data.edge_index, graph_data.edge_attr
-                )
-                val_loss = criterion(val_score[val_mask], y[val_mask])
-                
-                # Convert scores to binary predictions
-                train_preds = (torch.sigmoid(combined_score[train_mask]) > 0.5).float()
-                train_acc = (train_preds == y[train_mask]).float().mean()
-                
-                val_preds = (torch.sigmoid(val_score[val_mask]) > 0.5).float()
-                val_acc = (val_preds == y[val_mask]).float().mean()
-                
-                progress_bar.set_postfix({
+        scheduler.step()
+        model.eval()
+        with torch.no_grad():
+            val_score, _, _ = model(
+                graph_data.x, graph_data.edge_index, graph_data.edge_attr
+            )
+            val_loss = criterion(val_score[val_mask], y[val_mask])
+
+            train_preds = (torch.sigmoid(combined_score[train_mask]) > 0.5).float()
+            train_acc = (train_preds == y[train_mask]).float().mean()
+
+            val_preds = (torch.sigmoid(val_score[val_mask]) > 0.5).float()
+            val_acc = (val_preds == y[val_mask]).float().mean()
+
+            progress_bar.set_postfix({
                     'loss': f"{loss.item():.4f}",
                     'train_acc': f"{train_acc.item():.4f}",
                     'val_loss': f"{val_loss.item():.4f}",
                     'val_acc': f"{val_acc.item():.4f}"
-                })
-            model.train()
-    
-    return model
+            })
 
-def evaluate_strategic_adaptability(model, graph_data, reasoning_styles, performance_data):
-    """Evaluate strategic adaptability and test hypothesis"""
-    model.eval()
-    
-    # Get model outputs
-    with torch.no_grad():
-        combined_score, expert_weights, expert_scores = model(
-            graph_data.x, graph_data.edge_index, graph_data.edge_attr
-        )
-    
-    # Organize results by reasoning style
+                # Early stopping check
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
+                patience_counter = 0
+            else:
+                patience_counter += 1
+                if patience_counter >= patience:
+                    print(f"Early stopping at epoch {epoch+1}")
+                    break
+            model.train()
+    return model.cpu()
+
+
+def evaluate_ensemble_strategic_adaptability(models, graph_data, reasoning_styles, performance_data):
+    '''
+    here we evaluate the strategic adaptability usinfg the ensemble models
+    '''
+    num_models = len(models)
+    num_agents = len(graph_data.agent_names)
+    num_experts = len(models[0].experts) if num_models > 0 else 0
+
+    # Ensure graph data is on the correct device
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    graph_data = graph_data.to(device)
+
+    # Store cumulative results
+    all_combined_scores = torch.zeros(num_agents, 1, device=device)
+    all_expert_weights = torch.zeros(num_agents, num_experts, device=device)
+    all_expert_scores = torch.zeros(num_agents, num_experts, device=device)
+
+    for model in tqdm(models, desc="Evaluating Ensemble Models", leave=False):
+        model.to(device)
+        model.eval()
+        with torch.no_grad():
+            combined_score, expert_weights, expert_scores = model(
+                graph_data.x, graph_data.edge_index, graph_data.edge_attr
+            )
+            # Add results to cumulative sums
+            all_combined_scores += combined_score
+            all_expert_weights += expert_weights
+            all_expert_scores += expert_scores
+        model.cpu() # Move back to CPU
+       
+    avg_combined_scores = all_combined_scores / num_models
+    avg_expert_weights = all_expert_weights / num_models
+    avg_expert_scores = all_expert_scores / num_models
+
+    avg_combined_scores_np = avg_combined_scores.cpu().numpy()
+    avg_expert_weights_np = avg_expert_weights.cpu().numpy()
+    avg_expert_scores_np = avg_expert_scores.cpu().numpy()
+    probabilities = torch.sigmoid(avg_combined_scores).cpu().numpy()
+
     results = {
         "reasoning": {
-            "agents": [],
-            "combined_scores": [],
-            "expert_weights": [],
-            "expert_scores": [],
-            "performance": []
+            "agents": [], "combined_scores": [], "probabilities": [],
+            "expert_weights": [], "expert_scores": [], "performance": []
         },
         "non_reasoning": {
-            "agents": [],
-            "combined_scores": [],
-            "expert_weights": [],
-            "expert_scores": [],
-            "performance": []
+            "agents": [], "combined_scores": [], "probabilities": [],
+            "expert_weights": [], "expert_scores": [], "performance": []
         }
     }
-    
-    # Group results by reasoning style
-    for i, agent in enumerate(tqdm(graph_data.agent_names, desc="Evaluating agents")):
-        style = reasoning_styles[agent]
+
+    for i, agent in enumerate(graph_data.agent_names):
+        style = reasoning_styles.get(agent, classify_agent_reasoning_style(agent))
         results[style]["agents"].append(agent)
-        results[style]["combined_scores"].append(combined_score[i].item())
-        
-        # Handle expert weights and scores - ensuring they're available for each agent
-        if i < expert_weights.shape[0]:  # Make sure index is in bounds
-            weights = expert_weights[i].detach().cpu().numpy()
-            scores = expert_scores[i].detach().cpu().numpy()
+        results[style]["combined_scores"].append(avg_combined_scores_np[i].item())
+        results[style]["probabilities"].append(probabilities[i].item())
+        results[style]["expert_weights"].append(avg_expert_weights_np[i])
+        results[style]["expert_scores"].append(avg_expert_scores_np[i])
+        # Ensure performance_data uses cleaned agent names if necessary
+        cleaned_agent_name = get_display_name(agent) # Assuming get_display_name is available
+        results[style]["performance"].append(performance_data.get(cleaned_agent_name, 0))
+    
+    avg_performance = {}
+
+    for style, data in results.items(): #TODO mmake sure this is ok
+        valid_performances = [p for p in data["performance"] if isinstance(p, (int, float)) and not np.isnan(p)]
+        if valid_performances:
+            avg_performance[style] = np.mean(valid_performances)
         else:
-            # Use means if individual values aren't available
-            weights = expert_weights.mean(dim=0).detach().cpu().numpy()
-            scores = expert_scores.mean(dim=0).detach().cpu().numpy()
-            
-        results[style]["expert_weights"].append(weights)
-        results[style]["expert_scores"].append(scores)
-        results[style]["performance"].append(performance_data.get(agent, 0))
-    
-    # Calculate average performance by reasoning style
-    avg_performance = {
-        style: np.mean(data["performance"]) 
-        for style, data in results.items() 
-        if data["performance"]
-    }
-    
-    # Calculate performance improvement percentage
-    if avg_performance["non_reasoning"] > 0:
+             avg_performance[style] = 0
+
+    improvement_pct = 0
+    if "reasoning" in avg_performance and "non_reasoning" in avg_performance and avg_performance["non_reasoning"] > 0:
         improvement_pct = ((avg_performance["reasoning"] / avg_performance["non_reasoning"]) - 1) * 100
-    else:
-        improvement_pct = 0
-    
-    # Test if improvement is within hypothesized range (30-50%)
+
+    # Test if improvement is within hypothesized range (e.g., 30-50%)
     hypothesis_confirmed = 30 <= improvement_pct <= 50
-    
-    # Return results
+
     return {
         "results_by_style": results,
         "avg_performance": avg_performance,
         "improvement_pct": improvement_pct,
         "hypothesis_confirmed": hypothesis_confirmed
     }
+
+
+def analyze_ensemble_feature_importance(models, graph_data, criterion):
+    num_models = len(models)
+    num_features = graph_data.x.shape[1]
+    num_agents = graph_data.x.shape[0]
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    graph_data = graph_data.to(device)
+
+    # Node features (assuming balanced features per dimension)
+    feature_names = [
+        "Perf_Norm", "Perf_Raw",
+        "Coop_Welfare", "Coop_SelfWelfare",
+        "Exploit_Score", "Exploit_RawRegret",
+        "Adapt_Consistency", "Adapt_PerfSpread"
+    ]
+    # Ensure feature_names matches the actual number of features
+    if len(feature_names) != num_features:
+         feature_names = [f"Feature_{i}" for i in range(num_features)]
+
+
+    total_importance_scores = np.zeros(num_features)
+
+    # Create dummy labels (needed for loss calculation, use actual labels if available)
+    # Here, we assume a binary classification task based on some criteria
+    # If you have actual labels, use them instead.
+    dummy_labels = torch.randint(0, 2, (num_agents, 1), dtype=torch.float, device=device)
+
+
+    print("Analyzing feature importance across ensemble...")
+    for model in tqdm(models, desc="Feature Importance", leave=False):
+        model.to(device)
+        model.eval()
+
+        # 1. Calculate baseline loss/score
+        with torch.no_grad():
+            baseline_scores, _, _ = model(graph_data.x, graph_data.edge_index, graph_data.edge_attr)
+            # Using loss as the metric - lower is better. Change in loss indicates importance.
+            baseline_loss = criterion(baseline_scores, dummy_labels).item()
+            # Alternatively, use prediction accuracy or another metric if classification labels are reliable
+
+        model_importance = np.zeros(num_features)
+        for i in range(num_features):
+            original_feature = graph_data.x[:, i].clone()
+            permuted_indices = torch.randperm(num_agents, device=device)
+            graph_data.x[:, i] = graph_data.x[permuted_indices, i] # Permute feature i
+
+            with torch.no_grad():
+                permuted_scores, _, _ = model(graph_data.x, graph_data.edge_index, graph_data.edge_attr)
+                permuted_loss = criterion(permuted_scores, dummy_labels).item()
+
+            # Importance = increase in loss after permutation
+            model_importance[i] = permuted_loss - baseline_loss
+
+            # Restore original feature
+            graph_data.x[:, i] = original_feature
+
+        total_importance_scores += model_importance
+        model.cpu() # Move back to CPU
+
+    # Average importance over models
+    avg_importance_scores = total_importance_scores / num_models
+
+    # Create dictionary of feature importance
+    feature_importance = {
+        feature_names[i]: avg_importance_scores[i]
+        for i in range(len(feature_names))
+    }
+
+    return feature_importance
+
+
 
 def analyze_expert_contributions(results_by_style):
     """Analyze which experts contribute most to each reasoning style"""
@@ -753,99 +851,132 @@ def analyze_expert_contributions(results_by_style):
     
     return expert_weights_by_style
 
-def visualize_results(evaluation_results, expert_weights_by_style, expert_names):
-    """Create visualizations of the results"""
+def visualize_results(evaluation_results, expert_weights_by_style, feature_importance=None):
+    """Create visualizations of the ensemble results"""
     print("Creating performance comparison chart...")
     # 1. Performance comparison by reasoning style
     plt.figure(figsize=(10, 6))
     styles = list(evaluation_results["avg_performance"].keys())
     performances = [evaluation_results["avg_performance"][style] for style in styles]
     plt.bar(styles, performances)
-    plt.ylabel("Average Performance")
-    plt.title(f"Performance by Reasoning Style (Improvement: {evaluation_results['improvement_pct']:.1f}%)")
-    
+    plt.ylabel("Average Performance (Ensemble)")
+    plt.title(f"Ensemble Performance by Reasoning Style (Improvement: {evaluation_results['improvement_pct']:.1f}%)")
+
     for i, v in enumerate(performances):
-        plt.text(i, v + 5, f"{v:.1f}", ha='center')
-    
-    plt.savefig("performance_by_reasoning_style.png", dpi=300, bbox_inches='tight')
+        # Adjust text position if necessary
+        plt.text(i, v + (max(performances) * 0.02), f"{v:.1f}", ha='center')
+
+    plt.ylim(0, max(performances) * 1.1) # Adjust y-axis limit
+    plt.savefig("ensemble_performance_by_reasoning_style.png", dpi=300, bbox_inches='tight')
     plt.close()
-    
+
     print("Creating expert contribution chart...")
     # 2. Expert contribution by reasoning style
-    plt.figure(figsize=(12, 6))
-    
-    expert_names = list(expert_weights_by_style[styles[0]].keys())
+    plt.figure(figsize=(12, 7)) # Adjusted size
+    expert_names = list(expert_weights_by_style[styles[0]].keys()) if styles else []
+    if not expert_names:
+        print("Warning: No expert names found for visualization.")
+        return
+
     x = np.arange(len(expert_names))
     width = 0.35
-    
+
+    bar_container = {}
     for i, style in enumerate(styles):
-        weights = [expert_weights_by_style[style][name] for name in expert_names]
-        plt.bar(x + (i - 0.5) * width, weights, width, label=style)
-    
-    plt.ylabel("Expert Weight")
-    plt.title("Expert Contribution by Reasoning Style")
-    plt.xticks(x, expert_names)
-    plt.legend()
-    
-    plt.savefig("expert_weights_by_reasoning_style.png", dpi=300, bbox_inches='tight')
+        if style in expert_weights_by_style:
+            weights = [expert_weights_by_style[style].get(name, 0) for name in expert_names] # Handle missing experts gracefully
+            offset = (i - (len(styles) - 1) / 2) * width # Center bars
+            bar_container[style] = plt.bar(x + offset, weights, width, label=style)
+            # Add labels to bars
+            plt.bar_label(bar_container[style], fmt='%.2f', padding=3, size=8)
+
+
+    plt.ylabel("Average Expert Weight (Ensemble)")
+    plt.title("Ensemble Expert Contribution by Reasoning Style")
+    plt.xticks(x, expert_names, rotation=45, ha="right") # Rotate labels
+    plt.legend(loc='upper right')
+    plt.ylim(0, max(max(expert_weights_by_style[s].values()) for s in styles if s in expert_weights_by_style) * 1.15) # Adjust y-limit dynamically
+    plt.tight_layout() # Adjust layout
+    plt.savefig("ensemble_expert_weights_by_reasoning_style.png", dpi=300, bbox_inches='tight')
     plt.close()
-    
+
     print("Creating strategic dimensions chart...")
-    # 3. Strategic dimensions by agent
-    # Create a more detailed analysis of different strategic dimensions
+    # 3. Strategic dimensions by agent (using averaged expert scores)
     results = evaluation_results["results_by_style"]
-    
-    # Flatten data for easier plotting
-    all_agents = []
-    all_styles = []
-    all_scores = {expert: [] for expert in expert_names}
-    
+    all_agents, all_styles, all_scores = [], [], {expert: [] for expert in expert_names}
+    all_combined_scores = []
+
     for style, data in results.items():
         for i, agent in enumerate(data["agents"]):
             all_agents.append(agent)
             all_styles.append(style)
+            all_combined_scores.append(data["combined_scores"][i])
             for j, expert in enumerate(expert_names):
-                all_scores[expert].append(data["expert_scores"][i][j])
-    
-    # Sort agents by combined score
-    combined_scores = []
-    for style, data in results.items():
-        for score in data["combined_scores"]:
-            combined_scores.append(score)
-    
-    sorted_indices = np.argsort(combined_scores)[::-1]
-    
-    sorted_agents = [all_agents[i] for i in sorted_indices]
-    sorted_styles = [all_styles[i] for i in sorted_indices]
-    sorted_expert_scores = {
-        expert: [all_scores[expert][i] for i in sorted_indices]
-        for expert in expert_names
-    }
-    
-    # Plot strategic dimensions by agent
-    plt.figure(figsize=(14, 8))
-    
-    x = np.arange(len(sorted_agents))
-    width = 0.2
-    offsets = np.linspace(-0.3, 0.3, len(expert_names))
-    
-    for i, expert in enumerate(expert_names):
-        plt.bar(x + offsets[i], sorted_expert_scores[expert], width, label=expert)
-    
-    plt.ylabel("Strategic Dimension Score")
-    plt.title("Strategic Dimensions by Agent")
-    plt.xticks(x, sorted_agents, rotation=90)
-    
-    # Color the agent names by reasoning style
-    for i, style in enumerate(sorted_styles):
-        color = 'red' if style == 'reasoning' else 'blue'
-        plt.gca().get_xticklabels()[i].set_color(color)
-    
-    plt.legend()
-    plt.tight_layout()
-    
-    plt.savefig("strategic_dimensions_by_agent.png", dpi=300, bbox_inches='tight')
-    plt.close()
+                 # Ensure index j is valid for expert_scores[i]
+                if j < len(data["expert_scores"][i]):
+                    all_scores[expert].append(data["expert_scores"][i][j])
+                else:
+                    all_scores[expert].append(0) # Default value if missing
+
+
+    # Sort agents by averaged combined score
+    if all_combined_scores:
+        sorted_indices = np.argsort(all_combined_scores)[::-1]
+        sorted_agents = [all_agents[i] for i in sorted_indices]
+        sorted_styles = [all_styles[i] for i in sorted_indices]
+        sorted_expert_scores = {
+            expert: [all_scores[expert][i] for i in sorted_indices]
+            for expert in expert_names
+        }
+
+        plt.figure(figsize=(max(14, len(sorted_agents)*0.5), 8)) # Dynamic width
+        x = np.arange(len(sorted_agents))
+        num_experts = len(expert_names)
+        width = 0.8 / num_experts # Adjust width based on number of experts
+        offsets = np.linspace(-width * (num_experts - 1) / 2, width * (num_experts - 1) / 2, num_experts)
+
+
+        for i, expert in enumerate(expert_names):
+             if expert in sorted_expert_scores: # Check if expert scores exist
+                 plt.bar(x + offsets[i], sorted_expert_scores[expert], width, label=expert)
+
+        plt.ylabel("Average Strategic Dimension Score (Ensemble)")
+        plt.title("Ensemble Strategic Dimensions by Agent (Sorted by Combined Score)")
+        plt.xticks(x, sorted_agents, rotation=90, fontsize=8) # Adjust font size
+
+        # Color the agent names by reasoning style
+        ax = plt.gca()
+        for i, style in enumerate(sorted_styles):
+            color = 'red' if style == 'reasoning' else 'blue'
+            ax.get_xticklabels()[i].set_color(color)
+
+        plt.legend(loc='upper right')
+        plt.tight_layout()
+        plt.savefig("ensemble_strategic_dimensions_by_agent.png", dpi=300, bbox_inches='tight')
+        plt.close()
+    else:
+        print("Warning: Cannot create strategic dimensions chart, no combined scores found.")
+
+
+    # 4. Plot Feature Importance (if available)
+    if feature_importance:
+        print("Creating feature importance chart...")
+        plt.figure(figsize=(10, 6))
+        features = list(feature_importance.keys())
+        importances = list(feature_importance.values())
+
+        # Sort by importance
+        sorted_indices = np.argsort(importances)[::-1]
+        sorted_features = [features[i] for i in sorted_indices]
+        sorted_importances = [importances[i] for i in sorted_indices]
+
+        plt.bar(sorted_features, sorted_importances)
+        plt.ylabel("Average Importance Score (Ensemble)")
+        plt.title("Ensemble Feature Importance (Permutation Method)")
+        plt.xticks(rotation=45, ha="right")
+        plt.tight_layout()
+        plt.savefig("ensemble_feature_importance.png", dpi=300, bbox_inches='tight')
+        plt.close()
 
 def load_or_create_bootstrap_results(performance_matrix):
     """Create simplified bootstrap results if there's an issue with the bootstrap analysis"""
@@ -853,7 +984,7 @@ def load_or_create_bootstrap_results(performance_matrix):
         # Try to run the regular bootstrap analysis
         bootstrap_results, bootstrap_stats, _, ne_strategy_df = run_nash_analysis(
             performance_matrix,
-            num_bootstrap_samples=100,
+            num_bootstrap_samples=1000,
             confidence_level=0.95
         )
         return bootstrap_results, bootstrap_stats, ne_strategy_df
@@ -872,7 +1003,6 @@ def load_or_create_bootstrap_results(performance_matrix):
         })
         bootstrap_stats.set_index('Agent', inplace=True)
         
-        # Create simplified bootstrap results dictionary
         bootstrap_results = {
             'ne_regret': [[0.01] * len(agents)] * 10,  # 10 bootstrap samples with dummy values
             'ne_strategy': [np.ones(len(agents)) / len(agents)] * 10,  # Uniform strategy
@@ -1050,11 +1180,11 @@ def print_diagnostic_info(graph_data, ne_regret_matrix, reasoning_styles, moe_mo
     
     print("\n" + "="*60 + "\n")
 
-def main():
-    """Main function to run the analysis"""
+def main(num_ensemble=5, num_epochs=100, lr=0.001):
+    """Main function to run the ensemble analysis"""
     start_time = time.time()
-    print("Starting strategic adaptability analysis using Mixture of Experts GNN")
-    
+    print(f"Starting strategic adaptability analysis using Ensemble of {num_ensemble} MoE GNNs")
+
     # Create a top-level progress bar for tracking overall progress
     main_steps = ["Data Processing", "Matrix Creation", "Welfare Matrices", "Matrix Cleaning", 
                   "Nash Analysis", "Agent Classification", "Graph Building", "Model Training", 
@@ -1164,65 +1294,105 @@ def main():
     # Add diagnostic output before model training
     print_diagnostic_info(graph_data, bootstrap_stats, reasoning_styles, None)
     
-    # Train MoE model
-    print("\nTraining Mixture of Experts model...")
+    # --- Ensemble Training ---
+    print(f"\nTraining Ensemble of {num_ensemble} Mixture of Experts models...")
     train_start = time.time()
-    moe_model = train_moe_model(
-        graph_data,
-        reasoning_styles,
-        num_epochs=500,
-        lr=1e-6
-    )
-    print(f"MoE model training completed in {timedelta(seconds=int(time.time() - train_start))}")
-    main_progress.update(1)  # Update main progress
-    
-    # Add diagnostic output after model training
-    print_diagnostic_info(graph_data, bootstrap_stats, reasoning_styles, moe_model)
-    
-    # Evaluate strategic adaptability
-    print("\nEvaluating strategic adaptability...")
+    trained_models = []
+    num_nodes = graph_data.x.shape[0]
+
+    # Create a fixed train/val split to use for all models in the ensemble
+    indices = np.arange(num_nodes)
+    np.random.shuffle(indices)
+    train_split_idx = int(0.8 * num_nodes)
+    train_idx = indices[:train_split_idx]
+    val_idx = indices[train_split_idx:]
+
+
+    for i in range(num_ensemble):
+        print(f"\n--- Training Model {i+1}/{num_ensemble} ---")
+        model = train_moe_model(
+            graph_data,
+            reasoning_styles,
+            num_epochs=num_epochs, # Use parameter
+            lr=lr, # Use parameter
+            train_idx=train_idx, # Pass fixed split
+            val_idx=val_idx      # Pass fixed split
+        )
+        trained_models.append(model)
+
+    print(f"\nEnsemble model training completed in {timedelta(seconds=int(time.time() - train_start))}")
+    # main_progress.update(1) # Update progress tracking if used
+
+    # --- Ensemble Evaluation ---
+    print("\nEvaluating strategic adaptability using the ensemble...")
     eval_start = time.time()
-    evaluation_results = evaluate_strategic_adaptability(
-        moe_model,
+    # Use the correct performance data source (handle potential cleaning mismatches)
+    # performance_data = performance_matrices['overall_agent_performance'] # Original
+    # Corrected: use cleaned matrix and map original names if needed
+    cleaned_perf_matrix = cleaned_matrices['performance_matrix']
+    # Create a dict mapping cleaned names to average performance
+    performance_data_cleaned = {
+         agent: cleaned_perf_matrix.loc[agent, :].mean()
+         for agent in cleaned_perf_matrix.index
+     }
+
+
+    evaluation_results = evaluate_ensemble_strategic_adaptability( # Call new function
+        trained_models,
         graph_data,
         reasoning_styles,
-        performance_matrices['overall_agent_performance']
+        performance_data_cleaned # Use cleaned performance data
     )
-    print(f"Strategic adaptability evaluation completed in {timedelta(seconds=int(time.time() - eval_start))}")
-    main_progress.update(1)  # Update main progress
-    
-    # Analyze expert contributions
+    print(f"Ensemble strategic adaptability evaluation completed in {timedelta(seconds=int(time.time() - eval_start))}")
+    # main_progress.update(1)
+
+    # --- Ensemble Analysis ---
+    # Analyze expert contributions using ensemble results
     expert_weights_by_style = analyze_expert_contributions(
         evaluation_results["results_by_style"]
     )
-    
-    # Print results
-    print("\nResults:")
+
+    # Analyze feature importance using the ensemble
+    # Need a criterion instance for the importance function
+    criterion = nn.BCEWithLogitsLoss()
+    ensemble_feature_importance = analyze_ensemble_feature_importance(
+        trained_models, graph_data, criterion
+    )
+
+
+    # --- Print Results ---
+    print("\nEnsemble Results:")
     print(f"Average performance by reasoning style:")
     for style, avg_perf in evaluation_results["avg_performance"].items():
         print(f"  {style}: {avg_perf:.2f}")
-    
+
     print(f"Performance improvement: {evaluation_results['improvement_pct']:.2f}%")
-    print(f"Hypothesis confirmed: {evaluation_results['hypothesis_confirmed']}")
-    
-    print("\nExpert contributions by reasoning style:")
+    # print(f"Hypothesis confirmed: {evaluation_results['hypothesis_confirmed']}") # Optional
+
+    print("\nAverage Expert contributions by reasoning style (Ensemble):")
     for style, weights in expert_weights_by_style.items():
         print(f"  {style}:")
-        for expert, weight in weights.items():
-            print(f"    {expert}: {weight:.2f}")
-    
-    # Visualize results
-    print("\nCreating visualizations...")
+        for expert, weight in sorted(weights.items(), key=lambda item: item[1], reverse=True): # Sort by weight
+            print(f"    {expert}: {weight:.3f}")
+
+    print("\nAverage Feature Importance (Ensemble):")
+    for feature, importance in sorted(ensemble_feature_importance.items(), key=lambda item: item[1], reverse=True):
+        print(f"  {feature}: {importance:.4f}")
+
+    # --- Visualize Results ---
+    print("\nCreating ensemble visualizations...")
     viz_start = time.time()
-    expert_names = ["Exploitability", "Cooperativeness", "Adaptability", "Performance"]
-    visualize_results(evaluation_results, expert_weights_by_style, expert_names)
+    visualize_results(evaluation_results, expert_weights_by_style, ensemble_feature_importance) # Pass feature importance
     print(f"Visualizations created in {timedelta(seconds=int(time.time() - viz_start))}")
-    main_progress.update(1)  # Update main progress
-    
-    # Report total time
-    main_progress.close()
+    # main_progress.update(1)
+
+
+    # --- Final ---
+    # main_progress.close() # If using progress bar
     total_time = time.time() - start_time
-    print(f"\nStrategic adaptability analysis complete! Total time: {timedelta(seconds=int(total_time))}")
+    print(f"\nEnsemble strategic adaptability analysis complete! Total time: {timedelta(seconds=int(total_time))}")
+
 
 if __name__ == "__main__":
-    main() 
+    # Example: Run with an ensemble of 5 models
+    main(num_ensemble=5, num_epochs=150, lr=1e-4) # Adjust params as needed
