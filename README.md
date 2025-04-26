@@ -62,7 +62,7 @@ The framework utilizes both handcrafted statistical features (e.g., exploitabili
 ├── simple_gnn_ensemble*.png # Output figures from GNN analysis
 ├── solutions.py            # Solutions or equilibrium computation code
 ├── strategic_adaptability_gnn.py # GNN model for strategic adaptability
-├── strategic_adaptability_moe.py # Mixture-of-Experts model (?)
+├── strategic_adaptability_moe.py # Mixture-of-Experts models experiments & training
 ├── strategic_adaptability_README.md # Specific README for strategic adaptability
 ├── test_game_eval.ipynb    # Notebook for testing game evaluation
 ├── test_game_eval.py       # Script for testing game evaluation
@@ -93,7 +93,7 @@ The framework utilizes both handcrafted statistical features (e.g., exploitabili
 The core logic for running experiments and analyses can likely be found in:
 
 *   `game_runner.py`: To simulate games between specified agents.
-*   `strategic_adaptability_gnn.py` / `strategic_adaptability_moe.py`: To train and evaluate the GNN models.
+*   `strategic_adaptability_gnn.py` / `strategic_adaptability_moe.py`: To train and evaluate the GNN models. This contains the ensemble and MOE methods.
 *   `results.ipynb`: For reproducing analysis and figures from the paper.
 *   `experiment_scripts/`: Contains specific scripts used for the paper's experiments.
 
